@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "/pb";
+
+// Preparation
+
+message Constraints {
+  uint64 max_content_size = 1;
+  uint64 chunk_size = 2;
+  uint64 max_cache_duration = 3;
+  repeated string accepted_content_types = 5;
+}
+
+// <-
+message Hello {
+  string base_url = 1;
+  string client_id = 2;
+  bytes connection_secret = 3;
+  Constraints constraints = 4;
+}
+
+// Requests
+
+// <-
+message Request {
+  uint64 id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  string path = 3;
+  string query = 4;
+}
+
+// Responses
+
+// ->
+message EmptyResponse {
+  uint64 request_id = 1;
+}
+
+// ->
+message ContentHeader {
+  uint64 request_id = 1;
+  string content_type = 2;
+  uint64 content_size = 3;
+  optional uint32 max_cache_duration = 4;
+  optional string filename = 5;
+}
+
+// ->
+message ContentChunk {
+  uint64 request_id = 1;
+  uint64 sequence = 2;
+  bytes data = 3;
+}
+
+// Events
+
+// <-
+message Success {
+  uint64 request_id = 1;
+}
+
+// <-
+message RequestClosed {
+  uint64 request_id = 1;
+}
+
+// ->
+message CloseResponse {
+  uint64 request_id = 1;
+}
+
+// Error handling
+
+// <-
+// Close message, which is sent right before the server closes the session.
+message Close {
+  enum Reason {
+    REASON_UNSPECIFIED = 0;
+    REASON_CLOSED = 1;
+    REASON_ERROR = 2;
+    REASON_INVALID_CLIENT_MESSAGE = 3;
+    REASON_INVALID_REQUEST_ID = 4;
+    REASON_FORBIDDEN_CONTENT_TYPE = 5;
+    REASON_INVALID_CONTENT_SIZE = 6;
+    REASON_CONTENT_CHUNK_OUT_OF_SEQUENCE = 7;
+    REASON_INVALID_CHUNK_SIZE = 8;
+    REASON_INVALID_FILENAME = 9;
+    REASON_TIMED_OUT = 10;
+  }
+
+  Reason reason = 1;
+  string message = 2;
+}
+
+// Message encapsulation
+
+// ->
+message ClientMessage {
+  oneof data {
+    EmptyResponse empty_response = 1;
+    ContentHeader content_header = 2;
+    ContentChunk content_chunk = 3;
+    CloseResponse close_response = 4;
+  }
+}
+
+// <-
+message ServerMessage {
+  oneof data {
+    Hello hello = 1;
+    Request request = 2;
+    Success success = 3;
+    RequestClosed request_closed = 4;
+    Close close = 5;
+  }
+}
