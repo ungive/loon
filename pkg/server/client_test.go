@@ -14,10 +14,10 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
-	"github.com/ungive/loon/server/pb"
 	"google.golang.org/protobuf/proto"
 
-	. "github.com/ungive/loon/server"
+	"github.com/ungive/loon/pkg/pb"
+	. "github.com/ungive/loon/pkg/server"
 )
 
 const (

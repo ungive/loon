@@ -3,4 +3,4 @@
 all:
 
 proto:
-	protoc -I=. --go_out=server ./protocol/messages.proto
+	protoc -I=. --go_out=pkg ./api/messages.proto

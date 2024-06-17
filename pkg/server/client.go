@@ -14,9 +14,10 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/ungive/loon/server/pb"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/ungive/loon/pkg/pb"
 )
 
 const (

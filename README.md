@@ -54,17 +54,17 @@ You then send the image data back through that connection,
 which is then sent to the server.
 
 The protocol is described in full detail in
-**[protocol/specification.md](./protocol/specification.md)**.
+**[api/specification.md](./api/specification.md)**.
 
 For instructions on how to use each of the following solutions,
 read the [**Usage**](#usage) section below.
 
 A reference **server implementation** is provided in `Golang`.
-The source code can be found in the [`server`](./server) directory.
+The source code can be found in the [`pkg/server`](./pkg/server) directory.
 It has the following features:
 
 - A well-tested server protocol implementation
-  (89.7% test coverage for [`client.go`](./server/client.go) so far)
+  (89.7% test coverage for [`client.go`](./pkg/server/client.go) so far)
   - **`TODO`** *add tests for the entire server
     and add automated test coverage README badge*
 - A ready-to-use Docker image and docker-compose file
@@ -74,7 +74,7 @@ It has the following features:
 The source code can be found in the [`clients/cpp`](./clients/cpp) directory.
 
 **`TODO`** A reference **client implementation** in `Go`
-may be provided in the future in the [`client`](./client) directory.
+may be provided in the future in the [`pkg/client`](./pkg/client) directory.
 
 More client implementations may follow,
 namely a JavaScript implementation for the server (Node)
