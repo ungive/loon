@@ -423,6 +423,7 @@ type Response interface {
   // Returns the content header for this response.
   Header() ContentHeader
   // Returns the channel that supplies the sender's chunks.
+  // The returned channel is never closed.
   Chunks() chan []byte
   // Returns a channel that is closed,
   // when the response has been closed by the connected client
