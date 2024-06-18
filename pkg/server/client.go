@@ -11,6 +11,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -329,6 +330,7 @@ type clientImpl struct {
 	secret      []byte
 	constraints *pb.Constraints
 	intervals   *ProtocolIntervals
+	dirty       atomic.Bool
 
 	conn *websocket.Conn
 	recv chan *pb.ClientMessage
@@ -378,6 +380,7 @@ func NewClient(
 		secret:         secret[:],
 		constraints:    constraints,
 		intervals:      intervals,
+		dirty:          atomic.Bool{},
 		conn:           conn,
 		recv:           make(chan *pb.ClientMessage, 256),
 		send:           make(chan *pb.ServerMessage, 256),
@@ -406,6 +409,10 @@ func NewClient(
 }
 
 func (c *clientImpl) Run() {
+	if !c.dirty.CompareAndSwap(false, true) {
+		// A client's run loop may only be called once.
+		panic("client is in a dirty state")
+	}
 	var wg sync.WaitGroup
 	wg.Add(3)
 	go func() { c.writePump(); wg.Done() }()
@@ -638,6 +645,8 @@ func (c *clientImpl) protocol() {
 				request.getResponse().cancel()
 			}
 		}
+		// Clear some memory of possibly big objects.
+		c.requests = nil
 	}()
 	for {
 		select {
