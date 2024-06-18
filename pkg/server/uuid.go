@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -40,8 +41,12 @@ func ParseUUID(s string) (UUID, error) {
 	if !ok {
 		return UUID{}, fmt.Errorf("failed to parse base62: %q", s)
 	}
+	bytes := i.Bytes()
+	if len(bytes) != size {
+		return UUID{}, errors.New("the parsed string is not a valid UUID")
+	}
 	var id UUID
-	copy(id[:], i.Bytes())
+	copy(id[:], bytes)
 	return id, nil
 }
 
