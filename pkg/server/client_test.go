@@ -550,7 +550,7 @@ func Test_server_sends_RequestClosed_when_Request_Success_is_not_called_within_t
 		ContentType: testContentType,
 		ContentSize: uint64(16),
 	})
-	time.Sleep(2 * server.intervals.TimeoutDuration)
+	time.Sleep(server.intervals.TimeoutDuration)
 	conn.readRequestClosed()
 }
 
