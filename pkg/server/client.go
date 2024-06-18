@@ -51,6 +51,8 @@ type Client interface {
 	// Closes the connection and exits the Run loop,
 	// if it isn't already closed.
 	Close()
+	// Returns a channel that is closed once the Run loop has fully terminated.
+	Closed() <-chan struct{}
 }
 
 type Request interface {
@@ -335,11 +337,12 @@ type clientImpl struct {
 	intervals   *ProtocolIntervals
 	dirty       atomic.Bool
 
-	conn *websocket.Conn
-	recv chan *pb.ClientMessage
-	send chan *pb.ServerMessage
-	stop chan *pb.Close
-	done chan struct{}
+	conn    *websocket.Conn
+	recv    chan *pb.ClientMessage
+	send    chan *pb.ServerMessage
+	stop    chan *pb.Close
+	done    chan struct{}
+	runDone chan struct{}
 
 	requests      map[uint64]*internalRequest
 	countRequests chan chan int
@@ -389,6 +392,7 @@ func NewClient(
 		send:           make(chan *pb.ServerMessage, 256),
 		stop:           make(chan *pb.Close),
 		done:           make(chan struct{}),
+		runDone:        make(chan struct{}),
 		requests:       make(map[uint64]*internalRequest),
 		countRequests:  make(chan chan int),
 		nextRequest:    0,
@@ -422,6 +426,7 @@ func (c *clientImpl) Run() {
 	go func() { c.readPump(); wg.Done() }()
 	go func() { c.protocol(); wg.Done() }()
 	wg.Wait()
+	close(c.runDone)
 }
 
 func (c *clientImpl) ID() UUID {
@@ -467,6 +472,10 @@ func (c *clientImpl) ActiveRequests() (int, error) {
 
 func (c *clientImpl) Close() {
 	c.close(pb.Close_REASON_CLOSED, "Connection was closed by the server")
+}
+
+func (c *clientImpl) Closed() <-chan struct{} {
+	return c.runDone
 }
 
 func (c *clientImpl) computeMac(path string, query string) ([]byte, error) {

@@ -1019,6 +1019,7 @@ func Test_Client_Run_terminates_after_calling_Client_Close(t *testing.T) {
 	client.Close()
 	conn.readClose()
 	client.waitForExit()
+	waitForChanClose(t, client.Closed(), nil)
 }
 
 func Test_Client_Close_does_nothing_when_Client_is_already_closed(t *testing.T) {
@@ -1036,8 +1037,8 @@ func Test_Client_Close_does_nothing_when_Client_is_already_closed(t *testing.T) 
 // Same as waitFor(), but expects the channel to get closed.
 func waitForChanClose[T interface{}](
 	t *testing.T,
-	valueChan chan T,
-	errChan chan error,
+	valueChan <-chan T,
+	errChan <-chan error,
 ) {
 	_, ok := waitForChan(t, valueChan, errChan)
 	assert.False(t, ok, "Expected channel to be closed")
@@ -1047,8 +1048,8 @@ func waitForChanClose[T interface{}](
 // but expects the value to never be nil.
 func waitForChanValue[T interface{}](
 	t *testing.T,
-	valueChan chan T,
-	errChan chan error,
+	valueChan <-chan T,
+	errChan <-chan error,
 ) T {
 	value := waitForNullableChanValue(t, valueChan, errChan)
 	assert.NotNil(t, value, "Expected channel value to not be nil")
@@ -1059,8 +1060,8 @@ func waitForChanValue[T interface{}](
 // and therefore always return a value.
 func waitForNullableChanValue[T interface{}](
 	t *testing.T,
-	valueChan chan T,
-	errChan chan error,
+	valueChan <-chan T,
+	errChan <-chan error,
 ) T {
 	value, ok := waitForChan(t, valueChan, errChan)
 	assert.True(t, ok, "Expected channel to not be closed")
@@ -1075,8 +1076,8 @@ func waitForNullableChanValue[T interface{}](
 // is considered unexpected and an error.
 func waitForChan[T interface{}](
 	t *testing.T,
-	valueChan chan T,
-	errChan chan error,
+	valueChan <-chan T,
+	errChan <-chan error,
 ) (value T, ok bool) {
 	select {
 	case value, ok = <-valueChan:
