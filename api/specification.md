@@ -380,11 +380,15 @@ which encapsulates protocol communication with a websocket client.
 
 ```go
 type Client interface {
+  // Runs the clients internal run loop.
+  Run()
   // Sends a request to the client, with the given path and query.
   // Checks whether the MAC is authentic,
   // with the client's client ID and client secret.
   // Returns a Request instance or an error when an error occurs.
   Request(path string, query string, mac []byte) (Request, error)
+  // Closes the request, if it isn't already clsoed, and exits the run loop.
+  Close()
 }
 
 type Request interface {
@@ -486,6 +490,9 @@ type Response interface {
 - [x] server sends Close when client sends out of sequence ContentChunk
 - [x] server sends Close when client sends ContentChunk with invalid size
 - [x] server sends Close when client sends last ContentChunk with invalid size
+- [x] server sends Close after calling Client Close
+- [x] Client Run terminates after calling Client Close
+- [x] Client Close does nothing when Client is already closed
 
 ### Technical Tests
 

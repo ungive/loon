@@ -48,6 +48,9 @@ type Client interface {
 	// Returns the number of requests that are currently active.
 	// May include opened, closed and incomplete requests.
 	ActiveRequests() (int, error)
+	// Closes the connection and exits the Run loop,
+	// if it isn't already closed.
+	Close()
 }
 
 type Request interface {
@@ -462,6 +465,10 @@ func (c *clientImpl) ActiveRequests() (int, error) {
 	return <-out, nil
 }
 
+func (c *clientImpl) Close() {
+	c.close(pb.Close_REASON_CLOSED, "Connection was closed by the server")
+}
+
 func (c *clientImpl) computeMac(path string, query string) ([]byte, error) {
 	mac := hmac.New(sha256.New, c.secret)
 	items := [][]byte{
@@ -497,6 +504,7 @@ func (c *clientImpl) close(
 		Message: fmt.Sprintf(format, a...),
 	}:
 	case <-c.done:
+		return
 	}
 	// Block until the stop message has been processed
 	// and the client's run loops are all done

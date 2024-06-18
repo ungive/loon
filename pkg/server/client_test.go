@@ -1003,6 +1003,34 @@ func Test_server_sends_Close_when_client_sends_last_ContentChunk_with_invalid_si
 	conn.expectClose(pb.Close_REASON_INVALID_CHUNK_SIZE)
 }
 
+func Test_server_sends_Close_after_calling_Client_Close(t *testing.T) {
+	_, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	client.assertRunning()
+	client.Close()
+	close := conn.readClose()
+	assert.Equal(t, pb.Close_REASON_CLOSED, close.Reason)
+}
+
+func Test_Client_Run_terminates_after_calling_Client_Close(t *testing.T) {
+	_, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	client.assertRunning()
+	client.Close()
+	conn.readClose()
+	client.waitForExit()
+}
+
+func Test_Client_Close_does_nothing_when_Client_is_already_closed(t *testing.T) {
+	_, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	client.assertRunning()
+	client.Close()
+	conn.readClose()
+	client.waitForExit()
+	client.Close()
+}
+
 // ---
 
 // Same as waitFor(), but expects the channel to get closed.
@@ -1384,6 +1412,14 @@ func (c *wrappedClient) request(path string, query string) (Request, error) {
 // when it is expected to stop running.
 func (c *wrappedClient) waitForExit() {
 	waitForChanClose(c.t, c.exited, nil)
+}
+
+func (c *wrappedClient) assertRunning() {
+	select {
+	case <-c.exited:
+		assert.FailNow(c.t, "the client is not running anymore")
+	default:
+	}
 }
 
 func (c *wrappedClient) expectActiveRequests(expected int) {
