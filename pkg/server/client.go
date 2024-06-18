@@ -483,9 +483,9 @@ func (c *clientImpl) computeMac(path string, query string) ([]byte, error) {
 	items := [][]byte{
 		[]byte(c.id.String()),
 		[]byte("/"),
-		[]byte(path),
+		[]byte(strings.TrimPrefix(path, "/")),
 		[]byte("?"),
-		[]byte(query),
+		[]byte(strings.TrimPrefix(query, "?")),
 	}
 	for _, item := range items {
 		n, err := mac.Write(item)

@@ -89,6 +89,8 @@ that are defined in `messages.proto`
 Forwards any GET request as a request for path `<path>`
 and optional query parameters `<query>`
 to the client with the ID `<client_id>`.
+`<path>` must not start with a slash.
+`<query>` must not start with a question mark.
 The `client_id` must be the same value
 as the `client_id` string field in the `Hello` protocol message.
 The `<base_url>` contains protocol, hostname, port and base URL path,
@@ -107,6 +109,8 @@ with a cryptographically secure random number generator
 which is sent by the server to the client
 and stored on the server for the lifetime of the connection
 (see the `Hello` protocol message).
+The question mark (`'?'`) is always part of the hash,
+even if `<query>` is empty.
 
 The hash ensures that the request URL has been created by the client
 and not by an unauthorized third party
@@ -233,7 +237,7 @@ at which this request has been received by the server.
 
 The `path` is the path to identify the resource that is requested.
 It represents the `<path>` in the Endpoints section.
-In contrast to the `<path>` the `path` field always has a leading slash.
+In contrast to the `<path>` there, the `path` field always has a leading slash.
 Path components may be URL encoded.
 
 The `query` contains the query parameters of the request.
