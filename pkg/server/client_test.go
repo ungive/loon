@@ -1372,6 +1372,8 @@ func computeMac(
 	client_secret []byte,
 ) ([]byte, error) {
 	mac := hmac.New(sha256.New, client_secret)
+	path = strings.TrimPrefix(path, "/")
+	query = strings.TrimPrefix(query, "?")
 	message := []byte(client_id + "/" + path + "?" + query)
 	n, err := mac.Write(message)
 	if err != nil {
