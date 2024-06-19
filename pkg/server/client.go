@@ -180,6 +180,7 @@ func (r *internalRequest) Close() {
 	case r.client.triggerClose <- &forwardClose{
 		request: r,
 	}:
+	case <-r.closed:
 	case <-r.client.done:
 	}
 }
