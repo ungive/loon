@@ -444,7 +444,7 @@ func (c *clientImpl) Request(path string, query string, mac []byte) (Request, er
 	if len(query) > 0 {
 		_, err := url.ParseQuery(query)
 		if err != nil {
-			return nil, fmt.Errorf("invalid query string: %w", err)
+			return nil, errors.Join(ErrBadQuery, err)
 		}
 	}
 	path = strings.TrimSpace(strings.TrimLeft(path, "/"))

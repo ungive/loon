@@ -541,7 +541,7 @@ func Test_Client_Request_returns_error_when_query_string_is_malformed(t *testing
 	_, _, client, _, done := getServerConnClientHello(t)
 	defer done()
 	_, err := client.request(testPath, "key;value")
-	assert.NotNil(t, err)
+	assert.ErrorIs(t, err, ErrBadQuery)
 }
 
 func Test_Client_Request_returns_no_error_when_requesting_path_without_leading_slash(t *testing.T) {
