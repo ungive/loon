@@ -76,11 +76,12 @@ type Request interface {
 	// has been successfully forwarded by sending a Success message.
 	// May only be called if all chunks have been received.
 	Success() error
-	// Returns a channel that is closed if the request is closed,
-	// either because Close() was called on this Request,
-	// because the response from the client has timed out
-	// or because the client closed the response prematurely
-	// by sending a CloseResponse message.
+	// Returns a channel that is closed in the following cases:
+	// - when the Client itself has been closed with the Close() method,
+	// - when the Close() method is called on this Request,
+	// - when the client has closed the response with a CloseResponse message,
+	// - when the client times out because it did not respond in time, or
+	// - when the client disconnected.
 	Closed() chan struct{}
 	// Closes the request prematurely, if it hasn't already been completed,
 	// by sendign a RequestClosed message to the client.
@@ -96,11 +97,6 @@ type Response interface {
 	// Returns the channel that supplies the sender's chunks.
 	// The returned channel is never closed.
 	Chunks() chan []byte
-	// Returns a channel that is closed,
-	// when the response has been closed by the connected client
-	// because it sent a CloseResponse message
-	// or when the client disconnected.
-	Closed() chan struct{}
 }
 
 type internalRequest struct {
@@ -264,8 +260,6 @@ type internalResponse struct {
 	header        *pb.ContentHeader
 	chunkSequence uint64
 	chunks        chan []byte
-	canceled      chan struct{}
-	isCancelled   bool
 }
 
 func newResponse(
@@ -277,8 +271,6 @@ func newResponse(
 		header:        header,
 		chunkSequence: 0,
 		chunks:        make(chan []byte, 8),
-		canceled:      make(chan struct{}),
-		isCancelled:   false,
 	}
 }
 
@@ -292,17 +284,6 @@ func (r *internalResponse) Header() *pb.ContentHeader {
 
 func (r *internalResponse) Chunks() chan []byte {
 	return r.chunks
-}
-
-func (r *internalResponse) Closed() chan struct{} {
-	return r.canceled
-}
-
-func (r *internalResponse) cancel() {
-	if !r.isCancelled {
-		r.isCancelled = true
-		close(r.canceled)
-	}
 }
 
 func (r *internalResponse) nextChunkInfo() (sequence uint64, size uint64, last bool) {
@@ -686,13 +667,10 @@ func (c *clientImpl) protocol() {
 	timeoutTicker := time.NewTicker(c.config.Intervals.TimeoutInterval)
 	defer func() {
 		timeoutTicker.Stop()
-		// Close all requests and cancel all respones when the protocol ends.
+		// Close all requests when the protocol ends.
 		for _, request := range c.requests {
 			if !request.isClosed() {
 				request.close()
-			}
-			if request.hasResponse() {
-				request.getResponse().cancel()
 			}
 		}
 		// Clear some memory of possibly big objects.
@@ -725,7 +703,7 @@ func (c *clientImpl) protocol() {
 		case info := <-c.triggerSuccess:
 			c.sendSuccess(info)
 		case info := <-c.triggerClose:
-			c.sendRequestClosed(info)
+			c.closeRequest(info)
 		case <-timeoutTicker.C:
 			c.checkTimeouts()
 		case <-c.done:
@@ -748,12 +726,9 @@ func (c *clientImpl) checkTimeouts() {
 				request.id)
 			return
 		}
-		c.sendRequestClosed(&forwardClose{
+		c.closeRequest(&forwardClose{
 			request: request,
 		})
-		if request.hasResponse() {
-			request.getResponse().cancel()
-		}
 		if !request.isClosed() && request.isCompleted() {
 			c.deleteRequest(request)
 		}
@@ -818,7 +793,7 @@ func (c *clientImpl) sendSuccess(info *forwardSuccess) {
 	info.outErr <- nil
 }
 
-func (c *clientImpl) sendRequestClosed(info *forwardClose) {
+func (c *clientImpl) closeRequest(info *forwardClose) {
 	request, ok := c.requests[info.request.id]
 	if !ok {
 		// This request does not exist.
@@ -863,7 +838,7 @@ func (c *clientImpl) onCloseResponse(info *pb.CloseResponse) {
 			"Must receive a response before closing it [#%d]", request.id)
 		return
 	}
-	request.getResponse().cancel()
+	request.close()
 	// This is the only point at which responses that have content
 	// are deleted from the internal map.
 	c.deleteRequest(request)

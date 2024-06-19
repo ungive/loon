@@ -418,12 +418,12 @@ type Request interface {
   // Must be called if all chunks have been received,
   // otherwise the client panics.
   Success() error
-  // Returns a channel that is closed if the request is closed,
-  // either because Close() was called on this Request instance
-  // and RequestClosed has been sent to the client,
-  // because the response from the client has timed out
-  // when the client did not send a response message in time,
-  // or because the client disconnected.
+  // Returns a channel that is closed in the following cases:
+  // - when the Client itself has been closed with the Close() method,
+  // - when the Close() method is called on this Request,
+  // - when the client has closed the response with a CloseResponse message,
+  // - when the client times out because it did not respond in time, or
+  // - when the client disconnected.
   Closed() chan struct{}
   // Closes the request prematurely, if it hasn't already been completed,
   // by sending a RequestClosed message to the client.
@@ -437,11 +437,6 @@ type Response interface {
   // Returns the channel that supplies the sender's chunks.
   // The returned channel is never closed.
   Chunks() chan []byte
-  // Returns a channel that is closed,
-  // when the response has been closed by the connected client
-  // because it sent a CloseResponse message
-  // or when the client disconnected.
-  Closed() chan struct{}
 }
 ```
 
@@ -459,13 +454,12 @@ type Response interface {
 - [x] Response Chunks chan yields empty chunk when client sends empty ContentHeader
 - [x] Response Chunks chan yields single chunk when client sends ContentChunk
 - [x] Response Chunks chan yields two chunks when client sends two ContentChunks
+- [x] Request Closed channel is closed when calling Client Close
 - [x] Request Closed channel is closed when calling Request Close
+- [x] Request Closed channel is closed when client sends CloseResponse
 - [x] Request Closed channel is closed when client times out 
 - [x] Request Closed channel is closed when client disconnects
-- [x] Response Closed channel is closed when client sends CloseResponse
-- [x] Response Closed channel is closed when client times out after ContentHeader
 - [x] Response chan yields nil when client times out after EmptyResponse
-- [x] Response Closed channel is closed when client disconnects
 - [x] server sends RequestClosed when client times out after ContentHeader
 - [x] server sends Closed when client does not send CloseResponse after server sent RequestClosed
 - [x] server sends Success when calling Request Success after receiving all chunks

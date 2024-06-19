@@ -145,11 +145,7 @@ func Test_Request_Response_chan_yields_Response_when_client_sends_ContentHeader(
 	assert.Equal(t, testContentType, response.Header().ContentType)
 	assert.Equal(t, uint64(0), response.Header().ContentSize)
 	assert.Equal(t, request, response.Request())
-	select {
-	case <-response.Closed():
-		assert.Fail(t, "Response should not be closed")
-	default:
-	}
+	assertNoChanValue(t, request.Closed())
 	client.expectActiveRequests(1)
 }
 
@@ -231,10 +227,24 @@ func Test_Response_Chunks_chan_yields_two_chunks_when_client_sends_two_ContentCh
 	client.expectActiveRequests(1)
 }
 
+// ---------
+
+func Test_Request_Closed_channel_is_closed_when_calling_Client_Close(t *testing.T) {
+	server := newWebsocketServer(t, testAddress)
+	// Make sure the Request.Closed() channel is not closed because of a timeout.
+	server.intervals.TimeoutDuration = time.Minute
+	conn, client, _, done := getConnClientHello(server)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	client.Close()
+	waitForChanClose(t, request.Closed(), nil)
+}
+
 func Test_Request_Closed_channel_is_closed_when_calling_Request_Close(t *testing.T) {
 	server := newWebsocketServer(t, testAddress)
-	// Make sure the Request.Closed() channel is not closed because of a timeout,
-	// but because of the Request.Close() method call.
+	// Make sure the Request.Closed() channel is not closed because of a timeout.
 	server.intervals.TimeoutDuration = time.Minute
 	conn, client, _, done := getConnClientHello(server)
 	defer done()
@@ -247,12 +257,33 @@ func Test_Request_Closed_channel_is_closed_when_calling_Request_Close(t *testing
 	client.expectActiveRequests(1)
 }
 
+func Test_Request_Closed_channel_is_closed_when_client_sends_CloseResponse(t *testing.T) {
+	_, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	conn.writeContentHeader(&pb.ContentHeader{
+		RequestId:   request.ID(),
+		ContentType: testContentType,
+		ContentSize: uint64(16),
+	})
+	conn.writeCloseResponse(&pb.CloseResponse{
+		RequestId: request.ID(),
+	})
+	close := conn.waitCloseErr()
+	waitForChanValue(t, request.Response(), close)
+	waitForChanClose(t, request.Closed(), close)
+	client.expectActiveRequests(0)
+}
+
 func Test_Request_Closed_channel_is_closed_when_client_times_out(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
 	request, err := client.request(testPath, testQuery)
 	assert.NoError(t, err)
 	conn.readRequest()
+	conn.readRequestClosed()
 	waitForChanClose(t, request.Closed(), nil)
 	client.expectActiveRequests(1)
 }
@@ -268,43 +299,6 @@ func Test_Request_Closed_channel_is_closed_when_client_disconnects(t *testing.T)
 	client.waitForExit()
 }
 
-func Test_Response_Closed_channel_is_closed_when_client_sends_CloseResponse(t *testing.T) {
-	_, conn, client, _, done := getServerConnClientHello(t)
-	defer done()
-	request, err := client.request(testPath, testQuery)
-	assert.NoError(t, err)
-	conn.readRequest()
-	conn.writeContentHeader(&pb.ContentHeader{
-		RequestId:   request.ID(),
-		ContentType: testContentType,
-		ContentSize: uint64(16),
-	})
-	conn.writeCloseResponse(&pb.CloseResponse{
-		RequestId: request.ID(),
-	})
-	close := conn.waitCloseErr()
-	response := waitForChanValue(t, request.Response(), close)
-	waitForChanClose(t, response.Closed(), close)
-	client.expectActiveRequests(0)
-}
-
-func Test_Response_Closed_channel_is_closed_when_client_times_out_after_ContentHeader(t *testing.T) {
-	_, conn, client, _, done := getServerConnClientHello(t)
-	defer done()
-	request, err := client.request(testPath, testQuery)
-	assert.NoError(t, err)
-	conn.readRequest()
-	conn.writeContentHeader(&pb.ContentHeader{
-		RequestId:   request.ID(),
-		ContentType: testContentType,
-		ContentSize: uint64(16),
-	})
-	response := waitForChanValue(t, request.Response(), nil)
-	waitForChanClose(t, response.Closed(), nil)
-	conn.readRequestClosed()
-	client.expectActiveRequests(1)
-}
-
 func Test_Response_chan_yields_nil_when_client_times_out_after_EmptyResponse(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
@@ -317,23 +311,6 @@ func Test_Response_chan_yields_nil_when_client_times_out_after_EmptyResponse(t *
 	response := waitForNullableChanValue(t, request.Response(), nil)
 	assert.Nil(t, response)
 	client.expectActiveRequests(0)
-}
-
-func Test_Response_Closed_channel_is_closed_when_client_disconnects(t *testing.T) {
-	_, conn, client, _, done := getServerConnClientHello(t)
-	defer done()
-	request, err := client.request(testPath, testQuery)
-	assert.NoError(t, err)
-	conn.readRequest()
-	conn.writeContentHeader(&pb.ContentHeader{
-		RequestId:   request.ID(),
-		ContentType: testContentType,
-		ContentSize: uint64(16),
-	})
-	conn.close()
-	response := waitForChanValue(t, request.Response(), nil)
-	waitForChanClose(t, response.Closed(), nil)
-	client.waitForExit()
 }
 
 func Test_server_sends_RequestClosed_when_client_times_out_after_ContentHeader(t *testing.T) {
@@ -1109,6 +1086,17 @@ func Test_creating_a_client_fails_when_a_content_type_in_Contraints_is_not_all_l
 }
 
 // ---
+
+func assertNoChanValue[T interface{}](
+	t *testing.T,
+	valueChan <-chan T,
+) {
+	select {
+	case <-valueChan:
+		assert.Fail(t, "Expected channel to not supply a value")
+	default:
+	}
+}
 
 // Same as waitFor(), but expects the channel to get closed.
 func waitForChanClose[T interface{}](
