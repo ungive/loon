@@ -1,5 +1,7 @@
-/_notes
-/todo.txt
+/.vscode
 *.env
 *.exe
 *.out
+
+/_notes
+/todo.txt
