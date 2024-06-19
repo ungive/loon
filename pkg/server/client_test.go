@@ -561,18 +561,25 @@ func Test_Client_Request_returns_error_when_requesting_empty_path(t *testing.T) 
 	assert.ErrorIs(t, err, ErrBadPath)
 }
 
-func Test_Client_Request_returns_error_when_requesting_path_without_leading_slash(t *testing.T) {
+func Test_Client_Request_returns_error_when_query_string_is_malformed(t *testing.T) {
+	_, _, client, _, done := getServerConnClientHello(t)
+	defer done()
+	_, err := client.request(testPath, "key;value")
+	assert.NotNil(t, err)
+}
+
+func Test_Client_Request_returns_no_error_when_requesting_path_without_leading_slash(t *testing.T) {
 	_, _, client, _, done := getServerConnClientHello(t)
 	defer done()
 	_, err := client.request(testFilename, testQuery)
-	assert.ErrorIs(t, err, ErrBadPath)
+	assert.NoError(t, err)
 }
 
-func Test_Client_Request_returns_error_when_requesting_query_without_leading_question_mark(t *testing.T) {
+func Test_Client_Request_returns_no_error_when_requesting_query_without_leading_question_mark(t *testing.T) {
 	_, _, client, _, done := getServerConnClientHello(t)
 	defer done()
 	_, err := client.request(testPath, "key=value")
-	assert.ErrorIs(t, err, ErrBadQuery)
+	assert.NoError(t, err)
 }
 
 func Test_Client_Request_returns_error_when_requesting_with_invalid_MAC_hash(t *testing.T) {
@@ -1374,8 +1381,11 @@ func computeMac(
 	mac := hmac.New(sha256.New, client_secret)
 	path = strings.TrimPrefix(path, "/")
 	query = strings.TrimPrefix(query, "?")
-	message := []byte(client_id + "/" + path + "?" + query)
-	n, err := mac.Write(message)
+	message := client_id + "/" + path
+	if len(query) > 0 {
+		message += "?" + query
+	}
+	n, err := mac.Write([]byte(message))
 	if err != nil {
 		return nil, err
 	}

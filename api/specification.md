@@ -74,26 +74,29 @@ they should close the connection and open a new one.
 /ws
 ```
 
-Clients can connect to this endpoint
+Clients connect to this endpoint
 to open a websocket connection with the server.
-Messages must be binary messages
+Websocket messages must be binary messages
 encoded with the Protobuf encoding of those messages
-that are defined in `messages.proto`
+that are defined in `messages.proto`.
+Messages from the client must always be encapsulated as `ClientMessage`.
+Message from the server must always be encapsulated as `ServerMessage`.
 
 ### HTTP
 
 ```
-<base_url>/<client_id>/<hash>/<path>[?<query>]
+GET <base_url>/<client_id>/<hash>/<path>[?<query>]
 ```
 
-Forwards any GET request as a request for path `<path>`
-and optional query parameters `<query>`
+A GET request to the above path
+forwards a request for path `<path>` and optional query parameters `<query>`
 to the client with the ID `<client_id>`.
-`<path>` must not start with a slash.
-`<query>` must not start with a question mark.
+`<path>` must not start with a slash
+and `<query>` must not start with a question mark.
 The `client_id` must be the same value
 as the `client_id` string field in the `Hello` protocol message.
-The `<base_url>` contains protocol, hostname, port and base URL path,
+The `<base_url>` contains protocol (HTTP or HTTPS),
+hostname, port and base URL path,
 the exact details are left to the implementation.
 No other HTTP verbs are allowed or forwarded to the client.
 It is required that the hash `<hash>` is a valid cryptographic hash,
@@ -101,25 +104,33 @@ encoded as a hexadecimal string,
 which must have been computed in the following way:
 
 ```
-hash = HMAC-SHA256(client_id || '/' || path || '?' || query, secret)
+hash = HMAC-SHA256(client_id || '/' || path [|| '?' || query], secret)
 ```
 
 The `secret` is random sequence of bytes that has been generated
 with a cryptographically secure random number generator
-which is sent by the server to the client
-and stored on the server for the lifetime of the connection
-(see the `Hello` protocol message).
-The question mark (`'?'`) is always part of the hash,
-even if `<query>` is empty.
+which is sent by the server to the client within the `Hello` message
+and stored on the server for the lifetime of the connection.
+`client_id`, `path` and `query` are taken from the URL above.
+The `path` must not be URL-encoded for the computation of the hash.
+The query must be a valid HTTP query, which is properly URL-encoded.
+Just like in the URL, `path` and `query`
+must not start with either a slash or a question mark respectively.
+If `query` is a string of size 0,
+the question mark preceding it is omitted,
+therefore only computing the hash of `client_id || '/' || path`.
+`||` is the string concatenation operator.
+The HMAC must use the SHA-256 underlying hashing function.
 
-The hash ensures that the request URL has been created by the client
+The computed hash ensures that the request URL has been created by the client
 and not by an unauthorized third party
 and that there is some guarantee that the path exists at the client.
-Any request whose hash does not match is immediately discarded
+Any request whose hash cannot be authenticated on the server side
+is discarded immediately
 and not forwarded to the client through the websocket connection,
 which prevents the client from being spammed with arbitrary requests
 (point 3 under client abuse protection).
-Only requests with a path that contain a valid hash are accepted.
+Only requests with a path that contain a valid hash should be accepted.
 
 ### Caching
 
@@ -467,8 +478,9 @@ type Response interface {
 - [x] server has zero active requests when client timed out after sending last ContentChunk
 - [x] server sends RequestClosed when Request Success is not called within timeout period for completed request
 - [x] Client Request returns error when requesting empty path
-- [x] Client Request returns error when requesting path without leading slash
-- [x] Client Request returns error when requesting query without leading question mark
+- [x] Client Request returns error when query string is malformed
+- [x] Client Request returns no error when requesting path without leading slash
+- [x] Client Request returns no error when requesting query without leading question mark
 - [x] Client Request returns error when requesting with invalid MAC hash
 - [x] server closes connection after sending Close message
 - [x] server sends Close when client sends text websocket message

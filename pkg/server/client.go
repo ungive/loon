@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -429,11 +430,14 @@ func (c *clientImpl) ID() UUID {
 }
 
 func (c *clientImpl) Request(path string, query string, mac []byte) (Request, error) {
-	if len(path) == 0 || !strings.HasPrefix(path, "/") {
+	if len(path) == 0 {
 		return nil, ErrBadPath
 	}
-	if len(query) > 0 && !strings.HasPrefix(query, "?") {
-		return nil, ErrBadQuery
+	if len(query) > 0 {
+		_, err := url.ParseQuery(query)
+		if err != nil {
+			return nil, fmt.Errorf("invalid query string: %w", err)
+		}
 	}
 	computedMac, err := c.computeMac(path, query)
 	if err != nil {
@@ -474,13 +478,17 @@ func (c *clientImpl) Closed() <-chan struct{} {
 }
 
 func (c *clientImpl) computeMac(path string, query string) ([]byte, error) {
+	path = strings.TrimPrefix(path, "/")
+	query = strings.TrimPrefix(query, "?")
 	mac := hmac.New(sha256.New, c.secret)
 	items := [][]byte{
 		[]byte(c.id.String()),
 		[]byte("/"),
-		[]byte(strings.TrimPrefix(path, "/")),
-		[]byte("?"),
-		[]byte(strings.TrimPrefix(query, "?")),
+		[]byte(path),
+	}
+	if len(query) > 0 {
+		items = append(items, []byte("?"))
+		items = append(items, []byte(query))
 	}
 	for _, item := range items {
 		n, err := mac.Write(item)

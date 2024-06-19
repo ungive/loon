@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"log"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -42,8 +43,8 @@ func main() {
 	handler := newHandler(conn, hello)
 	go handler.run()
 
-	log.Printf("Hello: %v", hello)
-	log.Printf("URL: %v", makeUrl(hello, "example.txt", ""))
+	// log.Printf("Hello: %v", hello)
+	log.Printf("URL: %v", makeUrl(hello, "exam ple.txt", "key="+url.QueryEscape("va lue")))
 
 	// Block until the user hits CTRL+C
 	done := make(chan os.Signal, 1)
@@ -103,22 +104,20 @@ func (h *handler) handleRequest(request *pb.Request) {
 }
 
 func makeUrl(hello *pb.Hello, path string, query string) string {
-	path = strings.TrimPrefix(path, "/")
-	query = strings.TrimPrefix(query, "?")
 	mac, err := computeMac(hello.ClientId, hello.ConnectionSecret, path, query)
 	if err != nil {
 		log.Fatalf("failed to compute MAC: %v\n", err)
 	}
 	macEncoded := hex.EncodeToString(mac)
-	url := formatString(urlFormat,
+	result := formatString(urlFormat,
 		"base_url", *addr,
 		"client_id", hello.ClientId,
 		"mac", macEncoded,
-		"path", path)
+		"path", url.PathEscape(path))
 	if len(query) > 0 {
-		url += "?" + query
+		result += "?" + query
 	}
-	return url
+	return result
 }
 
 func dial() *clientConn {
@@ -204,13 +203,17 @@ func computeMac(
 	path string,
 	query string,
 ) ([]byte, error) {
+	path = strings.TrimPrefix(path, "/")
+	query = strings.TrimPrefix(query, "?")
 	mac := hmac.New(sha256.New, clientSecret)
 	items := [][]byte{
 		[]byte(clientId),
 		[]byte("/"),
-		[]byte(strings.TrimPrefix(path, "/")),
-		[]byte("?"),
-		[]byte(strings.TrimPrefix(query, "?")),
+		[]byte(path),
+	}
+	if len(query) > 0 {
+		items = append(items, []byte("?"))
+		items = append(items, []byte(query))
 	}
 	for _, item := range items {
 		n, err := mac.Write(item)
