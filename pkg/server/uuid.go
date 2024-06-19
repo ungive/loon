@@ -2,10 +2,9 @@ package server
 
 import (
 	"crypto/rand"
-	"errors"
+	"encoding/hex"
 	"fmt"
 	"io"
-	"math/big"
 )
 
 const (
@@ -36,25 +35,39 @@ func NewUUID() (UUID, error) {
 }
 
 func ParseUUID(s string) (UUID, error) {
-	var i big.Int
-	_, ok := i.SetString(s, 62)
-	if !ok {
-		return UUID{}, fmt.Errorf("failed to parse base62: %q", s)
-	}
-	bytes := i.Bytes()
-	if len(bytes) != size {
-		return UUID{}, errors.New("the parsed string is not a valid UUID")
+	data, err := hex.DecodeString(s)
+	if err != nil {
+		return UUID{}, err
 	}
 	var id UUID
-	copy(id[:], bytes)
+	copy(id[:], data)
 	return id, nil
 }
 
 func (c UUID) String() string {
-	var i big.Int
-	i.SetBytes(c[:])
-	return i.Text(62)
+	return hex.EncodeToString(c[:])
 }
+
+// func ParseUUID(s string) (UUID, error) {
+// 	var i big.Int
+// 	_, ok := i.SetString(s, 62)
+// 	if !ok {
+// 		return UUID{}, fmt.Errorf("failed to parse base62: %q", s)
+// 	}
+// 	bytes := i.Bytes()
+// 	if len(bytes) != size {
+// 		return UUID{}, errors.New("the parsed string is not a valid UUID")
+// 	}
+// 	var id UUID
+// 	copy(id[:], bytes)
+// 	return id, nil
+// }
+
+// func (c UUID) String() string {
+// 	var i big.Int
+// 	i.SetBytes(c[:])
+// 	return i.Text(62)
+// }
 
 // func ParseUUID(s string) (UUID, error) {
 // 	data, err := base64.URLEncoding.DecodeString(s)
