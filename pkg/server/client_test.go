@@ -1489,7 +1489,11 @@ func (s *websocketServer) getHandler() http.Handler {
 			s.errors <- err
 			return
 		}
-		client, err := NewClient(conn, s.mockAddress, s.constraints, s.intervals)
+		client, err := NewClient(conn, &ClientConfig{
+			BaseUrl:     s.mockAddress,
+			Constraints: s.constraints,
+			Intervals:   s.intervals,
+		})
 		if err != nil {
 			s.errors <- err
 			return

@@ -305,11 +305,11 @@ func (r *internalResponse) cancel() {
 
 func (r *internalResponse) nextChunkInfo() (sequence uint64, size uint64, last bool) {
 	total := r.header.ContentSize
-	received := r.chunkSequence * r.request.client.constraints.ChunkSize
+	received := r.chunkSequence * r.request.client.config.Constraints.ChunkSize
 	if received >= total {
 		panic("already received everything")
 	}
-	size = min(total-received, r.request.client.constraints.ChunkSize)
+	size = min(total-received, r.request.client.config.Constraints.ChunkSize)
 	last = received+size == total
 	sequence = r.chunkSequence
 	r.chunkSequence++
@@ -332,11 +332,10 @@ type forwardClose struct {
 }
 
 type clientImpl struct {
-	id          UUID
-	secret      []byte
-	constraints *pb.Constraints
-	intervals   *ProtocolIntervals
-	dirty       atomic.Bool
+	id     UUID
+	secret []byte
+	config *ClientConfig
+	dirty  atomic.Bool
 
 	conn    *websocket.Conn
 	recv    chan *pb.ClientMessage
@@ -354,25 +353,21 @@ type clientImpl struct {
 	triggerClose   chan *forwardClose
 }
 
-type ProtocolIntervals struct {
-	// The duration after which a message should be written.
-	WriteWait time.Duration
-	// The duration after which a pong message is expected.
-	PongWait time.Duration
-	// The interval for websocket ping messages.
-	PingInterval time.Duration
-	// The duration after which a message is considered timed out.
-	TimeoutDuration time.Duration
-	// The interval at which message timeouts are checked.
-	TimeoutInterval time.Duration
+type ClientConfig struct {
+	BaseUrl     string
+	Constraints *pb.Constraints
+	Intervals   *ProtocolIntervals
 }
 
-func NewClient(
-	conn *websocket.Conn,
-	baseUrl string,
-	constraints *pb.Constraints,
-	intervals *ProtocolIntervals,
-) (Client, error) {
+func (c *ClientConfig) Clone() *ClientConfig {
+	return &ClientConfig{
+		BaseUrl:     c.BaseUrl,
+		Constraints: proto.Clone(c.Constraints).(*pb.Constraints),
+		Intervals:   c.Intervals,
+	}
+}
+
+func NewClient(conn *websocket.Conn, config *ClientConfig) (Client, error) {
 	id, err := NewUUID()
 	if err != nil {
 		return nil, err
@@ -385,8 +380,7 @@ func NewClient(
 	client := &clientImpl{
 		id:             id,
 		secret:         secret[:],
-		constraints:    constraints,
-		intervals:      intervals,
+		config:         config.Clone(),
 		dirty:          atomic.Bool{},
 		conn:           conn,
 		recv:           make(chan *pb.ClientMessage, 256),
@@ -406,10 +400,10 @@ func NewClient(
 	client.send <- &pb.ServerMessage{
 		Data: &pb.ServerMessage_Hello{
 			Hello: &pb.Hello{
-				Constraints:      client.constraints,
+				Constraints:      client.config.Constraints,
 				ClientId:         client.id.String(),
 				ConnectionSecret: client.secret,
-				BaseUrl:          strings.TrimSuffix(baseUrl, "/"),
+				BaseUrl:          strings.TrimSuffix(config.BaseUrl, "/"),
 			},
 		},
 	}
@@ -534,10 +528,10 @@ func (c *clientImpl) exit() {
 // Pumps incoming messages from the websocket connection to the recv channel.
 func (c *clientImpl) readPump() {
 	// Chunks are the largest messages, so make sure a message can fit one.
-	c.conn.SetReadLimit(max(512, 2*int64(c.constraints.ChunkSize)))
-	c.conn.SetReadDeadline(time.Now().Add(c.intervals.PongWait))
+	c.conn.SetReadLimit(max(512, 2*int64(c.config.Constraints.ChunkSize)))
+	c.conn.SetReadDeadline(time.Now().Add(c.config.Intervals.PongWait))
 	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(c.intervals.PongWait))
+		c.conn.SetReadDeadline(time.Now().Add(c.config.Intervals.PongWait))
 		return nil
 	})
 	// Always call c.close() before returning from the loop,
@@ -595,7 +589,7 @@ func (c *clientImpl) write(message *pb.ServerMessage) error {
 		log.Printf("Failed to marshal message: %v", err)
 		return err
 	}
-	err = c.conn.SetWriteDeadline(time.Now().Add(c.intervals.WriteWait))
+	err = c.conn.SetWriteDeadline(time.Now().Add(c.config.Intervals.WriteWait))
 	if err != nil {
 		return err
 	}
@@ -606,7 +600,7 @@ func (c *clientImpl) write(message *pb.ServerMessage) error {
 // Pumps outgoing messages from the send and close channel to the connection.
 // NOTE: Only call once, since close(c.done) would cause a panic otherwise.
 func (c *clientImpl) writePump() {
-	ticker := time.NewTicker(c.intervals.PingInterval)
+	ticker := time.NewTicker(c.config.Intervals.PingInterval)
 	done := c.done
 	defer func() {
 		if done != nil {
@@ -637,7 +631,8 @@ func (c *clientImpl) writePump() {
 				return
 			}
 		case <-ticker.C:
-			err := c.conn.SetWriteDeadline(time.Now().Add(c.intervals.WriteWait))
+			err := c.conn.SetWriteDeadline(
+				time.Now().Add(c.config.Intervals.WriteWait))
 			if err != nil {
 				return
 			}
@@ -651,7 +646,7 @@ func (c *clientImpl) writePump() {
 
 // Executes the run loop for handling all protocol messages.
 func (c *clientImpl) protocol() {
-	timeoutTicker := time.NewTicker(c.intervals.TimeoutInterval)
+	timeoutTicker := time.NewTicker(c.config.Intervals.TimeoutInterval)
 	defer func() {
 		timeoutTicker.Stop()
 		// Close all requests and cancel all respones when the protocol ends.
@@ -705,7 +700,7 @@ func (c *clientImpl) protocol() {
 func (c *clientImpl) checkTimeouts() {
 	now := time.Now()
 	for _, request := range c.requests {
-		if now.Sub(request.lastUpdated) < c.intervals.TimeoutDuration {
+		if now.Sub(request.lastUpdated) < c.config.Intervals.TimeoutDuration {
 			continue
 		}
 		if request.isClosed() {
@@ -876,7 +871,7 @@ func (c *clientImpl) onContentHeader(header *pb.ContentHeader) {
 			request.id)
 		return
 	}
-	if header.ContentSize > c.constraints.MaxContentSize {
+	if header.ContentSize > c.config.Constraints.MaxContentSize {
 		c.close(pb.Close_REASON_INVALID_CONTENT_SIZE,
 			"Content size exceeds allowed maximum content size [#%d]",
 			request.id)
@@ -891,7 +886,7 @@ func (c *clientImpl) onContentHeader(header *pb.ContentHeader) {
 	// https://www.w3.org/Protocols/rfc1341/4_Content-Type.html
 	content_type := strings.Split(header.ContentType, CONTENT_TYPE_SEP)[0]
 	is_allowed := false
-	for _, allowed := range c.constraints.AcceptedContentTypes {
+	for _, allowed := range c.config.Constraints.AcceptedContentTypes {
 		if content_type == allowed {
 			is_allowed = true
 			break
