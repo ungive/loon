@@ -191,11 +191,11 @@ the connection is ready to be used to exchange further messages.
 
 The server must define the following constraints:
 
-- `max_content_size` -
-  The maximum number of total bytes a client response may contain.
 - `chunk_size` -
   Required size for content chunks in bytes.
   The last chunk may of course be smaller than this (but greater than zero).
+- `max_content_size` -
+  The maximum number of total bytes a client response may contain.
 - `max_cache_duration` -
   The maximum duration in milliseconds
   for which content may be cached on the server.
