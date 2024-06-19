@@ -247,15 +247,16 @@ The `timestamp` contains the time
 at which this request has been received by the server.
 
 The `path` is the path to identify the resource that is requested.
-It represents the `<path>` in the Endpoints section.
-In contrast to the `<path>` there, the `path` field always has a leading slash.
-Path components may be URL encoded.
+It represents the `<path>` in the Endpoints section
+and never starts with a leading slash.
+Path components should never be URL encoded.
 
 The `query` contains the query parameters of the request.
-Non-empty query strings always have a leading `?`,
-query parameters are separated by `&` symbols
+The query string never has a leading slash..
+Query parameters are separated by `&` symbols
 and keys and values are separated by `=` symbols.
-Keys or values may be URL-encoded.
+Values may be URL-encoded and should be decoded by the connected client,
+if they are needed.
 
 ### Response
 
@@ -481,6 +482,8 @@ type Response interface {
 - [x] Client Request returns error when query string is malformed
 - [x] Client Request returns no error when requesting path without leading slash
 - [x] Client Request returns no error when requesting query without leading question mark
+- [x] server sends Request without leading slash in path when calling Client Request with it
+- [x] server sends Request without leading question mark in query when calling Client Request with it
 - [x] Client Request returns error when requesting with invalid MAC hash
 - [x] server closes connection after sending Close message
 - [x] server sends Close when client sends text websocket message

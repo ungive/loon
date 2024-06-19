@@ -23,9 +23,8 @@ import (
 const (
 	testTimeout     = 250 * time.Millisecond
 	testContentType = "text/plain"
-	testFilename    = "example.txt"
-	testPath        = "/" + testFilename
-	testQuery       = "?key=value"
+	testPath        = "example.txt"
+	testQuery       = "key=value"
 	testAddress     = "http://example.com"
 )
 
@@ -571,7 +570,7 @@ func Test_Client_Request_returns_error_when_query_string_is_malformed(t *testing
 func Test_Client_Request_returns_no_error_when_requesting_path_without_leading_slash(t *testing.T) {
 	_, _, client, _, done := getServerConnClientHello(t)
 	defer done()
-	_, err := client.request(testFilename, testQuery)
+	_, err := client.request(testPath, testQuery)
 	assert.NoError(t, err)
 }
 
@@ -580,6 +579,26 @@ func Test_Client_Request_returns_no_error_when_requesting_query_without_leading_
 	defer done()
 	_, err := client.request(testPath, "key=value")
 	assert.NoError(t, err)
+}
+
+func Test_server_sends_Request_without_leading_slash_in_path_when_calling_Client_Request_with_it(t *testing.T) {
+	_, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	_, err := client.request("/"+testPath, testQuery)
+	assert.NoError(t, err)
+	m := conn.readRequest()
+	assert.Equal(t, strings.TrimLeft(m.Path, "/"), m.Path,
+		"the path in the request must not start with a slash")
+}
+
+func Test_server_sends_Request_without_leading_question_mark_in_query_when_calling_Client_Request_with_it(t *testing.T) {
+	_, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	_, err := client.request(testPath, "?"+testQuery)
+	assert.NoError(t, err)
+	m := conn.readRequest()
+	assert.Equal(t, strings.TrimLeft(m.Query, "?"), m.Query,
+		"the query in the request must not start with a question mark")
 }
 
 func Test_Client_Request_returns_error_when_requesting_with_invalid_MAC_hash(t *testing.T) {

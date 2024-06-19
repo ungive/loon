@@ -466,6 +466,8 @@ func (c *clientImpl) Request(path string, query string, mac []byte) (Request, er
 			return nil, fmt.Errorf("invalid query string: %w", err)
 		}
 	}
+	path = strings.TrimSpace(strings.TrimLeft(path, "/"))
+	query = strings.TrimSpace(strings.TrimLeft(query, "?"))
 	computedMac, err := c.computeMac(path, query)
 	if err != nil {
 		return nil, err
