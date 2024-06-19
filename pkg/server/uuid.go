@@ -3,8 +3,10 @@ package server
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 )
 
 const (
@@ -25,27 +27,37 @@ func assertCryptoRandAvailable() {
 
 type UUID [size]byte
 
+// Creates a new, random UUID.
 func NewUUID() (UUID, error) {
-	var id UUID = UUID{}
-	_, err := io.ReadFull(rand.Reader, id[:])
+	var uuid UUID
+	_, err := io.ReadFull(rand.Reader, uuid[:])
 	if err != nil {
 		return UUID{}, err
 	}
-	return id, nil
+	return uuid, nil
 }
 
+// Parses a UUID from a hex-encoded string.
 func ParseUUID(s string) (UUID, error) {
-	data, err := hex.DecodeString(s)
+	decoded, err := hex.DecodeString(s)
 	if err != nil {
 		return UUID{}, err
 	}
-	var id UUID
-	copy(id[:], data)
-	return id, nil
+	if len(decoded) != size {
+		return UUID{}, errors.New("the encoded string has an invalid length")
+	}
+	var uuid [size]byte
+	copy(uuid[:], decoded)
+	return uuid, nil
 }
 
-func (c UUID) String() string {
-	return hex.EncodeToString(c[:])
+// Returns the UUID as a hex-encoded string.
+func (uuid UUID) String() string {
+	return hex.EncodeToString(uuid[:])
+}
+
+func (uuid UUID) LogValue() slog.Value {
+	return slog.StringValue(uuid.String())
 }
 
 // func ParseUUID(s string) (UUID, error) {
