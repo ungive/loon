@@ -227,7 +227,27 @@ func Test_Response_Chunks_chan_yields_two_chunks_when_client_sends_two_ContentCh
 	client.expectActiveRequests(1)
 }
 
-// ---------
+func Test_Response_Chunks_chan_is_closed_when_all_chunks_have_been_received(t *testing.T) {
+	_, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	conn.writeContentHeader(&pb.ContentHeader{
+		RequestId:   request.ID(),
+		ContentType: testContentType,
+		ContentSize: uint64(1),
+	})
+	conn.writeContentChunk(&pb.ContentChunk{
+		RequestId: request.ID(),
+		Sequence:  0,
+		Data:      []byte("_"),
+	})
+	close := conn.waitCloseErr()
+	response := waitForChanValue(t, request.Response(), close)
+	waitForChanValue(t, response.Chunks(), close)
+	waitForChanClose(t, response.Chunks(), close)
+}
 
 func Test_Request_Closed_channel_is_closed_when_calling_Client_Close(t *testing.T) {
 	server := newWebsocketServer(t, testAddress)

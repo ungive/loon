@@ -434,8 +434,8 @@ type Request interface {
 type Response interface {
   // Returns the content header for this response.
   Header() ContentHeader
-  // Returns the channel that supplies the sender's chunks.
-  // The returned channel is never closed.
+  // The returned channel is closed if and only if
+  // the response has been fully received.
   Chunks() chan []byte
 }
 ```
@@ -454,6 +454,7 @@ type Response interface {
 - [x] Response Chunks chan yields empty chunk when client sends empty ContentHeader
 - [x] Response Chunks chan yields single chunk when client sends ContentChunk
 - [x] Response Chunks chan yields two chunks when client sends two ContentChunks
+- [x] Response Chunks chan is closed when all chunks have been received
 - [x] Request Closed channel is closed when calling Client Close
 - [x] Request Closed channel is closed when calling Request Close
 - [x] Request Closed channel is closed when client sends CloseResponse

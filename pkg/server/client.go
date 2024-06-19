@@ -95,7 +95,8 @@ type Response interface {
 	// Returns the content header for this response.
 	Header() *pb.ContentHeader
 	// Returns the channel that supplies the sender's chunks.
-	// The returned channel is never closed.
+	// The returned channel is closed if and only if
+	// the response has been fully received.
 	Chunks() chan []byte
 }
 
