@@ -2,15 +2,21 @@
 
 ![loon logo](./assets/loon-small.png)
 
-**loon** enables you to host
-a **<ins>lo</ins>cal** file **<ins>on</ins>line** via HTTP,
-for a temporary amount of time,
-without exposing your device to the internet
-or the use of sophisticated tunneling software
-that is doing more than asked
-and without having to start an HTTP server on a local port.
-It uses very little resources,
-which makes it a lightweight alternative to many other solutions.
+**<ins>loon</ins>** allows you to make
+a **<ins>lo</ins>cal** file
+accessible **<ins>on</ins>line**.
+
+The loon client generates one URL per resource,
+which points to an HTTP server,
+which in turn forwards any request back to the loon client
+through a websocket connection.
+It acts like a **tunnel for HTTP traffic**,
+but with a very minimal and lightweight implementation behind it,
+ideal to keep your client small and lean.
+
+## Usage
+
+**`TODO`**
 
 ## The problem
 
