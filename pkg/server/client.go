@@ -505,8 +505,8 @@ func (c *clientImpl) Closed() <-chan struct{} {
 }
 
 func (c *clientImpl) computeMac(path string, query string) ([]byte, error) {
-	path = strings.TrimPrefix(path, "/")
-	query = strings.TrimPrefix(query, "?")
+	path = strings.TrimLeft(path, "/")
+	query = strings.TrimLeft(query, "?")
 	mac := hmac.New(sha256.New, c.secret)
 	items := [][]byte{
 		[]byte(c.id.String()),

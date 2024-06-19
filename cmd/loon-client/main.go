@@ -203,8 +203,8 @@ func computeMac(
 	path string,
 	query string,
 ) ([]byte, error) {
-	path = strings.TrimPrefix(path, "/")
-	query = strings.TrimPrefix(query, "?")
+	path = strings.TrimLeft(path, "/")
+	query = strings.TrimLeft(query, "?")
 	mac := hmac.New(sha256.New, clientSecret)
 	items := [][]byte{
 		[]byte(clientId),
