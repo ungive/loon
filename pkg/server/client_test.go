@@ -876,6 +876,20 @@ func Test_server_sends_Close_when_client_response_content_type_is_not_in_constra
 	conn.expectClose(pb.Close_REASON_FORBIDDEN_CONTENT_TYPE)
 }
 
+func Test_server_does_not_send_Close_when_client_response_content_type_has_parameters(t *testing.T) {
+	_, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	conn.writeContentHeader(&pb.ContentHeader{
+		RequestId:   request.ID(),
+		ContentType: testContentType + "; charset=utf-8",
+		ContentSize: 0,
+	})
+	conn.readRequestClosed()
+}
+
 func Test_server_sends_Close_when_client_sends_ContentChunk_before_ContentHeader(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
@@ -1019,7 +1033,7 @@ func Test_server_sends_Close_after_calling_Client_Close(t *testing.T) {
 	assert.Equal(t, pb.Close_REASON_CLOSED, close.Reason)
 }
 
-func Test_Client_Run_terminates_after_calling_Client_Close(t *testing.T) {
+func Test_Client_terminates_after_calling_Client_Close(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
 	client.assertRunning()
@@ -1037,6 +1051,42 @@ func Test_Client_Close_does_nothing_when_Client_is_already_closed(t *testing.T) 
 	conn.readClose()
 	client.waitForExit()
 	client.Close()
+}
+
+func Test_creating_a_client_fails_when_a_content_type_in_Contraints_has_parameters(t *testing.T) {
+	c := newConstraints()
+	c.AcceptedContentTypes =
+		append(c.AcceptedContentTypes, "text/html; charset=utf-8")
+	_, err := NewClient(nil, &ClientConfig{
+		BaseUrl:     testAddress,
+		Constraints: c,
+		Intervals:   newIntervals(),
+	})
+	assert.NotNil(t, err)
+}
+
+func Test_creating_a_client_fails_when_a_content_type_in_Contraints_contains_spaces(t *testing.T) {
+	c := newConstraints()
+	c.AcceptedContentTypes =
+		append(c.AcceptedContentTypes, " text/html")
+	_, err := NewClient(nil, &ClientConfig{
+		BaseUrl:     testAddress,
+		Constraints: c,
+		Intervals:   newIntervals(),
+	})
+	assert.NotNil(t, err)
+}
+
+func Test_creating_a_client_fails_when_a_content_type_in_Contraints_is_not_all_lowercase(t *testing.T) {
+	c := newConstraints()
+	c.AcceptedContentTypes =
+		append(c.AcceptedContentTypes, "text/HTML")
+	_, err := NewClient(nil, &ClientConfig{
+		BaseUrl:     testAddress,
+		Constraints: c,
+		Intervals:   newIntervals(),
+	})
+	assert.NotNil(t, err)
 }
 
 // ---

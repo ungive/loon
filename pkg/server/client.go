@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
 	"net/url"
 	"strings"
 	"sync"
@@ -333,10 +334,11 @@ type forwardClose struct {
 }
 
 type clientImpl struct {
-	id     UUID
-	secret []byte
-	config *ClientConfig
-	dirty  atomic.Bool
+	id           UUID
+	secret       []byte
+	config       *ClientConfig
+	contentTypes map[string]struct{}
+	dirty        atomic.Bool
 
 	conn    *websocket.Conn
 	recv    chan *pb.ClientMessage
@@ -368,7 +370,28 @@ func (c *ClientConfig) Clone() *ClientConfig {
 	}
 }
 
+func (c *ClientConfig) validate() error {
+	for _, contentType := range c.Constraints.AcceptedContentTypes {
+		sanitized, params, err := mime.ParseMediaType(contentType)
+		if err != nil {
+			return fmt.Errorf("invalid accepted content type: %w", err)
+		}
+		if len(params) > 0 {
+			return errors.New("content type may not contain parameters")
+		}
+		if contentType != sanitized {
+			return errors.New(
+				"content type must be lowercase and contain no spaces")
+		}
+	}
+	return nil
+}
+
 func NewClient(conn *websocket.Conn, config *ClientConfig) (Client, error) {
+	err := config.validate()
+	if err != nil {
+		return nil, err
+	}
 	id, err := NewUUID()
 	if err != nil {
 		return nil, err
@@ -395,6 +418,10 @@ func NewClient(conn *websocket.Conn, config *ClientConfig) (Client, error) {
 		forwardRequest: make(chan *forwardRequest),
 		triggerSuccess: make(chan *forwardSuccess),
 		triggerClose:   make(chan *forwardClose),
+		contentTypes:   make(map[string]struct{}),
+	}
+	for _, key := range client.config.Constraints.AcceptedContentTypes {
+		client.contentTypes[key] = struct{}{}
 	}
 	// Make sure the first message that we send is a Hello message,
 	// by putting it into the buffer before the caller can call Run().
@@ -893,13 +920,7 @@ func (c *clientImpl) onContentHeader(header *pb.ContentHeader) {
 	// Only look at the type and subtype, not the parameters:
 	// https://www.w3.org/Protocols/rfc1341/4_Content-Type.html
 	content_type := strings.Split(header.ContentType, CONTENT_TYPE_SEP)[0]
-	is_allowed := false
-	for _, allowed := range c.config.Constraints.AcceptedContentTypes {
-		if content_type == allowed {
-			is_allowed = true
-			break
-		}
-	}
+	_, is_allowed := c.contentTypes[content_type]
 	if !is_allowed {
 		c.close(pb.Close_REASON_FORBIDDEN_CONTENT_TYPE,
 			"The given content type is forbidden [#%d]", request.id)

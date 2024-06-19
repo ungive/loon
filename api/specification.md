@@ -501,6 +501,7 @@ type Response interface {
 - [x] server does not send Close when client response filename is non-empty
 - [x] server sends Close when client response filename is empty
 - [x] server sends Close when client response content type is not in constraints
+- [x] server does not send Close when client response content type has parameters
 - [x] server sends Close when client sends ContentChunk before ContentHeader
 - [x] server sends Close when client sends the same ContentChunk twice
 - [x] server sends Close when client sends an additional ContentChunk
@@ -508,8 +509,11 @@ type Response interface {
 - [x] server sends Close when client sends ContentChunk with invalid size
 - [x] server sends Close when client sends last ContentChunk with invalid size
 - [x] server sends Close after calling Client Close
-- [x] Client Run terminates after calling Client Close
+- [x] Client terminates after calling Client Close
 - [x] Client Close does nothing when Client is already closed
+- [x] Creating a client fails when a content type in Contraints has parameters
+- [x] Creating a client fails when a content type in Contraints contains spaces
+- [x] Creating a client fails when a content type in Contraints is not all lowercase
 
 ### Technical Tests
 
