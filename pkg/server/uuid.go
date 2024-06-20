@@ -46,7 +46,7 @@ func ParseUUID(s string) (UUID, error) {
 	if len(decoded) != size {
 		return UUID{}, errors.New("the encoded string has an invalid length")
 	}
-	var uuid [size]byte
+	var uuid UUID
 	copy(uuid[:], decoded)
 	return uuid, nil
 }
@@ -58,6 +58,12 @@ func (uuid UUID) String() string {
 
 func (uuid UUID) LogValue() slog.Value {
 	return slog.StringValue(uuid.String())
+}
+
+func (uuid UUID) Clone() UUID {
+	var result UUID
+	copy(result[:], uuid[:])
+	return result
 }
 
 // func ParseUUID(s string) (UUID, error) {
