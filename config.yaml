@@ -1,6 +1,6 @@
 constraints:
   chunk_size: 65536 # 64 KiB
-  max_content_size: 8388608 # 8 MiB
+  max_content_size: 67108864 # 64 MiB
   accepted_content_types:
     - text/html
     - image/png
