@@ -317,22 +317,22 @@ type forwardClose struct {
 }
 
 type clientImpl struct {
-	id           UUID
-	secret       []byte
-	config       *ClientConfig
-	contentTypes map[string]struct{}
+	id           UUID                // ownership: read-only
+	secret       []byte              // ownership: read-only
+	config       *ClientConfig       // ownership: read-only
+	contentTypes map[string]struct{} // ownership: protocol()
 	dirty        atomic.Bool
 
-	conn    *websocket.Conn
+	conn    *websocket.Conn // ownership: read: readPump() write: writePump()
 	recv    chan *pb.ClientMessage
 	send    chan *pb.ServerMessage
 	stop    chan *pb.Close
 	done    chan struct{}
 	runDone chan struct{}
 
-	requests      map[uint64]*internalRequest
+	requests      map[uint64]*internalRequest // ownership: protocol()
 	countRequests chan chan int
-	nextRequest   uint64
+	nextRequest   uint64 // ownership: protocol()
 
 	forwardRequest chan *forwardRequest
 	triggerSuccess chan *forwardSuccess
