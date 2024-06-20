@@ -565,17 +565,19 @@ func Test_Client_Request_returns_error_when_query_string_is_malformed(t *testing
 }
 
 func Test_Client_Request_returns_no_error_when_requesting_path_without_leading_slash(t *testing.T) {
-	_, _, client, _, done := getServerConnClientHello(t)
+	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
 	_, err := client.request(testPath, testQuery)
 	assert.NoError(t, err)
+	conn.readRequest()
 }
 
 func Test_Client_Request_returns_no_error_when_requesting_query_without_leading_question_mark(t *testing.T) {
-	_, _, client, _, done := getServerConnClientHello(t)
+	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
 	_, err := client.request(testPath, "key=value")
 	assert.NoError(t, err)
+	conn.readRequest()
 }
 
 func Test_server_sends_Request_without_leading_slash_in_path_when_calling_Client_Request_with_it(t *testing.T) {
