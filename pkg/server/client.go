@@ -33,7 +33,9 @@ var (
 	ErrBadPath             = errors.New("the path is malformed")
 	ErrBadQuery            = errors.New("the query is malformed")
 	ErrBadMac              = errors.New("the MAC hash is invalid")
+	ErrRequestDeleted      = errors.New("the request does not exist")
 	ErrRequestClosed       = errors.New("the request is closed")
+	ErrRequestCompleted    = errors.New("the request is already completed")
 	ErrRequestNotCompleted = errors.New("the request is not completed yet")
 )
 
@@ -50,8 +52,7 @@ type Client interface {
 	// Returns the number of requests that are currently active.
 	// May include opened, closed and incomplete requests.
 	ActiveRequests() (int, error)
-	// Closes the connection and exits the Run loop,
-	// if it isn't already closed.
+	// Closes the client, if it isn't already closed, and exits the run loop.
 	Close()
 	// Returns a channel that is closed once the Run loop has fully terminated.
 	Closed() <-chan struct{}
@@ -75,7 +76,14 @@ type Request interface {
 	// Indicate to the client that the request's response
 	// has been successfully forwarded by sending a Success message.
 	// May only be called if all chunks have been received.
+	// Deletes the request internally.
 	Success() error
+	// Returns a channel that is closed once the request has been completed,
+	// i.e. all chunks have been received by the websocket client.
+	// Some chunks may still be buffer though
+	// and should be read from the Response object,
+	// before calling Success().
+	Completed() <-chan struct{}
 	// Returns a channel that is closed in the following cases:
 	// - when the Client itself has been closed with the Close() method,
 	// - when the Close() method is called on this Request,
@@ -83,10 +91,10 @@ type Request interface {
 	// - when the client times out because it did not respond in time, or
 	// - when the client disconnected.
 	Closed() <-chan struct{}
-	// Closes the request prematurely, if it hasn't already been completed,
-	// by sendign a RequestClosed message to the client.
-	// Does nothing if the request has already been closed.
-	Close()
+	// Closes the request prematurely by sending a RequestClosed message
+	// to the websocket peer. Returns an error if the client is closed
+	// or if the request has already been completed or closed.
+	Close() error
 }
 
 type Response interface {
@@ -100,6 +108,12 @@ type Response interface {
 	Chunks() <-chan []byte
 }
 
+// Note that objects of this type are owned by the protocol() run loop,
+// but instances of it are passed to outside callers.
+// Public methods must therefore be thread-safe,
+// since they could be called from multiple goroutines.
+// Internal methods do not need to be thread-safe,
+// as calls to them are synchronized within the protocol() method.
 type internalRequest struct {
 	client *clientImpl
 	id     uint64
@@ -111,7 +125,7 @@ type internalRequest struct {
 	responseProvided bool
 
 	lastUpdated time.Time
-	completed   bool
+	completed   chan struct{}
 	closed      chan struct{}
 }
 
@@ -135,7 +149,7 @@ func newRequest(
 		response:         nil,
 		responseProvided: false,
 		lastUpdated:      time.Now(),
-		completed:        false,
+		completed:        make(chan struct{}),
 		closed:           make(chan struct{}),
 	}
 }
@@ -160,30 +174,55 @@ func (r *internalRequest) Response() <-chan Response {
 }
 
 func (r *internalRequest) Success() error {
+	if chanClosed(r.client.done) {
+		return ErrClientClosed
+	}
+	if chanClosed(r.closed) {
+		return ErrRequestClosed
+	}
 	outErr := make(chan error)
 	select {
 	case r.client.triggerSuccess <- &forwardSuccess{
 		request: r,
 		outErr:  outErr,
 	}:
+	case <-r.closed:
+		return ErrRequestClosed
 	case <-r.client.done:
-		outErr <- ErrClientClosed
+		return ErrClientClosed
 	}
 	return <-outErr
+}
+
+func (r *internalRequest) Completed() <-chan struct{} {
+	return r.completed
 }
 
 func (r *internalRequest) Closed() <-chan struct{} {
 	return r.closed
 }
 
-func (r *internalRequest) Close() {
+func (r *internalRequest) Close() error {
+	if chanClosed(r.closed) || chanClosed(r.client.done) {
+		return nil
+	}
+	if chanClosed(r.completed) {
+		return ErrRequestCompleted
+	}
+	outErr := make(chan error)
 	select {
 	case r.client.triggerClose <- &forwardClose{
 		request: r,
+		outErr:  outErr,
 	}:
+	case <-r.completed:
+		return ErrRequestCompleted
 	case <-r.closed:
+		return nil
 	case <-r.client.done:
+		return nil
 	}
+	return <-outErr
 }
 
 // Reset the internal timeout timestamp.
@@ -220,15 +259,26 @@ func (r *internalRequest) getResponse() *internalResponse {
 	return r.response
 }
 
-// Marks this request as closed.
+// Marks this request as closed, if it isn't already
 func (r *internalRequest) close() {
-	if r.completed {
+	if r.isCompleted() {
 		return
 	}
 	if r.isClosed() {
-		panic("the request has already been closed")
+		return
 	}
 	close(r.closed)
+}
+
+// Marks this request as completed.
+func (r *internalRequest) complete() {
+	if r.isCompleted() {
+		panic("the request has already been completed")
+	}
+	if r.isClosed() {
+		panic("cannot complete a closed request")
+	}
+	close(r.completed)
 }
 
 // Checks if this request has been marked as closed with close().
@@ -241,20 +291,14 @@ func (r *internalRequest) isClosed() bool {
 	}
 }
 
-// Marks this request as completed.
-func (r *internalRequest) complete() {
-	if r.completed {
-		panic("the request has already been completed")
-	}
-	if r.isClosed() {
-		panic("cannot complete a closed request")
-	}
-	r.completed = true
-}
-
 // Checks if this request has been marked as completed with complete().
 func (r *internalRequest) isCompleted() bool {
-	return r.completed
+	select {
+	case <-r.completed:
+		return true
+	default:
+		return false
+	}
 }
 
 type internalResponse struct {
@@ -302,9 +346,10 @@ func (r *internalResponse) nextChunkInfo() (sequence uint64, size uint64, last b
 }
 
 type forwardRequest struct {
-	path  string
-	query string
-	out   chan Request
+	path   string
+	query  string
+	out    chan Request
+	outErr chan error
 }
 
 type forwardSuccess struct {
@@ -314,10 +359,12 @@ type forwardSuccess struct {
 
 type forwardClose struct {
 	request *internalRequest
+	outErr  chan error
 }
 
 type clientImpl struct {
 	id           UUID                // ownership: read-only
+	idStr        string              // ownership: read-only
 	secret       []byte              // ownership: read-only
 	config       *ClientConfig       // ownership: read-only
 	contentTypes map[string]struct{} // ownership: protocol()
@@ -386,6 +433,7 @@ func NewClient(conn *websocket.Conn, config *ClientConfig) (Client, error) {
 	}
 	client := &clientImpl{
 		id:             id,
+		idStr:          id.String(),
 		secret:         secret[:],
 		config:         config.Clone(),
 		dirty:          atomic.Bool{},
@@ -412,7 +460,7 @@ func NewClient(conn *websocket.Conn, config *ClientConfig) (Client, error) {
 		Data: &pb.ServerMessage_Hello{
 			Hello: &pb.Hello{
 				Constraints:      client.config.Constraints,
-				ClientId:         client.id.String(),
+				ClientId:         client.idStr,
 				ConnectionSecret: client.secret,
 				BaseUrl:          strings.TrimSuffix(config.BaseUrl, "/"),
 			},
@@ -436,7 +484,7 @@ func (c *clientImpl) Run() {
 }
 
 func (c *clientImpl) ID() UUID {
-	return c.id
+	return c.id.Clone()
 }
 
 func (c *clientImpl) Request(path string, query string, mac []byte) (Request, error) {
@@ -459,16 +507,23 @@ func (c *clientImpl) Request(path string, query string, mac []byte) (Request, er
 		return nil, ErrBadMac
 	}
 	out := make(chan Request)
+	outErr := make(chan error)
 	select {
 	case c.forwardRequest <- &forwardRequest{
-		path:  path,
-		query: query,
-		out:   out,
+		path:   path,
+		query:  query,
+		out:    out,
+		outErr: outErr,
 	}:
 	case <-c.done:
 		return nil, ErrClientClosed
 	}
-	return <-out, nil
+	select {
+	case request := <-out:
+		return request, nil
+	case err = <-outErr:
+		return nil, err
+	}
 }
 
 func (c *clientImpl) ActiveRequests() (int, error) {
@@ -494,7 +549,7 @@ func (c *clientImpl) computeMac(path string, query string) ([]byte, error) {
 	query = strings.TrimLeft(query, "?")
 	mac := hmac.New(sha256.New, c.secret)
 	items := [][]byte{
-		[]byte(c.id.String()),
+		[]byte(c.idStr),
 		[]byte("/"),
 		[]byte(path),
 	}
@@ -671,9 +726,7 @@ func (c *clientImpl) protocol() {
 		timeoutTicker.Stop()
 		// Close all requests when the protocol ends.
 		for _, request := range c.requests {
-			if !request.isClosed() {
-				request.close()
-			}
+			request.close()
 		}
 		// Clear some memory of possibly big objects.
 		c.requests = nil
@@ -699,13 +752,18 @@ func (c *clientImpl) protocol() {
 				panic("unknown client message type")
 			}
 		case info := <-c.forwardRequest:
-			c.sendRequest(info)
+			request, err := c.sendRequest(info.path, info.query)
+			if err != nil {
+				info.outErr <- err
+			} else {
+				info.out <- request
+			}
+		case info := <-c.triggerSuccess:
+			info.outErr <- c.sendSuccess(info.request)
+		case info := <-c.triggerClose:
+			info.outErr <- c.closeRequest(info.request)
 		case out := <-c.countRequests:
 			out <- len(c.requests)
-		case info := <-c.triggerSuccess:
-			c.sendSuccess(info)
-		case info := <-c.triggerClose:
-			c.closeRequest(info)
 		case <-timeoutTicker.C:
 			c.checkTimeouts()
 		case <-c.done:
@@ -728,23 +786,33 @@ func (c *clientImpl) checkTimeouts() {
 				request.id)
 			return
 		}
-		c.closeRequest(&forwardClose{
-			request: request,
-		})
-		if !request.isClosed() && request.isCompleted() {
+		if request.isCompleted() {
+			// The request is completed, but it has not been deleted yet,
+			// which it would have, if a Success message had been sent.
+			// In that case we just delete it silently.
 			c.deleteRequest(request)
+			continue
 		}
+		// Ignore any error, just make sure it's closed.
+		_ = c.closeRequest(request)
 	}
 }
 
-func (c *clientImpl) sendMessage(message *pb.ServerMessage) {
+// Sends a message to the connected websocket client.
+// Returns false if the client has been closed.
+func (c *clientImpl) sendMessage(message *pb.ServerMessage) bool {
 	select {
 	case c.send <- message:
+		return true
 	case <-c.done:
+		return false
 	}
 }
 
-func (c *clientImpl) sendRequest(info *forwardRequest) {
+func (c *clientImpl) sendRequest(
+	path string,
+	query string,
+) (*internalRequest, error) {
 	var id uint64
 	for {
 		id = c.nextRequestID()
@@ -752,66 +820,71 @@ func (c *clientImpl) sendRequest(info *forwardRequest) {
 			break
 		}
 	}
-	request := newRequest(c, id, info.path, info.query)
+	request := newRequest(c, id, path, query)
 	c.requests[id] = request
-	info.out <- request
-	c.sendMessage(&pb.ServerMessage{
+	ok := c.sendMessage(&pb.ServerMessage{
 		Data: &pb.ServerMessage_Request{
 			Request: &pb.Request{
 				Id:        id,
-				Path:      info.path,
-				Query:     info.query,
+				Path:      path,
+				Query:     query,
 				Timestamp: timestamppb.Now(),
 			},
 		},
 	})
+	if ok {
+		return request, nil
+	} else {
+		return nil, ErrClientClosed
+	}
 }
 
-func (c *clientImpl) sendSuccess(info *forwardSuccess) {
-	request, ok := c.requests[info.request.id]
+func (c *clientImpl) sendSuccess(request *internalRequest) error {
+	request, ok := c.requests[request.id]
 	if !ok {
-		// This request does not exist.
-		info.outErr <- ErrRequestClosed
-		return
+		return ErrRequestDeleted
 	}
 	if request.isClosed() {
-		// Cannot send a success message for a closed request.
-		info.outErr <- ErrRequestClosed
-		return
+		return ErrRequestClosed
 	}
 	if !request.isCompleted() {
-		// The request must be completed before sending a success message.
-		info.outErr <- ErrRequestNotCompleted
-		return
+		return ErrRequestNotCompleted
 	}
-	c.sendMessage(&pb.ServerMessage{
+	ok = c.sendMessage(&pb.ServerMessage{
 		Data: &pb.ServerMessage_Success{
 			Success: &pb.Success{
 				RequestId: request.id,
 			},
 		},
 	})
+	if !ok {
+		return ErrClientClosed
+	}
 	c.deleteRequest(request)
-	info.outErr <- nil
+	return nil
 }
 
-func (c *clientImpl) closeRequest(info *forwardClose) {
-	request, ok := c.requests[info.request.id]
+func (c *clientImpl) closeRequest(request *internalRequest) error {
+	request, ok := c.requests[request.id]
 	if !ok {
-		// This request does not exist.
-		return
+		return ErrRequestDeleted
 	}
 	if request.isClosed() {
-		// Request is already closed.
-		return
+		return nil
 	}
-	c.sendMessage(&pb.ServerMessage{
+	if request.isCompleted() {
+		return ErrRequestCompleted
+	}
+	ok = c.sendMessage(&pb.ServerMessage{
 		Data: &pb.ServerMessage_RequestClosed{
 			RequestClosed: &pb.RequestClosed{
 				RequestId: request.id,
 			},
 		},
 	})
+	if !ok {
+		return ErrClientClosed
+	}
 	// Reset the timeout and mark the request as closed.
 	// This will make sure the timeout is not reset anymore after this
 	// and since we are not deleting the request from the internal map,
@@ -821,6 +894,7 @@ func (c *clientImpl) closeRequest(info *forwardClose) {
 	// before it has to answer with a CloseResponse message.
 	request.resetTimeout()
 	request.close()
+	return nil
 }
 
 func (c *clientImpl) onCloseResponse(info *pb.CloseResponse) {
@@ -830,19 +904,17 @@ func (c *clientImpl) onCloseResponse(info *pb.CloseResponse) {
 			"Closed response for unknown request ID %d", info.RequestId)
 		return
 	}
-	if request.completed {
-		c.close(pb.Close_REASON_INVALID_CLIENT_MESSAGE,
-			"Cannot close a response that is already completed [#%d]", request.id)
-		return
-	}
 	if !request.hasResponse() {
 		c.close(pb.Close_REASON_INVALID_CLIENT_MESSAGE,
 			"Must receive a response before closing it [#%d]", request.id)
 		return
 	}
+	if request.isCompleted() {
+		c.close(pb.Close_REASON_INVALID_CLIENT_MESSAGE,
+			"Cannot close a response that is already completed [#%d]", request.id)
+		return
+	}
 	request.close()
-	// This is the only point at which responses that have content
-	// are deleted from the internal map.
 	c.deleteRequest(request)
 }
 
@@ -967,6 +1039,12 @@ func (c *clientImpl) onContentChunk(chunk *pb.ContentChunk) {
 	}
 }
 
+// Marks the request as completed and closes the response's chunk channel,
+// in case a response was sent. Panics if the request is already completed.
+// Should only be called if:
+// the client sent an EmptyResponse, or
+// the client sent a ContentHeader with content length 0, or
+// the client sent the last ContentChunk.
 func (c *clientImpl) completeRequest(request *internalRequest) {
 	if request.isCompleted() {
 		panic("request already completed")
@@ -978,6 +1056,12 @@ func (c *clientImpl) completeRequest(request *internalRequest) {
 	}
 }
 
+// Deletes the request from the internal map.
+// Should only be called if:
+// the request is completed and the Success message has been sent, or
+// the request is completed and the request has timed out, or
+// the request is not completed and the client closed the response, or
+// the client sent an EmptyResponse.
 func (c *clientImpl) deleteRequest(request *internalRequest) {
 	delete(c.requests, request.id)
 }
@@ -985,4 +1069,13 @@ func (c *clientImpl) deleteRequest(request *internalRequest) {
 func (c *clientImpl) nextRequestID() uint64 {
 	c.nextRequest++
 	return c.nextRequest
+}
+
+func chanClosed[T interface{}](c <-chan T) bool {
+	select {
+	case <-c:
+		return true
+	default:
+		return false
+	}
 }

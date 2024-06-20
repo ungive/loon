@@ -22,6 +22,7 @@ import (
 
 const (
 	testTimeout     = 250 * time.Millisecond
+	testAfterWait   = 10 * time.Millisecond
 	testContentType = "text/plain"
 	testPath        = "example.txt"
 	testQuery       = "key=value"
@@ -112,6 +113,7 @@ func Test_server_sends_RequestClosed_when_calling_Request_Close(t *testing.T) {
 	m1 := conn.readRequest()
 	m2 := conn.readRequestClosed()
 	assert.Equal(t, m1.Id, m2.RequestId)
+	assertNoChanValue(t, request.Completed())
 	client.expectActiveRequests(1)
 }
 
@@ -124,8 +126,11 @@ func Test_Request_Response_chan_yields_nil_when_client_sends_EmptyResponse(t *te
 	conn.writeEmptyResponse(&pb.EmptyResponse{
 		RequestId: request.ID(),
 	})
-	response := waitForNullableChanValue(t, request.Response(), conn.waitCloseErr())
+	close := conn.waitCloseErr()
+	response := waitForNullableChanValue(t, request.Response(), close)
 	assert.Nil(t, response)
+	waitForChanClose(t, request.Completed(), close)
+	assertNoChanValue(t, request.Closed())
 	client.expectActiveRequests(0)
 }
 
@@ -140,11 +145,13 @@ func Test_Request_Response_chan_yields_Response_when_client_sends_ContentHeader(
 		ContentType: testContentType,
 		ContentSize: 0,
 	})
-	response := waitForChanValue(t, request.Response(), conn.waitCloseErr())
+	close := conn.waitCloseErr()
+	response := waitForChanValue(t, request.Response(), close)
 	assert.Equal(t, request.ID(), response.Header().RequestId)
 	assert.Equal(t, testContentType, response.Header().ContentType)
 	assert.Equal(t, uint64(0), response.Header().ContentSize)
 	assert.Equal(t, request, response.Request())
+	waitForChanClose(t, request.Completed(), close)
 	assertNoChanValue(t, request.Closed())
 	client.expectActiveRequests(1)
 }
@@ -164,6 +171,8 @@ func Test_Response_Chunks_chan_yields_empty_chunk_when_client_sends_empty_Conten
 	response := waitForChanValue(t, request.Response(), close)
 	chunk := waitForChanValue(t, response.Chunks(), close)
 	assert.Equal(t, 0, len(chunk))
+	waitForChanClose(t, request.Completed(), close)
+	assertNoChanValue(t, request.Closed())
 	client.expectActiveRequests(1)
 }
 
@@ -179,16 +188,19 @@ func Test_Response_Chunks_chan_yields_single_chunk_when_client_sends_ContentChun
 		ContentType: testContentType,
 		ContentSize: uint64(len(payload)),
 	})
+	close := conn.waitCloseErr()
+	response := waitForChanValue(t, request.Response(), close)
+	assertNoChanValue(t, request.Completed())
 	conn.writeContentChunk(&pb.ContentChunk{
 		RequestId: request.ID(),
 		Sequence:  0,
 		Data:      []byte(payload),
 	})
-	close := conn.waitCloseErr()
-	response := waitForChanValue(t, request.Response(), close)
+	waitForChanClose(t, request.Completed(), close)
 	chunk := waitForChanValue(t, response.Chunks(), close)
 	assert.Equal(t, len(payload), len(chunk))
 	waitForChanClose(t, response.Chunks(), close)
+	assertNoChanValue(t, request.Closed())
 	client.expectActiveRequests(1)
 }
 
@@ -260,6 +272,7 @@ func Test_Request_Closed_channel_is_closed_when_calling_Client_Close(t *testing.
 	conn.readRequest()
 	client.Close()
 	waitForChanClose(t, request.Closed(), nil)
+	conn.readClose()
 }
 
 func Test_Request_Closed_channel_is_closed_when_calling_Request_Close(t *testing.T) {
@@ -330,6 +343,8 @@ func Test_Response_chan_yields_nil_when_client_times_out_after_EmptyResponse(t *
 	})
 	response := waitForNullableChanValue(t, request.Response(), nil)
 	assert.Nil(t, response)
+	waitForChanClose(t, request.Completed(), nil)
+	assertNoChanValue(t, request.Closed())
 	client.expectActiveRequests(0)
 }
 
@@ -424,7 +439,7 @@ func Test_Request_Success_returns_error_after_receiving_EmptyResponse(t *testing
 	})
 	assert.Nil(t, waitForNullableChanValue(t, request.Response(), nil))
 	err = request.Success()
-	assert.ErrorIs(t, err, ErrRequestClosed)
+	assert.ErrorIs(t, err, ErrRequestDeleted)
 	client.expectActiveRequests(0)
 }
 
@@ -473,13 +488,14 @@ func Test_Request_Success_returns_error_after_request_timed_out(t *testing.T) {
 	conn.writeContentHeader(&pb.ContentHeader{
 		RequestId:   request.ID(),
 		ContentType: testContentType,
-		ContentSize: uint64(0),
+		// The request is only closed after timeout if there are pending chunks.
+		ContentSize: uint64(1),
 	})
 	time.Sleep(1 * server.intervals.TimeoutDuration)
 	conn.readRequestClosed()
 	err = request.Success()
 	assert.ErrorIs(t, err, ErrRequestClosed)
-	client.expectActiveRequests(0)
+	client.expectActiveRequests(1)
 }
 
 func Test_server_has_one_active_request_when_client_timed_out_after_non_empty_ContentHeader(t *testing.T) {
@@ -509,8 +525,7 @@ func Test_server_has_zero_active_requests_when_client_timed_out_after_sending_em
 		ContentType: testContentType,
 		ContentSize: uint64(0),
 	})
-	time.Sleep(server.intervals.TimeoutDuration)
-	conn.readRequestClosed()
+	time.Sleep(2 * server.intervals.TimeoutDuration)
 	client.expectActiveRequests(0)
 }
 
@@ -530,8 +545,7 @@ func Test_server_has_zero_active_requests_when_client_timed_out_after_sending_la
 		Sequence:  0,
 		Data:      []byte("_"),
 	})
-	time.Sleep(server.intervals.TimeoutDuration)
-	conn.readRequestClosed()
+	time.Sleep(2 * server.intervals.TimeoutDuration)
 	client.expectActiveRequests(0)
 }
 
@@ -643,6 +657,25 @@ func Test_server_sends_Close_when_client_sends_badly_encoded_protobuf_message(t 
 	conn.expectClose(pb.Close_REASON_INVALID_CLIENT_MESSAGE)
 }
 
+func Test_server_sends_Close_when_client_sends_CloseResponse_after_response_is_completed(t *testing.T) {
+	server, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	conn.writeContentHeader(&pb.ContentHeader{
+		RequestId:   request.ID(),
+		ContentType: testContentType,
+		ContentSize: uint64(0),
+	})
+	waitForChanClose(t, request.Completed(), nil)
+	time.Sleep(2 * server.intervals.TimeoutDuration)
+	conn.writeCloseResponse(&pb.CloseResponse{
+		RequestId: request.ID(),
+	})
+	conn.expectClose(pb.Close_REASON_INVALID_REQUEST_ID)
+}
+
 func Test_server_sends_Close_when_client_sends_CloseResponse_before_first_response_message(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
@@ -728,6 +761,46 @@ func Test_server_sends_Close_when_client_sends_CloseResponse_with_unknown_reques
 		RequestId: request.ID() + 1, // invalid request ID
 	})
 	conn.expectClose(pb.Close_REASON_INVALID_REQUEST_ID)
+}
+
+func Test_server_sends_Close_when_client_sends_CloseResponse_twice(t *testing.T) {
+	_, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	conn.writeContentHeader(&pb.ContentHeader{
+		RequestId:   request.ID(),
+		ContentType: testContentType,
+		ContentSize: uint64(1),
+	})
+	conn.writeCloseResponse(&pb.CloseResponse{
+		RequestId: request.ID(),
+	})
+	conn.writeCloseResponse(&pb.CloseResponse{
+		RequestId: request.ID(),
+	})
+	conn.expectClose(pb.Close_REASON_INVALID_REQUEST_ID)
+}
+
+func Test_server_does_not_send_close_when_client_sends_CloseResponse_before_receiving_RequestClosed(t *testing.T) {
+	server, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	conn.writeContentHeader(&pb.ContentHeader{
+		RequestId:   request.ID(),
+		ContentType: testContentType,
+		ContentSize: uint64(1),
+	})
+	request.Close()
+	conn.writeCloseResponse(&pb.CloseResponse{
+		RequestId: request.ID(),
+	})
+	conn.readRequestClosed()
+	time.Sleep(2 * server.intervals.TimeoutDuration)
+	client.expectActiveRequests(0)
 }
 
 func Test_server_sends_Close_when_client_sends_EmptyResponse_with_unknown_request_ID(t *testing.T) {
@@ -859,7 +932,7 @@ func Test_server_does_not_send_Close_when_client_response_filename_is_non_empty(
 	conn.writeContentHeader(&pb.ContentHeader{
 		RequestId:   request.ID(),
 		ContentType: testContentType,
-		ContentSize: 0,
+		ContentSize: 1,
 		Filename:    strPtr("_"),
 	})
 	conn.readRequestClosed()
@@ -903,7 +976,7 @@ func Test_server_does_not_send_Close_when_client_response_content_type_has_param
 	conn.writeContentHeader(&pb.ContentHeader{
 		RequestId:   request.ID(),
 		ContentType: testContentType + "; charset=utf-8",
-		ContentSize: 0,
+		ContentSize: 1,
 	})
 	conn.readRequestClosed()
 }
@@ -1107,6 +1180,127 @@ func Test_creating_a_client_fails_when_a_content_type_in_Contraints_is_not_all_l
 	assert.NotNil(t, err)
 }
 
+func Test_server_does_not_send_RequestClosed_when_client_response_is_completed_and_times_out(t *testing.T) {
+	server, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	conn.writeContentHeader(&pb.ContentHeader{
+		RequestId:   request.ID(),
+		ContentType: testContentType,
+		ContentSize: 1,
+	})
+	conn.writeContentChunk(&pb.ContentChunk{
+		RequestId: request.ID(),
+		Sequence:  0,
+		Data:      []byte("_"),
+	})
+	// Wait long enough that a Close message may have been sent.
+	// The deferred done() above will check that there are no more messages.
+	time.Sleep(2 * server.intervals.TimeoutDuration)
+}
+
+func Test_Request_Success_returns_error_after_client_sent_CloseResponse(t *testing.T) {
+	server, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	conn.writeContentHeader(&pb.ContentHeader{
+		RequestId:   request.ID(),
+		ContentType: testContentType,
+		ContentSize: 1,
+	})
+	conn.writeCloseResponse(&pb.CloseResponse{
+		RequestId: request.ID(),
+	})
+	time.Sleep(server.intervals.TimeoutDuration / 2)
+	err = request.Success()
+	assert.ErrorIs(t, err, ErrRequestClosed)
+	client.expectActiveRequests(0)
+}
+
+func Test_Request_Success_returns_error_after_calling_Client_Close(t *testing.T) {
+	server, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	conn.writeContentHeader(&pb.ContentHeader{
+		RequestId:   request.ID(),
+		ContentType: testContentType,
+		ContentSize: 1,
+	})
+	client.Close()
+	time.Sleep(server.intervals.TimeoutDuration / 2)
+	err = request.Success()
+	assert.ErrorIs(t, err, ErrClientClosed)
+	conn.readClose()
+}
+
+func Test_Request_Success_returns_error_when_called_twice(t *testing.T) {
+	_, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	conn.writeContentHeader(&pb.ContentHeader{
+		RequestId:   request.ID(),
+		ContentType: testContentType,
+		ContentSize: 0,
+	})
+	waitForChanValue(t, request.Response(), nil)
+	err = request.Success()
+	assert.NoError(t, err)
+	err = request.Success()
+	assert.ErrorIs(t, err, ErrRequestDeleted)
+	conn.readSuccess()
+}
+
+func Test_Request_Close_returns_no_error_when_called_twice(t *testing.T) {
+	_, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	assert.NoError(t, request.Close())
+	assert.NoError(t, request.Close())
+	conn.readRequestClosed()
+}
+
+func Test_Request_Close_returns_no_error_after_client_sent_CloseResponse(t *testing.T) {
+	_, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	conn.writeCloseResponse(&pb.CloseResponse{
+		RequestId: request.ID(),
+	})
+	waitForChanClose(t, request.Closed(), nil)
+	assert.NoError(t, request.Close())
+	conn.readClose()
+	assertNoChanValue(t, request.Completed())
+}
+
+func Test_Request_Close_returns_error_after_request_is_completed(t *testing.T) {
+	_, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	conn.writeContentHeader(&pb.ContentHeader{
+		RequestId:   request.ID(),
+		ContentType: testContentType,
+		ContentSize: 0,
+	})
+	waitForChanValue(t, request.Response(), nil)
+	waitForChanClose(t, request.Completed(), nil)
+	err = request.Close()
+	assert.ErrorIs(t, err, ErrRequestCompleted)
+}
+
 // ---
 
 func assertNoChanValue[T interface{}](
@@ -1183,6 +1377,7 @@ func getConnClient(server *websocketServer) (
 	conn = server.connect()
 	client = server.lastClient()
 	done = func() {
+		time.Sleep(testAfterWait)
 		conn.done()
 		server.done()
 	}
@@ -1200,6 +1395,7 @@ func getConnClientHello(server *websocketServer) (
 	hello = conn.readHello()
 	client.setSecret(hello.ConnectionSecret)
 	done = func() {
+		time.Sleep(testAfterWait)
 		conn.done()
 		server.done()
 	}
@@ -1216,6 +1412,7 @@ func getServerConnClient(t *testing.T) (
 	conn = server.connect()
 	client = server.lastClient()
 	done = func() {
+		time.Sleep(testAfterWait)
 		conn.done()
 		server.done()
 	}
@@ -1235,6 +1432,7 @@ func getServerConnClientHello(t *testing.T) (
 	hello = conn.readHello()
 	client.setSecret(hello.ConnectionSecret)
 	done = func() {
+		time.Sleep(testAfterWait)
 		conn.done()
 		server.done()
 		client.waitForExit()

@@ -304,23 +304,54 @@ and keys and values are separated by `=` symbols.
 Values may be URL-encoded and should be decoded by the connected client,
 if they are needed.
 
+### Closing a response
+
+The client may close a response for any reason
+by sending a `CloseResponse` message to the server.
+The `request_id` field designates the request
+for which the response should be closed.
+The request for which the response should be closed
+must exist and must not already be completed
+(definition for a completed request is in the Response section).
+It is okay to send a `CloseResponse` message in place of a response.
+
 ### Response
+
+The client must send either an `EmptyResponse`, a `ContentHeader`
+or a `CloseResponse` message in response to a `Request` message.
+
+#### Completed responses
+
+A response is completed by either an `EmptyResponse`
+or by the last `ContentChunk` after a `ContentHeader`
+(unless the content size is zero,
+in which case `ContentHeader` completes the response).
+A request is NOT completed,
+if it is closed with a `CloseResponse` message.
+Only when all data has been sent to the server,
+a response is completed
+
+#### Sending content
 
 The client may send a `ContentHeader` message
 in response to a received `Request` message,
 to indicate that there is content available for the request
 and to send metadata about that content.
+
 The `request_id` maps the response to the correct request.
 
 The `content_type` designates the HTTP "Content-Type"
 of the data that will follow.
 This content type must be accepted by the server,
 see the `Constraints` message.
+It may contain additional content type parameters after a semicolon,
+e.g. `text/html; charset=utf-8`.
+Parameters must be ignored by the implementation.
 
 The `content_size` indicates the number of bytes in the content.
 The content size must be less than or equal
-to the allowed size in the `Constraints`.
-If the content size is zero, no chunks may follow.
+to the allowed size in the `Constraints`,
+but greater than or equal to zero.
 
 The `max_cache_duration` indicates the maximum duration in seconds
 for which the response data may be cached on the server.
@@ -336,31 +367,13 @@ but if it is set, it must have a length greater than 0.
 This will set the HTTP response's "Content-Disposition"
 to "attachment" with a "filename" set to the given value (quoted).
 
-The client may send an `EmptyResponse` message
-in response to a received `Request` message,
-to indicate that no content is available for the request.
-The `request_id` maps the response to the correct request.
-
-The client must send either an `EmptyResponse` or a `ContentHeader`.
-
-If the client does not send an `EmptyResponse`, `ContentHeader`
-or `ContentChunk` message within a given time frame
-(configured in the `Constraints` message),
-the connection will be closed by the server with an error.
-
-A response is concluded by either an `EmptyResponse`
-or by the last `ContentChunk` after a `ContentHeader`
-(unless the content size is zero,
-in which case `ContentHeader` concludes the response).
-
-### Content chunks
-
 If a `ContentHeader` message is sent in response to a `Request` message,
 a number of `ContentChunk` messages must follow,
 which add up to the size of the content
 as declared in the `ContentHeader` message,
 and which all contain the request ID in the `request_id` field,
 so they can be mapped to the correct response.
+If the content size is zero, no chunks may follow.
 
 Each chunk must have the `sequence` field set to a number
 that is one larger than the sequence number of the previously sent chunk,
@@ -380,20 +393,19 @@ as the maximum chunk size allows.
 The sum of all chunk sizes must match the `content_size`
 that was specified in the `ContentHeader` message.
 
-### Cancelling a response
+#### Empty response
 
-The client may cancel a response for any reason
-by sending a `CloseResponse` message to the server.
-The `request_id` field designates the request
-for which the response is canceled.
-If the response for the request that is being canceled
-has already been concluded, the connection is closed.
-If the request ID does not exist, the connection is closed.
-If the request ID exists but no response has been received yet,
-the connection is closed.
-This message may not be sent in place of
-an `EmptyResponse` or a `ContentHeader`.
-It may only be sent after one of those two messages.
+The client may send an `EmptyResponse` message
+in response to a received `Request` message,
+to indicate that no content is available for the request.
+The `request_id` maps the response to the correct request.
+
+#### Missing response
+
+If the client does not send an `EmptyResponse`, `ContentHeader`, `ContentChunk`
+or `CloseResponse` message within a given time frame
+(configured in the `Constraints` message),
+the connection will be closed by the server with an error.
 
 ### Request closed
 
@@ -401,22 +413,29 @@ The server must send a `RequestClosed` message
 if it does not want to receive a response or further response chunks.
 This may be due to the HTTP client having closed the HTTP request
 and the data not being needed anymore
-or because the client is sending the response to slowly
+or because the client is sending the response too slowly
 and the request timed out.
 
 If a request is canceled and the client is in the middle of sending a response,
 it is okay for the client to still send a response
 or continue sending chunks, the server should not trigger an error,
 but the client should stop sending messages to save on bandwidth.
-The server must discard any respones or chunks for the request ID,
-after a `RequestClosed` message has been sent for it.
+The server must discard any respones or further chunks for the request ID,
+after a `RequestClosed` message has been sent for it,
+and not forward it to any recipient.
 
 If a request is closed in this way,
 the client must acknowledge this by sending a `CloseResponse` message
 within the timeout period,
 otherwise the websocket connection will be closed.
 Once the server receives a `CloseResponse`
-it may free resources associated with a request and its response.
+it should free resources associated with a request and its response.
+
+The server may not send a `RequestClosed` message,
+if the response has already been completed,
+as this would violate the protocol,
+since the client would be then forced to send a `CloseResponse` message,
+which would be invalid, since the request has been completed.
 
 ### Acknowledging successful responses
 
@@ -463,9 +482,15 @@ type Request interface {
   Response() <-chan Response
   // Indicate to the client that the request's response
   // has been successfully forwarded by sending a Success message.
-  // Must be called if all chunks have been received,
-  // otherwise the client panics.
+  // May only be called if all chunks have been received.
+  // Deletes the request internally.
   Success() error
+  // Returns a channel that is closed once the request has been completed,
+  // i.e. all chunks have been received by the websocket client.
+  // Some chunks may still be buffer though
+  // and should be read from the Response object,
+  // before calling Success().
+  Completed() <-chan struct{}
   // Returns a channel that is closed in the following cases:
   // - when the Client itself has been closed with the Close() method,
   // - when the Close() method is called on this Request,
@@ -473,10 +498,10 @@ type Request interface {
   // - when the client times out because it did not respond in time, or
   // - when the client disconnected.
   Closed() <-chan struct{}
-  // Closes the request prematurely, if it hasn't already been completed,
-  // by sending a RequestClosed message to the client.
-  // Does nothing if the request has already been closed.
-  Close()
+  // Closes the request prematurely by sending a RequestClosed message
+  // to the websocket peer. Returns an error if the client is closed
+  // or if the request has already been completed or closed.
+  Close() error
 }
 
 type Response interface {
@@ -490,83 +515,11 @@ type Response interface {
 
 ## Tests
 
-### Protocol Tests
+For tests see [pkg/server/client_test.go](../pkg/server/client_test.go).
 
-- [x] server sends Hello when client connects
-- [x] base URL of Hello message does not end in trailing slash when client connects
-- [x] server sends Request when calling Client Request
-- [x] server sends Request with unique IDs when calling Client Request twice
-- [x] server sends RequestClosed when calling Request Close
-- [x] Request Response chan yields nil when client sends EmptyResponse
-- [x] Request Response chan yields Response when client sends ContentHeader
-- [x] Response Chunks chan yields empty chunk when client sends empty ContentHeader
-- [x] Response Chunks chan yields single chunk when client sends ContentChunk
-- [x] Response Chunks chan yields two chunks when client sends two ContentChunks
-- [x] Response Chunks chan is closed when all chunks have been received
-- [x] Request Closed channel is closed when calling Client Close
-- [x] Request Closed channel is closed when calling Request Close
-- [x] Request Closed channel is closed when client sends CloseResponse
-- [x] Request Closed channel is closed when client times out 
-- [x] Request Closed channel is closed when client disconnects
-- [x] Response chan yields nil when client times out after EmptyResponse
-- [x] server sends RequestClosed when client times out after ContentHeader
-- [x] server sends Closed when client does not send CloseResponse after server sent RequestClosed
-- [x] server sends Success when calling Request Success after receiving all chunks
-- [x] server sends Success when calling Request Success after receiving empty ContentHeader
-- [x] Request Success returns error after receiving EmptyResponse
-- [x] Request Success returns error when some chunks are pending
-- [x] Request Success returns error after calling Request Close
-- [x] Request Success returns error after request timed out
-- [x] server has one active request when client timed out after non-empty ContentHeader
-- [x] server has zero active requests when client timed out after sending empty ContentHeader
-- [x] server has zero active requests when client timed out after sending last ContentChunk
-- [x] server sends RequestClosed when Request Success is not called within timeout period for completed request
-- [x] Client Request returns error when requesting empty path
-- [x] Client Request returns error when query string is malformed
-- [x] Client Request returns no error when requesting path without leading slash
-- [x] Client Request returns no error when requesting query without leading question mark
-- [x] server sends Request without leading slash in path when calling Client Request with it
-- [x] server sends Request without leading question mark in query when calling Client Request with it
-- [x] Client Request returns error when requesting with invalid MAC hash
-- [x] server closes connection after sending Close message
-- [x] server sends Close when client sends text websocket message
-- [x] server sends Close when client sends badly encoded protobuf message
-- [x] server sends Close when client sends CloseResponse before first response message
-- [x] server sends Close when client sends CloseResponse after EmptyResponse
-- [x] server sends Close when client sends CloseResponse after empty ContentHeader
-- [x] server sends Close when client sends CloseResponse after last ContentChunk
-- [x] server sends Close when client sends CloseResponse with unknown request ID
-- [x] server sends Close when client sends EmptyResponse with unknown request ID
-- [x] server sends Close when client sends ContentHeader with unknown request ID
-- [x] server sends Close when client sends ContentChunk with unknown request ID
-- [x] server sends Close when client sends EmptyResponse twice for request ID
-- [x] server sends Close when client sends ContentHeader twice for request ID
-- [x] server sends Close when client sends EmptyResponse after ContentHeader
-- [x] server does not send Close when client response content size is at limit
-- [x] server sends Close when client response content size exceeds constraints
-- [x] server does not send Close when client response filename is non-empty
-- [x] server sends Close when client response filename is empty
-- [x] server sends Close when client response content type is not in constraints
-- [x] server does not send Close when client response content type has parameters
-- [x] server sends Close when client sends ContentChunk before ContentHeader
-- [x] server sends Close when client sends the same ContentChunk twice
-- [x] server sends Close when client sends an additional ContentChunk
-- [x] server sends Close when client sends out of sequence ContentChunk
-- [x] server sends Close when client sends ContentChunk with invalid size
-- [x] server sends Close when client sends last ContentChunk with invalid size
-- [x] server sends Close after calling Client Close
-- [x] Client terminates after calling Client Close
-- [x] Client Close does nothing when Client is already closed
-- [x] Creating a client fails when a content type in Contraints has parameters
-- [x] Creating a client fails when a content type in Contraints contains spaces
-- [x] Creating a client fails when a content type in Contraints is not all lowercase
+### TODO
 
-### Technical Tests
-
-- [ ] Server closes the connection when client does not send websocket ping in time
-
-### Integration Tests
-
+- [ ] write tests for the frontend
 - [ ] server receives full response with very large chunked data
 - [ ] server receives all responses when client answers requests in parallel
 
