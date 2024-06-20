@@ -45,9 +45,8 @@ var defaultIntervals = &ProtocolIntervals{
 }
 
 var defaultConstraints = &pb.Constraints{
-	MaxContentSize:   1024, // 1 KiB
-	ChunkSize:        64,   // 64 B
-	MaxCacheDuration: 0,    // No caching
+	MaxContentSize: 1024, // 1 KiB
+	ChunkSize:      64,   // 64 B
 	AcceptedContentTypes: []string{
 		testContentType,
 	},
@@ -62,7 +61,6 @@ func Test_server_sends_Hello_when_client_connects(t *testing.T) {
 	assert.Equal(t, MAC_KEY_SIZE, len(m.ConnectionSecret))
 	assert.Equal(t, defaultConstraints.MaxContentSize, m.Constraints.MaxContentSize)
 	assert.Equal(t, defaultConstraints.ChunkSize, m.Constraints.ChunkSize)
-	assert.Equal(t, defaultConstraints.MaxCacheDuration, m.Constraints.MaxCacheDuration)
 	assert.Equal(t, defaultConstraints.AcceptedContentTypes, m.Constraints.AcceptedContentTypes)
 }
 

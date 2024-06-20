@@ -253,12 +253,6 @@ The server must define the following constraints:
   The last chunk may of course be smaller than this (but greater than zero).
 - `max_content_size` -
   The maximum number of total bytes a client response may contain.
-- `max_cache_duration` -
-  The maximum duration in milliseconds
-  for which content may be cached on the server.
-  This value may either be unset or zero,
-  if the content is not cached by the server at all.
-  The exact cache duration can be controlled per response.
 - `accepted_content_types` -
   A list of HTTP "Content-Type" values that are accepted in response messages.
   Responses may not contain content with a content type
@@ -355,9 +349,7 @@ but greater than or equal to zero.
 
 The `max_cache_duration` indicates the maximum duration in seconds
 for which the response data may be cached on the server.
-A value of 0 indicates that the data should not be cached.
-If this value is larger than the maximum cache duration in the `Constraints`,
-then the maximum value from the Constraints will be used (without any error).
+A value of 0 indicates that the data should not be stored in any cache.
 
 The `filename` may contain an optional filename,
 which will be used as the filename for the data,
