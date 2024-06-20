@@ -1,0 +1,13 @@
+constraints:
+  chunk_size: 65536 # 64 KiB
+  max_content_size: 8388608 # 8 MiB
+  accepted_content_types:
+    - text/html
+    - image/png
+    - image/jpeg
+intervals:
+  write_wait: 10s
+  pong_wait: 60s
+  ping_interval: 48s
+  timeout_duration: 30s
+  timeout_interval: 8s
