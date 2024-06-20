@@ -403,8 +403,10 @@ type Client interface {
   // with the client's client ID and client secret.
   // Returns a Request instance or an error when an error occurs.
   Request(path string, query string, mac []byte) (Request, error)
-  // Closes the request, if it isn't already clsoed, and exits the run loop.
+  // Closes the client, if it isn't already closed, and exits the run loop.
   Close()
+  // Returns a channel that is closed once the Run loop has fully terminated.
+  Closed() <-chan struct{}
 }
 
 type Request interface {
