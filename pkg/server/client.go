@@ -1079,7 +1079,7 @@ func (c *clientImpl) onContentHeader(header *pb.ContentHeader) {
 	}
 	// Only look at the type and subtype, not the parameters:
 	// https://www.w3.org/Protocols/rfc1341/4_Content-Type.html
-	content_type := strings.Split(header.ContentType, CONTENT_TYPE_SEP)[0]
+	content_type := strings.Split(header.ContentType, CONTENT_TYPE_PARAM_SEP)[0]
 	_, is_allowed := c.contentTypes[content_type]
 	if !is_allowed {
 		c.close(pb.Close_REASON_FORBIDDEN_CONTENT_TYPE,
