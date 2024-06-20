@@ -421,6 +421,31 @@ func (c *ClientConfig) Clone() *ClientConfig {
 }
 
 func (c *ClientConfig) validate() error {
+	if len(c.BaseUrl) == 0 {
+		return errors.New("base URL cannot be empty")
+	}
+	if c.Intervals.WriteWait <= 0 {
+		return errors.New("write wait must be greater than zero")
+	}
+	if c.Intervals.PongWait <= 0 {
+		return errors.New("pong wait must be greater than zero")
+	}
+	if c.Intervals.PingInterval <= 0 {
+		return errors.New("ping interval must be greater than zero")
+	}
+	if c.Intervals.TimeoutDuration <= 0 {
+		return errors.New("timeout duration must be greater than zero")
+	}
+	if c.Intervals.TimeoutInterval <= 0 {
+		return errors.New("timeout interval must be greater than zero")
+	}
+	if c.Constraints.ChunkSize > c.Constraints.MaxContentSize {
+		return errors.New(
+			"chunk size cannot be larger than maximum content size")
+	}
+	if len(c.Constraints.AcceptedContentTypes) == 0 {
+		return errors.New("accepted content types cannot be empty")
+	}
 	for _, contentType := range c.Constraints.AcceptedContentTypes {
 		sanitized, params, err := mime.ParseMediaType(contentType)
 		if err != nil {
