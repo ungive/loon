@@ -64,6 +64,7 @@ message Success {
 // <-
 message RequestClosed {
   uint64 request_id = 1;
+  string message = 2;
 }
 
 // ->

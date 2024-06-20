@@ -501,7 +501,7 @@ type Request interface {
   // Closes the request prematurely by sending a RequestClosed message
   // to the websocket peer. Returns an error if the client is closed
   // or if the request has already been completed or closed.
-  Close() error
+  Close(message string) error
 }
 
 type Response interface {

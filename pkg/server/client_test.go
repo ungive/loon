@@ -109,10 +109,12 @@ func Test_server_sends_RequestClosed_when_calling_Request_Close(t *testing.T) {
 	defer done()
 	request, err := client.request(testPath, testQuery)
 	assert.NoError(t, err)
-	request.Close()
+	message := "MSG"
+	request.Close(message)
 	m1 := conn.readRequest()
 	m2 := conn.readRequestClosed()
 	assert.Equal(t, m1.Id, m2.RequestId)
+	assert.Equal(t, message, m2.Message)
 	assertNoChanValue(t, request.Completed())
 	client.expectActiveRequests(1)
 }
@@ -284,7 +286,7 @@ func Test_Request_Closed_channel_is_closed_when_calling_Request_Close(t *testing
 	request, err := client.request(testPath, testQuery)
 	assert.NoError(t, err)
 	conn.readRequest()
-	request.Close()
+	request.Close("")
 	waitForChanClose(t, request.Closed(), nil)
 	conn.readRequestClosed()
 	client.expectActiveRequests(1)
@@ -471,7 +473,7 @@ func Test_Request_Success_returns_error_after_calling_Request_Close(t *testing.T
 		ContentType: testContentType,
 		ContentSize: uint64(1),
 	})
-	request.Close()
+	request.Close("")
 	conn.readRequestClosed()
 	waitForChanValue(t, request.Response(), nil)
 	err = request.Success()
@@ -794,7 +796,7 @@ func Test_server_does_not_send_close_when_client_sends_CloseResponse_before_rece
 		ContentType: testContentType,
 		ContentSize: uint64(1),
 	})
-	request.Close()
+	request.Close("")
 	conn.writeCloseResponse(&pb.CloseResponse{
 		RequestId: request.ID(),
 	})
@@ -1264,8 +1266,8 @@ func Test_Request_Close_returns_no_error_when_called_twice(t *testing.T) {
 	request, err := client.request(testPath, testQuery)
 	assert.NoError(t, err)
 	conn.readRequest()
-	assert.NoError(t, request.Close())
-	assert.NoError(t, request.Close())
+	assert.NoError(t, request.Close(""))
+	assert.NoError(t, request.Close(""))
 	conn.readRequestClosed()
 }
 
@@ -1279,7 +1281,7 @@ func Test_Request_Close_returns_no_error_after_client_sent_CloseResponse(t *test
 		RequestId: request.ID(),
 	})
 	waitForChanClose(t, request.Closed(), nil)
-	assert.NoError(t, request.Close())
+	assert.NoError(t, request.Close(""))
 	conn.readClose()
 	assertNoChanValue(t, request.Completed())
 }
@@ -1297,7 +1299,7 @@ func Test_Request_Close_returns_error_after_request_is_completed(t *testing.T) {
 	})
 	waitForChanValue(t, request.Response(), nil)
 	waitForChanClose(t, request.Completed(), nil)
-	err = request.Close()
+	err = request.Close("")
 	assert.ErrorIs(t, err, ErrRequestCompleted)
 }
 

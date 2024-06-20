@@ -94,7 +94,7 @@ type Request interface {
 	// Closes the request prematurely by sending a RequestClosed message
 	// to the websocket peer. Returns an error if the client is closed
 	// or if the request has already been completed or closed.
-	Close() error
+	Close(message string) error
 }
 
 type Response interface {
@@ -202,7 +202,7 @@ func (r *internalRequest) Closed() <-chan struct{} {
 	return r.closed
 }
 
-func (r *internalRequest) Close() error {
+func (r *internalRequest) Close(message string) error {
 	if chanClosed(r.closed) || chanClosed(r.client.done) {
 		return nil
 	}
@@ -213,6 +213,7 @@ func (r *internalRequest) Close() error {
 	select {
 	case r.client.triggerClose <- &forwardClose{
 		request: r,
+		message: message,
 		outErr:  outErr,
 	}:
 	case <-r.completed:
@@ -359,6 +360,7 @@ type forwardSuccess struct {
 
 type forwardClose struct {
 	request *internalRequest
+	message string
 	outErr  chan error
 }
 
@@ -761,7 +763,7 @@ func (c *clientImpl) protocol() {
 		case info := <-c.triggerSuccess:
 			info.outErr <- c.sendSuccess(info.request)
 		case info := <-c.triggerClose:
-			info.outErr <- c.closeRequest(info.request)
+			info.outErr <- c.closeRequest(info.request, info.message)
 		case out := <-c.countRequests:
 			out <- len(c.requests)
 		case <-timeoutTicker.C:
@@ -794,7 +796,7 @@ func (c *clientImpl) checkTimeouts() {
 			continue
 		}
 		// Ignore any error, just make sure it's closed.
-		_ = c.closeRequest(request)
+		_ = c.closeRequest(request, "request timed out")
 	}
 }
 
@@ -864,7 +866,7 @@ func (c *clientImpl) sendSuccess(request *internalRequest) error {
 	return nil
 }
 
-func (c *clientImpl) closeRequest(request *internalRequest) error {
+func (c *clientImpl) closeRequest(request *internalRequest, message string) error {
 	request, ok := c.requests[request.id]
 	if !ok {
 		return ErrRequestDeleted
@@ -879,6 +881,7 @@ func (c *clientImpl) closeRequest(request *internalRequest) error {
 		Data: &pb.ServerMessage_RequestClosed{
 			RequestClosed: &pb.RequestClosed{
 				RequestId: request.id,
+				Message:   message,
 			},
 		},
 	})
