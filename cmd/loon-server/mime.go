@@ -8,6 +8,7 @@ import (
 
 const (
 	CONTENT_TYPE_SEP         = ","
+	CONTENT_TYPE_PARAM_SEP   = ";"
 	CONTENT_TYPE_SUBTYPE_SEP = "/"
 )
 
@@ -31,10 +32,26 @@ func NewContentType(value string) (*ContentType, error) {
 	}
 	return &ContentType{
 		Type:     parsed,
-		RootType: root,
-		SubType:  sub,
+		RootType: strings.TrimSpace(root),
+		SubType:  strings.TrimSpace(sub),
 		Params:   params,
 	}, nil
+}
+
+func (c *ContentType) HasWildcard() bool {
+	return c.RootType == "*" || c.SubType == "*"
+}
+
+func (c *ContentType) MatchesAll() bool {
+	return c.RootType == "*" && c.SubType == "*"
+}
+
+func (c *ContentType) MatchesAllSubtypes() bool {
+	return c.RootType != "*" && c.SubType == "*"
+}
+
+func (c *ContentType) String() string {
+	return mime.FormatMediaType(c.Type, c.Params)
 }
 
 type ContentTypeIndex interface {
@@ -43,38 +60,38 @@ type ContentTypeIndex interface {
 	ContainsRootContentType(value string) bool
 }
 
-type singleContentTypeIndex struct {
+type SingleContentTypeIndex struct {
 	value *ContentType
 }
 
-func newSingleContentTypeIndex(contentType *ContentType) *singleContentTypeIndex {
-	return &singleContentTypeIndex{
+func NewSingleContentTypeIndex(contentType *ContentType) *SingleContentTypeIndex {
+	return &SingleContentTypeIndex{
 		value: contentType,
 	}
 }
 
-func (i *singleContentTypeIndex) ContentTypes() []*ContentType {
+func (i *SingleContentTypeIndex) ContentTypes() []*ContentType {
 	return []*ContentType{i.value}
 }
 
-func (i *singleContentTypeIndex) ContainsContentType(value string) bool {
+func (i *SingleContentTypeIndex) ContainsContentType(value string) bool {
 	return i.value.Type == value
 }
 
-func (i *singleContentTypeIndex) ContainsRootContentType(value string) bool {
+func (i *SingleContentTypeIndex) ContainsRootContentType(value string) bool {
 	return i.value.RootType == value
 }
 
-type multiContentTypeIndex struct {
+type MultiContentTypeIndex struct {
 	values           []*ContentType
 	contentTypes     map[string]struct{}
 	rootContentTypes map[string]struct{}
 }
 
-func newMultiContentTypeIndex(
+func NewMultiContentTypeIndex(
 	contentTypes []*ContentType,
-) *multiContentTypeIndex {
-	index := &multiContentTypeIndex{
+) *MultiContentTypeIndex {
+	index := &MultiContentTypeIndex{
 		values:           make([]*ContentType, len(contentTypes)),
 		contentTypes:     make(map[string]struct{}),
 		rootContentTypes: make(map[string]struct{}),
@@ -87,32 +104,59 @@ func newMultiContentTypeIndex(
 	return index
 }
 
-func (i *multiContentTypeIndex) ContentTypes() []*ContentType {
+func (i *MultiContentTypeIndex) ContentTypes() []*ContentType {
 	return i.values
 }
 
-func (i *multiContentTypeIndex) ContainsContentType(value string) bool {
+func (i *MultiContentTypeIndex) ContainsContentType(value string) bool {
 	_, ok := i.contentTypes[value]
 	return ok
 }
 
-func (i *multiContentTypeIndex) ContainsRootContentType(value string) bool {
+func (i *MultiContentTypeIndex) ContainsRootContentType(value string) bool {
 	_, ok := i.rootContentTypes[value]
 	return ok
 }
 
-type contentTypeRegistry struct {
+type ContentTypeRegistry struct {
 	index ContentTypeIndex
 }
 
-func newContentTypeRegistry(index ContentTypeIndex) *contentTypeRegistry {
-	return &contentTypeRegistry{
+func NewContentTypeRegistry(index ContentTypeIndex) *ContentTypeRegistry {
+	return &ContentTypeRegistry{
 		index: index,
 	}
 }
 
+func NewContentTypeRegistryFromStrings(
+	contentTypes []string,
+) (*ContentTypeRegistry, error) {
+	result := make([]*ContentType, len(contentTypes))
+	for i, value := range contentTypes {
+		contentType, err := NewContentType(value)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = contentType
+	}
+	index := NewMultiContentTypeIndex(result)
+	registry := NewContentTypeRegistry(index)
+	return registry, nil
+}
+
+// Checks whether the given content type is in the registry.
+func (r *ContentTypeRegistry) Contains(contentType *ContentType) bool {
+	if contentType.MatchesAll() {
+		return true
+	}
+	if contentType.MatchesAllSubtypes() {
+		return r.index.ContainsRootContentType(contentType.RootType)
+	}
+	return r.index.ContainsContentType(contentType.Type)
+}
+
 // Checks whether any of the accepted content types are in the registry.
-func (r *contentTypeRegistry) canServeAccept(acceptValue string) bool {
+func (r *ContentTypeRegistry) CanServeAccept(acceptValue string) bool {
 	acceptedContentTypes := strings.Split(acceptValue, CONTENT_TYPE_SEP)
 	for _, contentType := range acceptedContentTypes {
 		index := strings.Index(contentType, ";")
@@ -128,7 +172,7 @@ func (r *contentTypeRegistry) canServeAccept(acceptValue string) bool {
 			if root == "*" {
 				return true
 			}
-			if r.index.ContainsContentType(root) {
+			if r.index.ContainsRootContentType(root) {
 				return true
 			}
 			continue
