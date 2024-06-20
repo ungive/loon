@@ -119,9 +119,9 @@ type internalRequest struct {
 	path   string
 	query  string
 
-	pendingResponse  chan Response
-	response         *internalResponse
-	responseProvided bool
+	pendingResponse chan Response
+	response        *internalResponse
+	responseMutex   sync.Mutex
 
 	lastUpdated time.Time
 	completed   chan struct{}
@@ -144,12 +144,11 @@ func newRequest(
 		// all further communication with the client.
 		// This way the response can also be ignored and discarded
 		// by simply leaving it in the buffer and deleting the channel.
-		pendingResponse:  make(chan Response, 1),
-		response:         nil,
-		responseProvided: false,
-		lastUpdated:      time.Now(),
-		completed:        make(chan struct{}),
-		closed:           make(chan struct{}),
+		pendingResponse: make(chan Response, 1),
+		response:        nil,
+		lastUpdated:     time.Now(),
+		completed:       make(chan struct{}),
+		closed:          make(chan struct{}),
 	}
 }
 
@@ -208,6 +207,29 @@ func (r *internalRequest) Close(message string) error {
 	if chanClosed(r.completed) {
 		return ErrRequestCompleted
 	}
+	// Critical during heavy load:
+	// The protocol loop for this client can get stuck at writing chunks,
+	// when the chunk buffer is filled and sending to the chunk channel blocks.
+	// Before sending a value to "triggerClose", which requires the protocol
+	// loop to be ready, we need to make space for further chunks and
+	// immediately discard them, until the request has been closed.
+	r.responseMutex.Lock()
+	response := r.response
+	r.responseMutex.Unlock()
+	if response != nil {
+		select {
+		case r.client.discardChunks <- &forwardDiscard{
+			chunks: response.chunks,
+			done:   r.closed,
+		}:
+		case <-r.completed:
+			return ErrRequestCompleted
+		case <-r.closed:
+			return nil
+		case <-r.client.done:
+			return nil
+		}
+	}
 	outErr := make(chan error)
 	select {
 	case r.client.triggerClose <- &forwardClose{
@@ -238,11 +260,12 @@ func (r *internalRequest) resetTimeout() {
 // Provide a response for this request.
 // The reponse is forwarded to the calling code that made the request.
 func (r *internalRequest) provideResponse(response *internalResponse) {
-	if r.responseProvided {
+	r.responseMutex.Lock()
+	if r.response != nil {
 		panic("response already provided")
 	}
-	r.responseProvided = true
 	r.response = response
+	r.responseMutex.Unlock()
 	if !r.isClosed() {
 		// Only forward the response if the request is not closed.
 		r.pendingResponse <- response
@@ -253,12 +276,14 @@ func (r *internalRequest) provideResponse(response *internalResponse) {
 // Check if this request has a response,
 // i.e. if a response was provided via provideResponse().
 func (r *internalRequest) hasResponse() bool {
-	return r.responseProvided
+	// No need to lock, since private methods are synchronized
+	return r.response != nil
 }
 
 // Get the internal response.
 // Check hasResponse() before using the result of this function.
 func (r *internalRequest) getResponse() *internalResponse {
+	// No need to lock, since private methods are synchronized
 	return r.response
 }
 
@@ -381,6 +406,11 @@ type forwardClose struct {
 	outErr  chan error
 }
 
+type forwardDiscard struct {
+	chunks <-chan []byte
+	done   <-chan struct{}
+}
+
 type clientImpl struct {
 	id           UUID                // ownership: read-only
 	idStr        string              // ownership: read-only
@@ -403,6 +433,7 @@ type clientImpl struct {
 	forwardRequest chan *forwardRequest
 	triggerSuccess chan *forwardSuccess
 	triggerClose   chan *forwardClose
+	discardChunks  chan *forwardDiscard
 }
 
 type ClientConfig struct {
@@ -493,6 +524,7 @@ func NewClient(conn *websocket.Conn, config *ClientConfig) (Client, error) {
 		forwardRequest: make(chan *forwardRequest),
 		triggerSuccess: make(chan *forwardSuccess),
 		triggerClose:   make(chan *forwardClose),
+		discardChunks:  make(chan *forwardDiscard),
 		contentTypes:   make(map[string]struct{}),
 	}
 	for _, key := range client.config.Constraints.AcceptedContentTypes {
@@ -519,10 +551,11 @@ func (c *clientImpl) Run() {
 		panic("client is in a dirty state")
 	}
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(4)
 	go func() { c.writePump(); wg.Done() }()
 	go func() { c.readPump(); wg.Done() }()
 	go func() { c.protocol(); wg.Done() }()
+	go func() { c.chunkDiscarder(); wg.Done() }()
 	wg.Wait()
 	close(c.runDone)
 }
@@ -651,6 +684,28 @@ func (c *clientImpl) exit() {
 	case <-c.done:
 	}
 	<-c.done
+}
+
+// Runs in the background to discard any buffered response chunks.
+func (c *clientImpl) chunkDiscarder() {
+	for {
+		select {
+		case info := <-c.discardChunks:
+		discard:
+			for {
+				select {
+				case _, ok := <-info.chunks:
+					if !ok {
+						continue discard
+					}
+				case <-info.done:
+					break discard
+				}
+			}
+		case <-c.done:
+			return
+		}
+	}
 }
 
 // Pumps incoming messages from the websocket connection to the recv channel.
