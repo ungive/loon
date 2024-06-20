@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/goccy/go-yaml"
 	"github.com/gorilla/websocket"
@@ -25,10 +26,13 @@ var (
 
 var log *slog.Logger
 var config *server.Config
-var acceptedContentTypes *contentTypeRegistry
+var acceptedContentTypes *server.ContentTypeRegistry
 
 // TODO: use prometheus time series values
-var activeClientCount = atomic.Int64{}
+var (
+	activeClientCount = atomic.Int64{}
+	requestIndex      = atomic.Int64{}
+)
 
 func init() {
 	flag.Parse()
@@ -39,7 +43,12 @@ func init() {
 
 func main() {
 	handler := newHandler()
-	err := http.ListenAndServe(*addr, handler)
+	srv := http.Server{
+		Addr:         *addr,
+		WriteTimeout: 1 * time.Second, // TODO: use config value
+		Handler:      handler,
+	}
+	err := srv.ListenAndServe()
 	if err != nil {
 		log.Error("failed to listen on address", "addr", *addr, "err", err)
 		abort()
@@ -103,8 +112,9 @@ func (h *handler) serveWs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) serve(w http.ResponseWriter, r *http.Request) {
-	log := log.With("context", "request")
-	if !acceptedContentTypes.canServeAccept(r.Header.Get("Accept")) {
+	index := requestIndex.Add(1)
+	log := log.With("context", "request", "index", index)
+	if !acceptedContentTypes.CanServeAccept(r.Header.Get("Accept")) {
 		close(w, http.StatusNotAcceptable,
 			"not serving any acceptable content type", log, nil)
 		return
@@ -130,10 +140,10 @@ func (h *handler) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	path := r.PathValue("path")
 	query := r.URL.RawQuery
-	log = log.With(
-		slog.String("path", path),
-		slog.String("query", query),
-	)
+	log = log.With("path", path)
+	if len(query) > 0 {
+		log = log.With("query", query)
+	}
 	clientRequest, err := client.Request(path, query, mac)
 	if err != nil {
 		if errors.Is(err, server.ErrClientClosed) {
@@ -176,7 +186,7 @@ func (h *handler) serveRequest(
 		closeTimeout(w, log, nil)
 		return
 	}
-	contentType, err := NewContentType(response.Header().ContentType)
+	contentType, err := server.NewContentType(response.Header().ContentType)
 	if err != nil {
 		// this should never happen, since the content type in the header
 		// is compared against the accepted content types in the contraints,
@@ -188,8 +198,9 @@ func (h *handler) serveRequest(
 	}
 	// Create a registry with a single content type,
 	// to check if the accept header allows us to serve this file.
-	registry := newContentTypeRegistry(newSingleContentTypeIndex(contentType))
-	if !registry.canServeAccept(r.Header.Get("Accept")) {
+	registry := server.NewContentTypeRegistry(
+		server.NewSingleContentTypeIndex(contentType))
+	if !registry.CanServeAccept(r.Header.Get("Accept")) {
 		request.Close("response content type not accepted by HTTP client")
 		log := log.With("content_type", contentType.Type, "accept", r.Header.Get("Accept"))
 		close(w, http.StatusNotAcceptable,
@@ -291,12 +302,12 @@ func readConfig() *server.Config {
 	return &v
 }
 
-func contentTypeRegistryForConfig(config *server.Config) *contentTypeRegistry {
+func contentTypeRegistryForConfig(config *server.Config) *server.ContentTypeRegistry {
 	clog := log.With("context", "config")
 	acceptedContentTypes := config.Constraints.AcceptedContentTypes
-	contentTypes := make([]*ContentType, len(acceptedContentTypes))
+	contentTypes := make([]*server.ContentType, len(acceptedContentTypes))
 	for i, value := range acceptedContentTypes {
-		contentType, err := NewContentType(value)
+		contentType, err := server.NewContentType(value)
 		if err != nil {
 			clog.Error("failed to parse content type",
 				slog.Int("index", i),
@@ -306,8 +317,8 @@ func contentTypeRegistryForConfig(config *server.Config) *contentTypeRegistry {
 		}
 		contentTypes[i] = contentType
 	}
-	index := newMultiContentTypeIndex(contentTypes)
-	registry := newContentTypeRegistry(index)
+	index := server.NewMultiContentTypeIndex(contentTypes)
+	registry := server.NewContentTypeRegistry(index)
 	for i, value := range contentTypes {
 		vlog := clog.With("value", value.Type)
 		if len(value.Params) > 0 {
@@ -360,9 +371,9 @@ func close(
 			logInfo = logInfo.With("err", err)
 		}
 		if status >= 500 && status <= 599 {
-			logInfo.Error("request closed")
+			logInfo.Error("request failed")
 		} else {
-			logInfo.Warn("request closed")
+			logInfo.Warn("request failed")
 		}
 	}
 }
