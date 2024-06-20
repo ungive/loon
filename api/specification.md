@@ -132,6 +132,52 @@ which prevents the client from being spammed with arbitrary requests
 (point 3 under client abuse protection).
 Only requests with a path that contain a valid hash should be accepted.
 
+#### Status codes
+
+The following status codes must be returned by the server
+under the given circumstances
+and possibly some actions need to be taken
+in regard to the communication with the websocket client.
+
+Code `200` (OK), if the connected websocket client
+successfully sent a full response.
+The body of the HTTP response contains the content that the client sent.
+
+Code `400` (Bad Request), if the request is malformed.
+
+Code `404` (Not Found) in the following cases:
+- no client with the given client ID is connected to the server, or
+- the MAC hash could not be authenticated for the given client, or
+- the client returned an empty response.
+
+The first two errors are combined under the `404` status code,
+in order to hide to the outside when client ID is correct,
+but the MAC is not. Attackers should not be able to tell the difference,
+whether the client ID is incorrect or the MAC.
+Only when the client ID is valid, a client is connected with that ID
+and the MAC could be authenticated against the client's secret,
+only then the request should proceed past a `404` status code.
+
+Code `406` (Not Acceptable) in the following cases:
+- none of the content types that are accepted in the HTTP request header
+  overlap with the content types that the server accepts from the client, or
+- the client returned a response with a content type
+  which is not accepted in the HTTP request header.
+  The server should then close the request with the websocket client.
+
+Code `504` (Gateway Timeout), in the following cases:
+- the connected websocket client did not send a response in time, or
+- the connected websocket client has closed the response, or
+- the connected websocket client has disconnected.
+
+Further status codes may be enforced by the HTTP server implementation.
+
+The HTTP server may send a text message explaining what happened.
+
+Whenever an error occurs while handling an HTTP request
+the request with the websocket client should be closed
+by sending a `RequestClosed` message.
+
 ### Caching
 
 HTTP responses from clients may be cached
