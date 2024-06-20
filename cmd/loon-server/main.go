@@ -197,7 +197,7 @@ func (h *handler) serveRequest(
 		return
 	}
 	// Set the content type headers and the attachment filename, if present.
-	w.Header().Set("Content-Type", contentType.Type)
+	w.Header().Set("Content-Type", contentType.String())
 	if filename := response.Header().Filename; filename != nil {
 		value := strings.ReplaceAll(*filename, "\"", "\\\"")
 		w.Header().Set("Content-Disposition",
