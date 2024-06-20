@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/goccy/go-yaml"
 	"github.com/gorilla/websocket"
@@ -45,7 +44,7 @@ func main() {
 	handler := newHandler()
 	srv := http.Server{
 		Addr:         *addr,
-		WriteTimeout: 1 * time.Second, // TODO: use config value
+		WriteTimeout: config.Http.WriteWait,
 		Handler:      handler,
 	}
 	err := srv.ListenAndServe()

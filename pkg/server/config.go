@@ -9,6 +9,11 @@ import (
 type Config struct {
 	Constraints *pb.Constraints    `json:"constraints"`
 	Intervals   *ProtocolIntervals `json:"intervals"`
+	Http        *HttpConfig        `json:"http"`
+}
+
+type HttpConfig struct {
+	WriteWait time.Duration `json:"write_wait"`
 }
 
 type ProtocolIntervals struct {
