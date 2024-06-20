@@ -471,9 +471,9 @@ func Test_Request_Success_returns_error_after_calling_Request_Close(t *testing.T
 		ContentType: testContentType,
 		ContentSize: uint64(1),
 	})
+	waitForChanValue(t, request.Response(), nil)
 	request.Close("")
 	conn.readRequestClosed()
-	waitForChanValue(t, request.Response(), nil)
 	err = request.Success()
 	assert.ErrorIs(t, err, ErrRequestClosed)
 	client.expectActiveRequests(1)
@@ -783,7 +783,7 @@ func Test_server_sends_Close_when_client_sends_CloseResponse_twice(t *testing.T)
 	conn.expectClose(pb.Close_REASON_INVALID_REQUEST_ID)
 }
 
-func Test_server_does_not_send_close_when_client_sends_CloseResponse_before_receiving_RequestClosed(t *testing.T) {
+func Test_server_does_not_send_Close_when_client_sends_CloseResponse_before_receiving_RequestClosed(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
 	request, err := client.request(testPath, testQuery)
@@ -1299,6 +1299,61 @@ func Test_Request_Close_returns_error_after_request_is_completed(t *testing.T) {
 	waitForChanClose(t, request.Completed(), nil)
 	err = request.Close("")
 	assert.ErrorIs(t, err, ErrRequestCompleted)
+}
+
+func Test_server_does_not_send_Close_when_client_sends_empty_ContentHeader_after_request_is_closed(t *testing.T) {
+	server, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	request.Close("")
+	conn.readRequestClosed()
+	conn.writeContentHeader(&pb.ContentHeader{
+		RequestId:   request.ID(),
+		ContentType: testContentType,
+		ContentSize: uint64(0),
+	})
+	time.Sleep(2 * server.intervals.TimeoutDuration)
+	client.expectActiveRequests(0)
+}
+
+func Test_server_does_not_send_Close_when_client_sends_last_ContentChunk_after_request_is_closed(t *testing.T) {
+	server, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	conn.writeContentHeader(&pb.ContentHeader{
+		RequestId:   request.ID(),
+		ContentType: testContentType,
+		ContentSize: uint64(1),
+	})
+	waitForChanValue(t, request.Response(), nil)
+	request.Close("")
+	conn.readRequestClosed()
+	conn.writeContentChunk(&pb.ContentChunk{
+		RequestId: request.ID(),
+		Sequence:  0,
+		Data:      []byte("_"),
+	})
+	time.Sleep(2 * server.intervals.TimeoutDuration)
+	client.expectActiveRequests(0)
+}
+
+func Test_server_does_not_send_Close_when_client_sends_EmptyResponse_after_request_is_closed(t *testing.T) {
+	server, conn, client, _, done := getServerConnClientHello(t)
+	defer done()
+	request, err := client.request(testPath, testQuery)
+	assert.NoError(t, err)
+	conn.readRequest()
+	request.Close("")
+	conn.readRequestClosed()
+	conn.writeEmptyResponse(&pb.EmptyResponse{
+		RequestId: request.ID(),
+	})
+	time.Sleep(2 * server.intervals.TimeoutDuration)
+	client.expectActiveRequests(0)
 }
 
 // ---

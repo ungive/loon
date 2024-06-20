@@ -244,8 +244,11 @@ func (r *internalRequest) provideResponse(response *internalResponse) {
 	}
 	r.responseProvided = true
 	r.response = response
-	r.pendingResponse <- response
-	close(r.pendingResponse)
+	if !r.isClosed() {
+		// Only forward the response if the request is not closed.
+		r.pendingResponse <- response
+		close(r.pendingResponse)
+	}
 }
 
 // Check if this request has a response,
@@ -331,6 +334,21 @@ func (r *internalResponse) Header() *pb.ContentHeader {
 
 func (r *internalResponse) Chunks() <-chan []byte {
 	return r.chunks
+}
+
+func (r *internalResponse) write(chunk []byte) {
+	if !r.request.isClosed() {
+		// Only forward a chunk if the request is not closed.
+		r.chunks <- chunk
+	}
+}
+
+func (r *internalResponse) done() {
+	if !r.request.isClosed() {
+		// Only signal that all chunks have been received,
+		// if the request is not closed.
+		close(r.chunks)
+	}
 }
 
 func (r *internalResponse) nextChunkInfo() (sequence uint64, size uint64, last bool) {
@@ -983,9 +1001,9 @@ func (c *clientImpl) onContentHeader(header *pb.ContentHeader) {
 	request.resetTimeout()
 	response := newResponse(request, header)
 	request.provideResponse(response)
-	// Content size is empty, the request is therefore immediately concluded.
+	// Content size is empty, the request is therefore immediately completed.
 	if header.ContentSize == 0 {
-		response.chunks <- []byte{}
+		response.write([]byte{})
 		c.completeRequest(request)
 	}
 }
@@ -1036,7 +1054,7 @@ func (c *clientImpl) onContentChunk(chunk *pb.ContentChunk) {
 		return
 	}
 	request.resetTimeout()
-	response.chunks <- chunk.Data
+	response.write(chunk.Data)
 	if lastChunk {
 		c.completeRequest(request)
 	}
@@ -1052,10 +1070,17 @@ func (c *clientImpl) completeRequest(request *internalRequest) {
 	if request.isCompleted() {
 		panic("request already completed")
 	}
+	if request.isClosed() {
+		// A closed request whose response was fully received
+		// does not need to be marked as completed anymore,
+		// but instead should be deleted from the internal map.
+		c.deleteRequest(request)
+		return
+	}
 	request.complete()
 	response := request.getResponse()
 	if response != nil {
-		close(response.chunks)
+		response.done()
 	}
 }
 
