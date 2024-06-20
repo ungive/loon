@@ -1503,7 +1503,14 @@ func expectedServerMessage[T interface{}, P *T](
 	case P:
 		return m
 	default:
-		assert.FailNow(t, "Unexpected message type %T: %v", m, m)
+	}
+	switch m := message.Data.(type) {
+	case *pb.ServerMessage_Close:
+		assert.FailNow(t, "Unexpected close message", "%v", m.Close)
+		panic("unreachable")
+	default:
+		assert.FailNow(t, "Unexpected message type", "%T %#v",
+			message.Data, message.Data)
 		panic("unreachable")
 	}
 }
