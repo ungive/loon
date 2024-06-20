@@ -589,12 +589,17 @@ func (c *clientImpl) Closed() <-chan struct{} {
 	return c.runDone
 }
 
-func (c *clientImpl) computeMac(path string, query string) ([]byte, error) {
+func ComputeMac(
+	clientId string,
+	clientSecret []byte,
+	path string,
+	query string,
+) ([]byte, error) {
 	path = strings.TrimLeft(path, "/")
 	query = strings.TrimLeft(query, "?")
-	mac := hmac.New(sha256.New, c.secret)
+	mac := hmac.New(sha256.New, clientSecret)
 	items := [][]byte{
-		[]byte(c.idStr),
+		[]byte(clientId),
 		[]byte("/"),
 		[]byte(path),
 	}
@@ -612,6 +617,10 @@ func (c *clientImpl) computeMac(path string, query string) ([]byte, error) {
 		}
 	}
 	return mac.Sum(nil), nil
+}
+
+func (c *clientImpl) computeMac(path string, query string) ([]byte, error) {
+	return ComputeMac(c.idStr, c.secret, path, query)
 }
 
 // Queues a close message for this connection
