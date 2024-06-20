@@ -13,3 +13,5 @@ intervals:
   timeout_interval: 8s
 http:
   write_wait: 5s
+log:
+  level: INFO

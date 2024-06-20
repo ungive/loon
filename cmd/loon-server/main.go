@@ -19,7 +19,7 @@ import (
 
 var (
 	addr       = flag.String("addr", ":8080", "http service address")
-	verbose    = flag.Bool("verbose", false, "enable verbose logging")
+	isDebug    = flag.Bool("debug", false, "enable debug logging")
 	configPath = flag.String("config", "", "the path to a config file")
 )
 
@@ -35,7 +35,7 @@ var (
 
 func init() {
 	flag.Parse()
-	log = newLogger()
+	log = newLogger(slog.LevelWarn)
 	config = readConfig()
 	acceptedContentTypes = contentTypeRegistryForConfig(config)
 }
@@ -93,7 +93,7 @@ func (h *handler) serveWs(w http.ResponseWriter, r *http.Request) {
 	}
 	h.manager.Register(client)
 	activeClientCount.Add(1)
-	log.Debug("client connected",
+	log.Info("client connected",
 		"client_id", client.ID(),
 		"active_clients", activeClientCount.Load(),
 	)
@@ -101,7 +101,7 @@ func (h *handler) serveWs(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			h.manager.Unregister(client)
 			activeClientCount.Add(-1)
-			log.Debug("client disconnected",
+			log.Info("client disconnected",
 				"client_id", client.ID(),
 				"active_clients", activeClientCount.Load(),
 			)
@@ -265,11 +265,11 @@ recv:
 
 // ---
 
-func newLogger() *slog.Logger {
+func newLogger(defaultLevel slog.Level) *slog.Logger {
 	options := &slog.HandlerOptions{
-		Level: slog.LevelInfo,
+		Level: defaultLevel,
 	}
-	if *verbose {
+	if *isDebug {
 		options.Level = slog.LevelDebug
 	}
 	handler := slog.NewJSONHandler(os.Stdout, options)
@@ -277,26 +277,28 @@ func newLogger() *slog.Logger {
 }
 
 func readConfig() *server.Config {
-	log := log.With("context", "config")
+	clog := log.With("context", "config")
 	if len(*configPath) <= 0 {
-		log.Warn("using the default config, only do this during testing")
+		clog.Warn("using the default config, only do this during testing")
 		return defaultConfig
 	}
 	path, err := filepath.Abs(*configPath)
 	if err != nil {
-		log.Error("failed to retrieve absolute path of config", "err", err)
+		clog.Error("failed to retrieve absolute path of config", "err", err)
 		abort()
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		log.Error("failed to open config file:", "err", err)
+		clog.Error("failed to open config file:", "err", err)
 		abort()
 	}
 	var v server.Config
 	if err := yaml.Unmarshal(data, &v); err != nil {
-		log.Error("failed to parse config YAML:", "err", err)
+		clog.Error("failed to parse config YAML:", "err", err)
 		abort()
 	}
+	// Update the logger to reflect the configured logging level.
+	log = newLogger(v.Log.Level)
 	log.Info("loaded config", "path", path)
 	return &v
 }

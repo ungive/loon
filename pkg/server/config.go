@@ -1,6 +1,7 @@
 package server
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/ungive/loon/pkg/pb"
@@ -10,10 +11,15 @@ type Config struct {
 	Constraints *pb.Constraints    `json:"constraints"`
 	Intervals   *ProtocolIntervals `json:"intervals"`
 	Http        *HttpConfig        `json:"http"`
+	Log         *LogConfig         `json:"log"`
 }
 
 type HttpConfig struct {
 	WriteWait time.Duration `json:"write_wait"`
+}
+
+type LogConfig struct {
+	Level slog.Level `json:"level"`
 }
 
 type ProtocolIntervals struct {
