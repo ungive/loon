@@ -1,21 +1,28 @@
 package main
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
+	"bufio"
 	"encoding/hex"
 	"errors"
 	"flag"
+	"fmt"
+	"io"
+	"io/fs"
 	"log"
+	"mime"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/ungive/loon/pkg/pb"
+	"github.com/ungive/loon/pkg/server"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -28,88 +35,87 @@ import (
 // loon-client --addr http://localhost:8080 ./example.txt
 
 const (
-	urlFormat    = "{base_url}/{client_id}/{mac}/{path}"
 	pingInterval = 20 * time.Second
 	pongWait     = 60 * time.Second
 	writeWait    = 10 * time.Second
 )
 
-var addr = flag.String("addr", "http://localhost:8080", "server address")
+var addr = flag.String("server", "", "server address")
+var explicitContentType = flag.String("type", "", "explicitly set the HTTP content type")
+var downloadFilename = flag.String("download", "", "set the download filename")
+var help = flag.Bool("help", false, "print help")
+var stop = atomic.Bool{}
+
+func init() {
+	log.SetFlags(0)
+}
 
 func main() {
 	flag.Parse()
-	conn := dial()
+	if *help {
+		fmt.Println("usage: loon-client -server <address> [options] <path>")
+		fmt.Println("options:")
+		flag.PrintDefaults()
+		return
+	}
+	if len(*addr) == 0 || flag.NArg() == 0 || len(flag.Arg(0)) == 0 {
+		log.Fatalf("invalid arguments")
+	}
+	path := flag.Arg(0)
+	file, err := os.Open(path)
+	if err != nil {
+		log.Fatalf("failed to open file: %v", err)
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		log.Fatalf("failed to stat file: %v", err)
+	}
+	size := info.Size()
+	conn := connect()
+	defer conn.close()
 	hello := conn.readHello()
-	handler := newHandler(conn, hello)
+	if uint64(size) > hello.Constraints.MaxContentSize {
+		log.Fatalf("server file size limit exceeded: maximum content size"+
+			" is %v bytes, got %v bytes, %v bytes over limit",
+			hello.Constraints.MaxContentSize, size,
+			uint64(size)-hello.Constraints.MaxContentSize)
+	}
+	fileType := getContentType(file)
+	if fileType.HasWildcard() {
+		log.Fatalf("the content type may not contain any wildcards: %v",
+			fileType)
+	}
+	contentTypes, err := server.NewContentTypeRegistryFromStrings(
+		hello.Constraints.AcceptedContentTypes)
+	if err != nil {
+		log.Fatalf("failed to interpret allowed content types: %v", err)
+	}
+	if !contentTypes.Contains(fileType) {
+		log.Fatalf("content type not allowed by the server: %v",
+			fileType)
+	}
+	// Handle incoming requests.
+	handler := newHandler(conn, hello, file, info, fileType)
 	go handler.run()
-
-	// log.Printf("Hello: %v", hello)
-	log.Printf("URL: %v", makeUrl(hello, "exam ple.txt", "key="+url.QueryEscape("va lue")))
-
+	// Print the URL under which the file is served.
+	log.Println(buildUrl(hello, info.Name(), ""))
 	// Block until the user hits CTRL+C
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
 	<-done
+	stop.Store(true)
 }
 
-type handler struct {
-	conn  *clientConn
-	hello *pb.Hello
-}
-
-func newHandler(conn *clientConn, hello *pb.Hello) *handler {
-	return &handler{
-		conn:  conn,
-		hello: hello,
-	}
-}
-
-func (h *handler) run() {
-	for {
-		message := h.conn.read()
-		log.Printf("recv: %T %v\n", message.Data, message)
-		switch value := message.Data.(type) {
-		case *pb.ServerMessage_Request:
-			h.handleRequest(value.Request)
-		case *pb.ServerMessage_Success:
-			log.Printf("successfully forwarded request %v!\n",
-				value.Success.RequestId)
-		default:
-			log.Fatalf("unexpected server message: %T %v", value, value)
-		}
-	}
-}
-
-func (h *handler) handleRequest(request *pb.Request) {
-	testPayload := []byte("<h1>It works!")
-	h.conn.write(&pb.ClientMessage{
-		Data: &pb.ClientMessage_ContentHeader{
-			ContentHeader: &pb.ContentHeader{
-				RequestId:   request.Id,
-				ContentType: "text/html",
-				ContentSize: uint64(len(testPayload)),
-				// Filename:    strPtr("index.html"),
-			},
-		},
-	})
-	h.conn.write(&pb.ClientMessage{
-		Data: &pb.ClientMessage_ContentChunk{
-			ContentChunk: &pb.ContentChunk{
-				RequestId: request.Id,
-				Sequence:  0,
-				Data:      testPayload,
-			},
-		},
-	})
-}
-
-func makeUrl(hello *pb.Hello, path string, query string) string {
-	mac, err := computeMac(hello.ClientId, hello.ConnectionSecret, path, query)
+func buildUrl(hello *pb.Hello, path string, query string) string {
+	mac, err := server.ComputeMac(
+		hello.ClientId, hello.ConnectionSecret, path, query)
 	if err != nil {
 		log.Fatalf("failed to compute MAC: %v\n", err)
 	}
 	macEncoded := hex.EncodeToString(mac)
-	result := formatString(urlFormat,
+	result := formatString(
+		"{base_url}/{client_id}/{mac}/{path}",
 		"base_url", *addr,
 		"client_id", hello.ClientId,
 		"mac", macEncoded,
@@ -120,70 +126,203 @@ func makeUrl(hello *pb.Hello, path string, query string) string {
 	return result
 }
 
-func dial() *clientConn {
+type handler struct {
+	conn  *clientConn
+	hello *pb.Hello
+	file  *os.File
+	info  fs.FileInfo
+	mime  *server.ContentType
+}
+
+func newHandler(
+	conn *clientConn,
+	hello *pb.Hello,
+	file *os.File,
+	info fs.FileInfo,
+	mime *server.ContentType,
+) *handler {
+	return &handler{
+		conn:  conn,
+		hello: hello,
+		file:  file,
+		info:  info,
+		mime:  mime,
+	}
+}
+
+func (h *handler) run() {
+	answer := make(chan *pb.Request, 16)
+	go func() {
+		for {
+			request := <-answer
+			h.sendContent(request)
+		}
+	}()
+	for {
+		message := h.conn.read()
+		switch m := message.Data.(type) {
+		case *pb.ServerMessage_Request:
+			if m.Request.Path != h.info.Name() {
+				log.Fatalf("unexpected path in request: %+v", m.Request.Path)
+			}
+			log.Printf("received request (%v): %v",
+				m.Request.Id, m.Request.Path)
+			answer <- m.Request
+		case *pb.ServerMessage_Success:
+		case *pb.ServerMessage_RequestClosed:
+			log.Printf("request closed (%v): %v",
+				m.RequestClosed.RequestId, m.RequestClosed.Message)
+		case *pb.ServerMessage_Close:
+			parts := strings.Split(m.Close.Reason.String(), "_")
+			for i, part := range parts {
+				parts[i] = strings.ToLower(part)
+			}
+			reason := strings.Join(parts[1:], " ")
+			log.Fatalf("connection closed: %v (%v)", m.Close.Message, reason)
+		default:
+			log.Fatalf("unexpected server message: %T %v", m, m)
+		}
+	}
+}
+
+func (h *handler) sendContent(request *pb.Request) {
+	_, err := h.file.Seek(0, io.SeekStart)
+	if err != nil {
+		log.Fatalf("failed to seek to beginning of file: %v", err)
+	}
+	var filename *string
+	if len(*downloadFilename) > 0 {
+		filename = downloadFilename
+	}
+	h.conn.write(&pb.ClientMessage{
+		Data: &pb.ClientMessage_ContentHeader{
+			ContentHeader: &pb.ContentHeader{
+				RequestId:        request.Id,
+				ContentType:      h.mime.String(),
+				ContentSize:      uint64(h.info.Size()),
+				Filename:         filename,
+				MaxCacheDuration: nil,
+			},
+		},
+	})
+	reader := bufio.NewReader(h.file)
+	buf := make([]byte, h.hello.Constraints.ChunkSize)
+	for sequence := uint64(0); ; sequence++ {
+		n, err := reader.Read(buf)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			log.Fatalf("failed to read file: %v", err)
+		}
+		data := buf[0:n]
+		h.conn.write(&pb.ClientMessage{
+			Data: &pb.ClientMessage_ContentChunk{
+				ContentChunk: &pb.ContentChunk{
+					RequestId: request.Id,
+					Sequence:  sequence,
+					Data:      data,
+				},
+			},
+		})
+	}
+}
+
+func connect() *clientConn {
 	// TODO properly parse URL and replace protocol
 	// FIXME handle https
+	// TODO must be protocol http or https
 	address := "ws" + strings.TrimPrefix(*addr, "http")
 	address = strings.TrimSuffix(address, "/") + "/ws"
-	log.Printf("dialing websocket address: %v\n", address)
-	conn, _, err := websocket.DefaultDialer.Dial(address, nil)
+	rawConn, _, err := websocket.DefaultDialer.Dial(address, nil)
 	if err != nil {
-		log.Fatalf("failed to dial websocket: %v\n", err)
+		log.Fatalf("failed to dial websocket at %v: %v", address, err)
 	}
-	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(pongWait))
+	log.Printf("connected to %v", address)
+	rawConn.SetPongHandler(func(string) error {
+		rawConn.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
-	// FIXME data race: writing ping while writing response
+	conn := &clientConn{
+		conn: rawConn,
+		send: make(chan []byte),
+		ping: make(chan struct{}),
+	}
 	go func() {
 		ticker := time.NewTicker(pingInterval)
 		for range ticker.C {
-			conn.SetWriteDeadline(time.Now().Add(writeWait))
-			err := conn.WriteMessage(websocket.PingMessage, []byte{})
-			if err != nil {
-				log.Fatalf("failed to write ping message: %v\n", err)
-			}
+			conn.ping <- struct{}{}
 		}
 	}()
-	return &clientConn{
-		conn: conn,
-	}
+	go conn.writePump()
+	return conn
 }
 
 type clientConn struct {
 	conn *websocket.Conn
+	send chan []byte
+	ping chan struct{}
+}
+
+func (c *clientConn) writePump() {
+	defer c.conn.Close()
+	for {
+		select {
+		case <-c.ping:
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			err := c.conn.WriteMessage(websocket.PingMessage, []byte{})
+			if err != nil {
+				if stop.Load() {
+					return
+				}
+				log.Fatalf("failed to write ping message: %v", err)
+			}
+		case data := <-c.send:
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			err := c.conn.WriteMessage(websocket.BinaryMessage, data)
+			if err != nil {
+				if stop.Load() {
+					return
+				}
+				log.Fatalf("failed to write client message: %v", err)
+			}
+		}
+	}
+}
+
+func (c *clientConn) write(message *pb.ClientMessage) {
+	data, err := proto.Marshal(message)
+	if err != nil {
+		log.Fatalf("failed to marshal client message: %v", err)
+	}
+	c.send <- data
+}
+
+func (c *clientConn) read() *pb.ServerMessage {
+	typ, data, err := c.conn.ReadMessage()
+	if err != nil {
+		if stop.Load() {
+			os.Exit(0)
+		}
+		log.Fatalf("failed to read message from server: %v", err)
+	}
+	if typ != websocket.BinaryMessage {
+		log.Fatalf("received an unexpected message type: %v", typ)
+	}
+	msg := &pb.ServerMessage{}
+	err = proto.Unmarshal(data, msg)
+	if err != nil {
+		log.Fatalf("failed to unmarshal server message: %v", err)
+	}
+	return msg
 }
 
 func (c *clientConn) readHello() *pb.Hello {
 	return getServerMessage[pb.ServerMessage_Hello](c.read()).Hello
 }
 
-func (c *clientConn) write(message *pb.ClientMessage) {
-	data, err := proto.Marshal(message)
-	if err != nil {
-		log.Fatalf("failed to marshal client message: %v\n", err)
-	}
-	c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-	err = c.conn.WriteMessage(websocket.BinaryMessage, data)
-	if err != nil {
-		log.Fatalf("failed to write client message: %v", err)
-	}
-}
-
-func (c *clientConn) read() *pb.ServerMessage {
-	typ, data, err := c.conn.ReadMessage()
-	if err != nil {
-		log.Fatalf("failed to read message from server: %v\n", err)
-	}
-	if typ != websocket.BinaryMessage {
-		log.Fatalf("received an unexpected message type: %v\n", typ)
-	}
-	msg := &pb.ServerMessage{}
-	err = proto.Unmarshal(data, msg)
-	if err != nil {
-		log.Fatalf("failed to unmarshal server message: %v\n", err)
-	}
-	return msg
+func (c *clientConn) close() {
+	c.conn.Close()
 }
 
 func getServerMessage[T interface{}, P *T](message *pb.ServerMessage) P {
@@ -191,40 +330,48 @@ func getServerMessage[T interface{}, P *T](message *pb.ServerMessage) P {
 	case P:
 		return m
 	default:
-		log.Fatalf("unexpected server message: %T %v\n", m, m)
+		log.Fatalf("unexpected server message: %T %v", m, m)
 	}
 	panic("unreachable")
 }
 
-// FIXME copied from client.go
-func computeMac(
-	clientId string,
-	clientSecret []byte,
-	path string,
-	query string,
-) ([]byte, error) {
-	path = strings.TrimLeft(path, "/")
-	query = strings.TrimLeft(query, "?")
-	mac := hmac.New(sha256.New, clientSecret)
-	items := [][]byte{
-		[]byte(clientId),
-		[]byte("/"),
-		[]byte(path),
+func getContentType(file *os.File) *server.ContentType {
+	if len(*explicitContentType) > 0 {
+		result := parseContentType(*explicitContentType)
+		log.Printf("using explicit content type: %v\n", result)
+		return result
 	}
-	if len(query) > 0 {
-		items = append(items, []byte("?"))
-		items = append(items, []byte(query))
+	extType := mime.TypeByExtension(filepath.Ext(file.Name()))
+	if len(extType) > 0 {
+		result := parseContentType(extType)
+		log.Printf("detected content type from extension: %v\n", result)
+		return result
 	}
-	for _, item := range items {
-		n, err := mac.Write(item)
-		if err != nil {
-			return nil, err
-		}
-		if n != len(item) {
-			return nil, errors.New("write did not write all bytes")
-		}
+	_, err := file.Seek(0, io.SeekStart)
+	if err != nil {
+		log.Fatalf("failed to seek to beginning of file: %v", err)
 	}
-	return mac.Sum(nil), nil
+	reader := bufio.NewReader(file)
+	buf := make([]byte, 512)
+	n, err := reader.Read(buf)
+	if errors.Is(err, io.EOF) {
+		log.Fatalf("cannot detect content type of empty file")
+	}
+	if err != nil {
+		log.Fatalf("failed to read file: %v", err)
+	}
+	data := buf[0:n]
+	result := parseContentType(http.DetectContentType(data))
+	log.Printf("detected content type from content: %v\n", result)
+	return result
+}
+
+func parseContentType(value string) *server.ContentType {
+	result, err := server.NewContentType(value)
+	if err != nil {
+		log.Fatalf("failed to parse content type %v: %v", value, err)
+	}
+	return result
 }
 
 // https://stackoverflow.com/a/40811635/6748004
@@ -235,8 +382,4 @@ func formatString(format string, args ...string) string {
 		}
 	}
 	return strings.NewReplacer(args...).Replace(format)
-}
-
-func strPtr(s string) *string {
-	return &s
 }
