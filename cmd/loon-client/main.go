@@ -72,7 +72,7 @@ func main() {
 		log.Fatalf("failed to stat file: %v", err)
 	}
 	size := info.Size()
-	conn := connect()
+	conn := connect(*addr)
 	defer conn.close()
 	hello := conn.readHello()
 	if uint64(size) > hello.Constraints.MaxContentSize {
@@ -228,12 +228,21 @@ func (h *handler) sendContent(request *pb.Request) {
 	}
 }
 
-func connect() *clientConn {
-	// TODO properly parse URL and replace protocol
-	// FIXME handle https
-	// TODO must be protocol http or https
-	address := "ws" + strings.TrimPrefix(*addr, "http")
-	address = strings.TrimSuffix(address, "/") + "/ws"
+func connect(address string) *clientConn {
+	address = strings.TrimSuffix(address, "/")
+	u, err := url.Parse(address)
+	if err != nil {
+		log.Fatalf("failed to parse address: %v", err)
+	}
+	switch u.Scheme {
+	case "http":
+		u.Scheme = "ws"
+	case "https":
+		u.Scheme = "wss"
+	default:
+		log.Fatalf("address must either have protocol HTTP or HTTPS: %v", u)
+	}
+	address = u.String() + "/ws"
 	rawConn, _, err := websocket.DefaultDialer.Dial(address, nil)
 	if err != nil {
 		log.Fatalf("failed to dial websocket at %v: %v", address, err)
