@@ -24,8 +24,7 @@ import (
 )
 
 const (
-	MAC_KEY_SIZE     = 64
-	CONTENT_TYPE_SEP = ";"
+	MAC_KEY_SIZE = 64
 )
 
 var (
