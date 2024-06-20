@@ -71,7 +71,7 @@ type Request interface {
 	// The channel is closed if the request is closed,
 	// either because Close() was called on this Request instance
 	// or because the response from the client has timed out.
-	Response() chan Response
+	Response() <-chan Response
 	// Indicate to the client that the request's response
 	// has been successfully forwarded by sending a Success message.
 	// May only be called if all chunks have been received.
@@ -82,7 +82,7 @@ type Request interface {
 	// - when the client has closed the response with a CloseResponse message,
 	// - when the client times out because it did not respond in time, or
 	// - when the client disconnected.
-	Closed() chan struct{}
+	Closed() <-chan struct{}
 	// Closes the request prematurely, if it hasn't already been completed,
 	// by sendign a RequestClosed message to the client.
 	// Does nothing if the request has already been closed.
@@ -97,7 +97,7 @@ type Response interface {
 	// Returns the channel that supplies the sender's chunks.
 	// The returned channel is closed if and only if
 	// the response has been fully received.
-	Chunks() chan []byte
+	Chunks() <-chan []byte
 }
 
 type internalRequest struct {
@@ -155,7 +155,7 @@ func (r *internalRequest) Query() string {
 	return r.query
 }
 
-func (r *internalRequest) Response() chan Response {
+func (r *internalRequest) Response() <-chan Response {
 	return r.pendingResponse
 }
 
@@ -172,7 +172,7 @@ func (r *internalRequest) Success() error {
 	return <-outErr
 }
 
-func (r *internalRequest) Closed() chan struct{} {
+func (r *internalRequest) Closed() <-chan struct{} {
 	return r.closed
 }
 
@@ -284,7 +284,7 @@ func (r *internalResponse) Header() *pb.ContentHeader {
 	return r.header
 }
 
-func (r *internalResponse) Chunks() chan []byte {
+func (r *internalResponse) Chunks() <-chan []byte {
 	return r.chunks
 }
 

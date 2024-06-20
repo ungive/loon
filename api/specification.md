@@ -414,7 +414,7 @@ type Request interface {
   // The channel yields exactly one value and is then closed.
   // Yields a Response instance, if the client sends a ContentHeader,
   // and a nil value if the client sends an EmptyResponse.
-  Response() chan Response
+  Response() <-chan Response
   // Indicate to the client that the request's response
   // has been successfully forwarded by sending a Success message.
   // Must be called if all chunks have been received,
@@ -426,7 +426,7 @@ type Request interface {
   // - when the client has closed the response with a CloseResponse message,
   // - when the client times out because it did not respond in time, or
   // - when the client disconnected.
-  Closed() chan struct{}
+  Closed() <-chan struct{}
   // Closes the request prematurely, if it hasn't already been completed,
   // by sending a RequestClosed message to the client.
   // Does nothing if the request has already been closed.
@@ -438,7 +438,7 @@ type Response interface {
   Header() ContentHeader
   // The returned channel is closed if and only if
   // the response has been fully received.
-  Chunks() chan []byte
+  Chunks() <-chan []byte
 }
 ```
 
