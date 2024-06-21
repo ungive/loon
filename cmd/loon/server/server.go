@@ -58,7 +58,7 @@ func Main(cmd string, args []string) {
 	}
 }
 
-func readConfig(path string) *server.Config {
+func readConfig(path string) *server.Options {
 	logger = newLogger(slog.LevelWarn)
 	clog := logger.With("context", "config")
 	if len(*configPath) <= 0 {
@@ -82,7 +82,7 @@ func readConfig(path string) *server.Config {
 		clog.Error("failed to open config file", "err", err)
 		abort()
 	}
-	var v server.Config
+	var v server.Options
 	if err := yaml.Unmarshal(data, &v); err != nil {
 		clog.Error("failed to parse config YAML", "err", err)
 		abort()

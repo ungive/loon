@@ -9,7 +9,7 @@ import (
 )
 
 // Sane default values for testing the server without an explicit config.
-var defaultConfig = &server.Config{
+var defaultConfig = &server.Options{
 	Protocol: &server.ProtocolOptions{
 		BaseUrl: "localhost:" + defaultPort,
 		Constraints: &pb.Constraints{
@@ -18,11 +18,11 @@ var defaultConfig = &server.Config{
 			AcceptedContentTypes: defaultContentTypes,
 		},
 		Intervals: &server.ProtocolIntervals{
-			WriteWait:       10 * time.Second,
-			PongWait:        60 * time.Second,
-			PingInterval:    48 * time.Second,
-			TimeoutDuration: 30 * time.Second,
-			TimeoutInterval: 8 * time.Second,
+			WriteTimeout:          10 * time.Second,
+			PongTimeout:           60 * time.Second,
+			PingInterval:          48 * time.Second,
+			ClientTimeout:         30 * time.Second,
+			ClientTimeoutInterval: 8 * time.Second,
 		},
 	},
 	Http: &server.HttpOptions{

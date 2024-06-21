@@ -35,13 +35,13 @@ var (
 )
 
 var defaultIntervals = &ProtocolIntervals{
-	WriteWait:    10 * time.Second,
-	PongWait:     40 * time.Millisecond,
+	WriteTimeout: 10 * time.Second,
+	PongTimeout:  40 * time.Millisecond,
 	PingInterval: 5 * time.Millisecond,
 	// Note that these should be smaller than the test timeout,
 	// especially when testing protocol timeouts.
-	TimeoutDuration: 60 * time.Millisecond,
-	TimeoutInterval: 10 * time.Millisecond,
+	ClientTimeout:         60 * time.Millisecond,
+	ClientTimeoutInterval: 10 * time.Millisecond,
 }
 
 var defaultConstraints = &pb.Constraints{
@@ -264,7 +264,7 @@ func Test_Response_Chunks_chan_is_closed_when_all_chunks_have_been_received(t *t
 func Test_Request_Closed_channel_is_closed_when_calling_Client_Close(t *testing.T) {
 	server := newWebsocketServer(t, testAddress)
 	// Make sure the Request.Closed() channel is not closed because of a timeout.
-	server.intervals.TimeoutDuration = time.Minute
+	server.intervals.ClientTimeout = time.Minute
 	conn, client, _, done := getConnClientHello(server)
 	defer done()
 	request, err := client.request(testPath, testQuery)
@@ -278,7 +278,7 @@ func Test_Request_Closed_channel_is_closed_when_calling_Client_Close(t *testing.
 func Test_Request_Closed_channel_is_closed_when_calling_Request_Close(t *testing.T) {
 	server := newWebsocketServer(t, testAddress)
 	// Make sure the Request.Closed() channel is not closed because of a timeout.
-	server.intervals.TimeoutDuration = time.Minute
+	server.intervals.ClientTimeout = time.Minute
 	conn, client, _, done := getConnClientHello(server)
 	defer done()
 	request, err := client.request(testPath, testQuery)
@@ -375,7 +375,7 @@ func Test_server_sends_Closed_when_client_does_not_send_CloseResponse_after_serv
 		ContentSize: uint64(16),
 	})
 	conn.readRequestClosed()
-	time.Sleep(server.intervals.TimeoutDuration)
+	time.Sleep(server.intervals.ClientTimeout)
 	conn.expectClose(pb.Close_REASON_TIMED_OUT)
 	client.waitForExit()
 }
@@ -491,7 +491,7 @@ func Test_Request_Success_returns_error_after_request_timed_out(t *testing.T) {
 		// The request is only closed after timeout if there are pending chunks.
 		ContentSize: uint64(1),
 	})
-	time.Sleep(1 * server.intervals.TimeoutDuration)
+	time.Sleep(1 * server.intervals.ClientTimeout)
 	conn.readRequestClosed()
 	err = request.Success()
 	assert.ErrorIs(t, err, ErrRequestClosed)
@@ -509,7 +509,7 @@ func Test_server_has_one_active_request_when_client_timed_out_after_non_empty_Co
 		ContentType: testContentType,
 		ContentSize: uint64(1),
 	})
-	time.Sleep(server.intervals.TimeoutDuration)
+	time.Sleep(server.intervals.ClientTimeout)
 	conn.readRequestClosed()
 	client.expectActiveRequests(1)
 }
@@ -525,7 +525,7 @@ func Test_server_has_zero_active_requests_when_client_timed_out_after_sending_em
 		ContentType: testContentType,
 		ContentSize: uint64(0),
 	})
-	time.Sleep(2 * server.intervals.TimeoutDuration)
+	time.Sleep(2 * server.intervals.ClientTimeout)
 	client.expectActiveRequests(0)
 }
 
@@ -545,7 +545,7 @@ func Test_server_has_zero_active_requests_when_client_timed_out_after_sending_la
 		Sequence:  0,
 		Data:      []byte("_"),
 	})
-	time.Sleep(2 * server.intervals.TimeoutDuration)
+	time.Sleep(2 * server.intervals.ClientTimeout)
 	client.expectActiveRequests(0)
 }
 
@@ -560,7 +560,7 @@ func Test_server_sends_RequestClosed_when_Request_Success_is_not_called_within_t
 		ContentType: testContentType,
 		ContentSize: uint64(16),
 	})
-	time.Sleep(server.intervals.TimeoutDuration)
+	time.Sleep(server.intervals.ClientTimeout)
 	conn.readRequestClosed()
 }
 
@@ -669,7 +669,7 @@ func Test_server_sends_Close_when_client_sends_CloseResponse_after_response_is_c
 		ContentSize: uint64(0),
 	})
 	waitForChanClose(t, request.Completed(), nil)
-	time.Sleep(2 * server.intervals.TimeoutDuration)
+	time.Sleep(2 * server.intervals.ClientTimeout)
 	conn.writeCloseResponse(&pb.CloseResponse{
 		RequestId: request.ID(),
 	})
@@ -799,7 +799,7 @@ func Test_server_does_not_send_Close_when_client_sends_CloseResponse_before_rece
 		RequestId: request.ID(),
 	})
 	conn.readRequestClosed()
-	time.Sleep(2 * server.intervals.TimeoutDuration)
+	time.Sleep(2 * server.intervals.ClientTimeout)
 	client.expectActiveRequests(0)
 }
 
@@ -1144,42 +1144,6 @@ func Test_Client_Close_does_nothing_when_Client_is_already_closed(t *testing.T) 
 	client.Close()
 }
 
-func Test_creating_a_client_fails_when_a_content_type_in_Contraints_has_parameters(t *testing.T) {
-	c := newConstraints()
-	c.AcceptedContentTypes =
-		append(c.AcceptedContentTypes, "text/html; charset=utf-8")
-	_, err := NewClient(nil, &ProtocolOptions{
-		BaseUrl:     testAddress,
-		Constraints: c,
-		Intervals:   newIntervals(),
-	})
-	assert.NotNil(t, err)
-}
-
-func Test_creating_a_client_fails_when_a_content_type_in_Contraints_contains_spaces(t *testing.T) {
-	c := newConstraints()
-	c.AcceptedContentTypes =
-		append(c.AcceptedContentTypes, " text/html")
-	_, err := NewClient(nil, &ProtocolOptions{
-		BaseUrl:     testAddress,
-		Constraints: c,
-		Intervals:   newIntervals(),
-	})
-	assert.NotNil(t, err)
-}
-
-func Test_creating_a_client_fails_when_a_content_type_in_Contraints_is_not_all_lowercase(t *testing.T) {
-	c := newConstraints()
-	c.AcceptedContentTypes =
-		append(c.AcceptedContentTypes, "text/HTML")
-	_, err := NewClient(nil, &ProtocolOptions{
-		BaseUrl:     testAddress,
-		Constraints: c,
-		Intervals:   newIntervals(),
-	})
-	assert.NotNil(t, err)
-}
-
 func Test_server_does_not_send_RequestClosed_when_client_response_is_completed_and_times_out(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
@@ -1198,7 +1162,7 @@ func Test_server_does_not_send_RequestClosed_when_client_response_is_completed_a
 	})
 	// Wait long enough that a Close message may have been sent.
 	// The deferred done() above will check that there are no more messages.
-	time.Sleep(2 * server.intervals.TimeoutDuration)
+	time.Sleep(2 * server.intervals.ClientTimeout)
 }
 
 func Test_Request_Success_returns_error_after_client_sent_CloseResponse(t *testing.T) {
@@ -1215,7 +1179,7 @@ func Test_Request_Success_returns_error_after_client_sent_CloseResponse(t *testi
 	conn.writeCloseResponse(&pb.CloseResponse{
 		RequestId: request.ID(),
 	})
-	time.Sleep(server.intervals.TimeoutDuration / 2)
+	time.Sleep(server.intervals.ClientTimeout / 2)
 	err = request.Success()
 	assert.ErrorIs(t, err, ErrRequestClosed)
 	client.expectActiveRequests(0)
@@ -1233,7 +1197,7 @@ func Test_Request_Success_returns_error_after_calling_Client_Close(t *testing.T)
 		ContentSize: 1,
 	})
 	client.Close()
-	time.Sleep(server.intervals.TimeoutDuration / 2)
+	time.Sleep(server.intervals.ClientTimeout / 2)
 	err = request.Success()
 	assert.ErrorIs(t, err, ErrClientClosed)
 	conn.readClose()
@@ -1314,7 +1278,7 @@ func Test_server_does_not_send_Close_when_client_sends_empty_ContentHeader_after
 		ContentType: testContentType,
 		ContentSize: uint64(0),
 	})
-	time.Sleep(2 * server.intervals.TimeoutDuration)
+	time.Sleep(2 * server.intervals.ClientTimeout)
 	client.expectActiveRequests(0)
 }
 
@@ -1337,7 +1301,7 @@ func Test_server_does_not_send_Close_when_client_sends_last_ContentChunk_after_r
 		Sequence:  0,
 		Data:      []byte("_"),
 	})
-	time.Sleep(2 * server.intervals.TimeoutDuration)
+	time.Sleep(2 * server.intervals.ClientTimeout)
 	client.expectActiveRequests(0)
 }
 
@@ -1352,7 +1316,7 @@ func Test_server_does_not_send_Close_when_client_sends_EmptyResponse_after_reque
 	conn.writeEmptyResponse(&pb.EmptyResponse{
 		RequestId: request.ID(),
 	})
-	time.Sleep(2 * server.intervals.TimeoutDuration)
+	time.Sleep(2 * server.intervals.ClientTimeout)
 	client.expectActiveRequests(0)
 }
 

@@ -3,11 +3,19 @@ package server
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"mime"
 	"time"
 
 	"github.com/ungive/loon/pkg/pb"
 )
+
+// Root object for any server configuration file.
+type Options struct {
+	Protocol *ProtocolOptions `json:"protocol"`
+	Http     *HttpOptions     `json:"http"`
+	Log      *LogOptions      `json:"log"`
+}
 
 type ProtocolOptions struct {
 	BaseUrl     string             `json:"base_url"`
@@ -15,11 +23,31 @@ type ProtocolOptions struct {
 	Intervals   *ProtocolIntervals `json:"intervals"`
 }
 
+type HttpOptions struct {
+	WriteTimeout time.Duration `json:"write_timeout"`
+	ReadTimeout  time.Duration `json:"read_timeout"`
+	IdleTimeout  time.Duration `json:"idle_timeout"`
+}
+
+type LogOptions struct {
+	Level slog.Level `json:"level"`
+}
+
+func (c *Options) Validate() error {
+	if err := c.Protocol.Validate(); err != nil {
+		return err
+	}
+	if err := c.Http.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (c *ProtocolOptions) Validate() error {
 	if len(c.BaseUrl) == 0 {
 		return errors.New("base URL cannot be empty")
 	}
-	if err := ValidateProtocolIntervals(c.Intervals); err != nil {
+	if err := c.Intervals.Validate(); err != nil {
 		return err
 	}
 	if err := ValidateConstraints(c.Constraints); err != nil {
@@ -28,42 +56,55 @@ func (c *ProtocolOptions) Validate() error {
 	return nil
 }
 
+func (h *HttpOptions) Validate() error {
+	if h.WriteTimeout < 0 {
+		return errors.New("http write wait must be greater or equal to zero")
+	}
+	if h.ReadTimeout < 0 {
+		return errors.New("http write wait must be greater or equal to zero")
+	}
+	if h.IdleTimeout < 0 {
+		return errors.New("http write wait must be greater or equal to zero")
+	}
+	return nil
+}
+
 type ProtocolIntervals struct {
 	// The duration after which a message should have been written.
 	// If the message was not fully written within this time frame,
 	// the connection is closed.
-	WriteWait time.Duration `json:"write_wait"`
+	WriteTimeout time.Duration `json:"write_wait"`
 
 	// The duration after which a pong message should have arrived.
 	// If no pong is received within this time frame, the connection is closed.
-	PongWait time.Duration `json:"pong_wait"`
+	PongTimeout time.Duration `json:"pong_wait"`
 
 	// The interval at which websocket ping messages are sent.
 	PingInterval time.Duration `json:"ping_interval"`
 
-	// The duration after which an expected message should have arrived.
+	// The duration after which an expected client message should have arrived.
 	// If no message is received within this time frame,
 	// the connection is closed.
-	TimeoutDuration time.Duration `json:"timeout_duration"`
+	ClientTimeout time.Duration `json:"timeout_duration"`
 
-	// The interval at which message timeouts are checked.
-	TimeoutInterval time.Duration `json:"timeout_interval"`
+	// The interval at which client message timeouts are checked.
+	ClientTimeoutInterval time.Duration `json:"timeout_interval"`
 }
 
-func ValidateProtocolIntervals(intervals *ProtocolIntervals) error {
-	if intervals.WriteWait <= 0 {
+func (i *ProtocolIntervals) Validate() error {
+	if i.WriteTimeout <= 0 {
 		return errors.New("write wait must be greater than zero")
 	}
-	if intervals.PongWait <= 0 {
+	if i.PongTimeout <= 0 {
 		return errors.New("pong wait must be greater than zero")
 	}
-	if intervals.PingInterval <= 0 {
+	if i.PingInterval <= 0 {
 		return errors.New("ping interval must be greater than zero")
 	}
-	if intervals.TimeoutDuration <= 0 {
+	if i.ClientTimeout <= 0 {
 		return errors.New("timeout duration must be greater than zero")
 	}
-	if intervals.TimeoutInterval <= 0 {
+	if i.ClientTimeoutInterval <= 0 {
 		return errors.New("timeout interval must be greater than zero")
 	}
 	return nil

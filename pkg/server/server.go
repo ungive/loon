@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -19,45 +18,6 @@ var (
 	requestIndex      = atomic.Int64{}
 )
 
-type Config struct {
-	Protocol *ProtocolOptions `json:"protocol"`
-	Http     *HttpOptions     `json:"http"`
-	Log      *LogOptions      `json:"log"`
-}
-
-func (c *Config) Validate() error {
-	if err := c.Protocol.Validate(); err != nil {
-		return err
-	}
-	if err := c.Http.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-type HttpOptions struct {
-	WriteTimeout time.Duration `json:"write_timeout"`
-	ReadTimeout  time.Duration `json:"read_timeout"`
-	IdleTimeout  time.Duration `json:"idle_timeout"`
-}
-
-func (h *HttpOptions) Validate() error {
-	if h.WriteTimeout < 0 {
-		return errors.New("http write wait must be greater or equal to zero")
-	}
-	if h.ReadTimeout < 0 {
-		return errors.New("http write wait must be greater or equal to zero")
-	}
-	if h.IdleTimeout < 0 {
-		return errors.New("http write wait must be greater or equal to zero")
-	}
-	return nil
-}
-
-type LogOptions struct {
-	Level slog.Level `json:"level"`
-}
-
 type Server interface {
 	// Run loop for the server.
 	Run()
@@ -66,14 +26,14 @@ type Server interface {
 }
 
 type serverImpl struct {
-	config       *Config
+	config       *Options
 	log          *slog.Logger
 	manager      ClientManager
 	upgrader     websocket.Upgrader
 	contentTypes *ContentTypeRegistry
 }
 
-func NewServer(config *Config, log *slog.Logger) (Server, error) {
+func NewServer(config *Options, log *slog.Logger) (Server, error) {
 	server := &serverImpl{
 		config:       config,
 		log:          log,

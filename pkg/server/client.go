@@ -657,9 +657,9 @@ func (c *clientImpl) chunkDiscarder() {
 func (c *clientImpl) readPump() {
 	// Chunks are the largest messages, so make sure a message can fit one.
 	c.conn.SetReadLimit(max(512, 2*int64(c.config.Constraints.ChunkSize)))
-	c.conn.SetReadDeadline(time.Now().Add(c.config.Intervals.PongWait))
+	c.conn.SetReadDeadline(time.Now().Add(c.config.Intervals.PongTimeout))
 	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(c.config.Intervals.PongWait))
+		c.conn.SetReadDeadline(time.Now().Add(c.config.Intervals.PongTimeout))
 		return nil
 	})
 	// Always call c.close() before returning from the loop,
@@ -717,7 +717,8 @@ func (c *clientImpl) write(message *pb.ServerMessage) error {
 		log.Printf("Failed to marshal message: %v", err)
 		return err
 	}
-	err = c.conn.SetWriteDeadline(time.Now().Add(c.config.Intervals.WriteWait))
+	err = c.conn.SetWriteDeadline(
+		time.Now().Add(c.config.Intervals.WriteTimeout))
 	if err != nil {
 		return err
 	}
@@ -760,7 +761,7 @@ func (c *clientImpl) writePump() {
 			}
 		case <-ticker.C:
 			err := c.conn.SetWriteDeadline(
-				time.Now().Add(c.config.Intervals.WriteWait))
+				time.Now().Add(c.config.Intervals.WriteTimeout))
 			if err != nil {
 				return
 			}
@@ -774,7 +775,7 @@ func (c *clientImpl) writePump() {
 
 // Executes the run loop for handling all protocol messages.
 func (c *clientImpl) protocol() {
-	timeoutTicker := time.NewTicker(c.config.Intervals.TimeoutInterval)
+	timeoutTicker := time.NewTicker(c.config.Intervals.ClientTimeoutInterval)
 	defer func() {
 		timeoutTicker.Stop()
 		// Close all requests when the protocol ends.
@@ -828,7 +829,7 @@ func (c *clientImpl) protocol() {
 func (c *clientImpl) checkTimeouts() {
 	now := time.Now()
 	for _, request := range c.requests {
-		if now.Sub(request.lastUpdated) < c.config.Intervals.TimeoutDuration {
+		if now.Sub(request.lastUpdated) < c.config.Intervals.ClientTimeout {
 			continue
 		}
 		if request.isClosed() {
