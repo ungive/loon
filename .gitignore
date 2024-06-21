@@ -2,6 +2,7 @@
 *.env
 *.exe
 *.out
+cover.html
 
 /_notes
 /todo.txt
