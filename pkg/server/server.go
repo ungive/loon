@@ -231,10 +231,10 @@ func (s *serverImpl) serve(
 	if cacheFor := response.Header().MaxCacheDuration; cacheFor != nil {
 		maxAge = *cacheFor
 	}
+	w.Header().Set("Age", "0") // The data is always recent
 	if maxAge == 0 {
 		w.Header().Set("Cache-Control", "no-store")
 	} else {
-		w.Header().Set("Age", "0")
 		w.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d", maxAge))
 	}
 	// Read the content and forward it to the HTTP client.
