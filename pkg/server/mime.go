@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"mime"
 	"strings"
 )
@@ -36,6 +37,19 @@ func NewContentType(value string) (*ContentType, error) {
 		SubType:  strings.TrimSpace(sub),
 		Params:   params,
 	}, nil
+}
+
+func ParseContentTypes(values []string) ([]*ContentType, error) {
+	result := make([]*ContentType, len(values))
+	for i, value := range values {
+		contentType, err := NewContentType(value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse content type:"+
+				" %q at index %d: %w", value, i, err)
+		}
+		result[i] = contentType
+	}
+	return result, nil
 }
 
 func (c *ContentType) HasWildcard() bool {
@@ -119,25 +133,21 @@ func (i *MultiContentTypeIndex) ContainsRootContentType(value string) bool {
 }
 
 type ContentTypeRegistry struct {
-	index ContentTypeIndex
+	Index ContentTypeIndex
 }
 
 func NewContentTypeRegistry(index ContentTypeIndex) *ContentTypeRegistry {
 	return &ContentTypeRegistry{
-		index: index,
+		Index: index,
 	}
 }
 
 func NewContentTypeRegistryFromStrings(
-	contentTypes []string,
+	values []string,
 ) (*ContentTypeRegistry, error) {
-	result := make([]*ContentType, len(contentTypes))
-	for i, value := range contentTypes {
-		contentType, err := NewContentType(value)
-		if err != nil {
-			return nil, err
-		}
-		result[i] = contentType
+	result, err := ParseContentTypes(values)
+	if err != nil {
+		return nil, err
 	}
 	index := NewMultiContentTypeIndex(result)
 	registry := NewContentTypeRegistry(index)
@@ -150,9 +160,9 @@ func (r *ContentTypeRegistry) Contains(contentType *ContentType) bool {
 		return true
 	}
 	if contentType.MatchesAllSubtypes() {
-		return r.index.ContainsRootContentType(contentType.RootType)
+		return r.Index.ContainsRootContentType(contentType.RootType)
 	}
-	return r.index.ContainsContentType(contentType.Type)
+	return r.Index.ContainsContentType(contentType.Type)
 }
 
 // Checks whether any of the accepted content types are in the registry.
@@ -172,7 +182,7 @@ func (r *ContentTypeRegistry) CanServeAccept(acceptValue string) bool {
 			if root == "*" {
 				return true
 			}
-			if r.index.ContainsRootContentType(root) {
+			if r.Index.ContainsRootContentType(root) {
 				return true
 			}
 			continue
@@ -180,7 +190,7 @@ func (r *ContentTypeRegistry) CanServeAccept(acceptValue string) bool {
 		if root == "*" {
 			continue // invalid
 		}
-		if r.index.ContainsContentType(contentType) {
+		if r.Index.ContainsContentType(contentType) {
 			return true
 		}
 	}

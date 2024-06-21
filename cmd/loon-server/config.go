@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/ungive/loon/pkg/pb"
@@ -9,17 +10,26 @@ import (
 
 // Sane default values for testing the server without an explicit config.
 var defaultConfig = &server.Config{
-	Constraints: &pb.Constraints{
-		MaxContentSize:       64 * 1024 * 1024, // 64 MiB
-		ChunkSize:            64 * 1024,        // 64 KiB
-		AcceptedContentTypes: defaultContentTypes,
+	Protocol: &server.ProtocolOptions{
+		BaseUrl: "localhost:" + defaultPort,
+		Constraints: &pb.Constraints{
+			MaxContentSize:       64 * 1024 * 1024, // 64 MiB
+			ChunkSize:            64 * 1024,        // 64 KiB
+			AcceptedContentTypes: defaultContentTypes,
+		},
+		Intervals: &server.ProtocolIntervals{
+			WriteWait:       10 * time.Second,
+			PongWait:        60 * time.Second,
+			PingInterval:    48 * time.Second,
+			TimeoutDuration: 30 * time.Second,
+			TimeoutInterval: 8 * time.Second,
+		},
 	},
-	Intervals: &server.ProtocolIntervals{
-		WriteWait:       10 * time.Second,
-		PongWait:        60 * time.Second,
-		PingInterval:    48 * time.Second,
-		TimeoutDuration: 30 * time.Second,
-		TimeoutInterval: 8 * time.Second,
+	Http: &server.HttpOptions{
+		WriteWait: 10 * time.Second,
+	},
+	Log: &server.LogOptions{
+		Level: slog.LevelDebug,
 	},
 }
 

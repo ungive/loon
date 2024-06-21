@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"mime"
 	"net/url"
 	"strings"
 	"sync"
@@ -415,7 +414,7 @@ type clientImpl struct {
 	id           UUID                // ownership: read-only
 	idStr        string              // ownership: read-only
 	secret       []byte              // ownership: read-only
-	config       *ClientConfig       // ownership: read-only
+	config       *ProtocolOptions    // ownership: read-only
 	contentTypes map[string]struct{} // ownership: protocol()
 	dirty        atomic.Bool
 
@@ -436,67 +435,13 @@ type clientImpl struct {
 	discardChunks  chan *forwardDiscard
 }
 
-type ClientConfig struct {
-	BaseUrl     string
-	Constraints *pb.Constraints
-	Intervals   *ProtocolIntervals
-}
-
-func (c *ClientConfig) Clone() *ClientConfig {
-	return &ClientConfig{
-		BaseUrl:     c.BaseUrl,
-		Constraints: proto.Clone(c.Constraints).(*pb.Constraints),
-		Intervals:   c.Intervals,
-	}
-}
-
-func (c *ClientConfig) validate() error {
-	if len(c.BaseUrl) == 0 {
-		return errors.New("base URL cannot be empty")
-	}
-	if c.Intervals.WriteWait <= 0 {
-		return errors.New("write wait must be greater than zero")
-	}
-	if c.Intervals.PongWait <= 0 {
-		return errors.New("pong wait must be greater than zero")
-	}
-	if c.Intervals.PingInterval <= 0 {
-		return errors.New("ping interval must be greater than zero")
-	}
-	if c.Intervals.TimeoutDuration <= 0 {
-		return errors.New("timeout duration must be greater than zero")
-	}
-	if c.Intervals.TimeoutInterval <= 0 {
-		return errors.New("timeout interval must be greater than zero")
-	}
-	if c.Constraints.ChunkSize > c.Constraints.MaxContentSize {
-		return errors.New(
-			"chunk size cannot be larger than maximum content size")
-	}
-	if len(c.Constraints.AcceptedContentTypes) == 0 {
-		return errors.New("accepted content types cannot be empty")
-	}
-	for _, contentType := range c.Constraints.AcceptedContentTypes {
-		sanitized, params, err := mime.ParseMediaType(contentType)
-		if err != nil {
-			return fmt.Errorf("invalid accepted content type: %w", err)
-		}
-		if len(params) > 0 {
-			return errors.New("content type may not contain parameters")
-		}
-		if contentType != sanitized {
-			return errors.New(
-				"content type must be lowercase and contain no spaces")
-		}
-	}
-	return nil
-}
-
-func NewClient(conn *websocket.Conn, config *ClientConfig) (Client, error) {
-	err := config.validate()
-	if err != nil {
-		return nil, err
-	}
+// Creates a new client instance, wrapping a websocket connection.
+// The configuration is expected to have valid entries,
+// validation should have been done beforehand,
+// so that it is not repeated whenever a new client connects.
+// If validation needs to be performed automatically,
+// create new clients with the ClientFactory type.
+func NewClient(conn *websocket.Conn, config *ProtocolOptions) (Client, error) {
 	id, err := NewUUID()
 	if err != nil {
 		return nil, err
@@ -510,7 +455,7 @@ func NewClient(conn *websocket.Conn, config *ClientConfig) (Client, error) {
 		id:             id,
 		idStr:          id.String(),
 		secret:         secret[:],
-		config:         config.Clone(),
+		config:         config,
 		dirty:          atomic.Bool{},
 		conn:           conn,
 		recv:           make(chan *pb.ClientMessage, 256),

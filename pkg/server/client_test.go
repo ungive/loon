@@ -1148,7 +1148,7 @@ func Test_creating_a_client_fails_when_a_content_type_in_Contraints_has_paramete
 	c := newConstraints()
 	c.AcceptedContentTypes =
 		append(c.AcceptedContentTypes, "text/html; charset=utf-8")
-	_, err := NewClient(nil, &ClientConfig{
+	_, err := NewClient(nil, &ProtocolOptions{
 		BaseUrl:     testAddress,
 		Constraints: c,
 		Intervals:   newIntervals(),
@@ -1160,7 +1160,7 @@ func Test_creating_a_client_fails_when_a_content_type_in_Contraints_contains_spa
 	c := newConstraints()
 	c.AcceptedContentTypes =
 		append(c.AcceptedContentTypes, " text/html")
-	_, err := NewClient(nil, &ClientConfig{
+	_, err := NewClient(nil, &ProtocolOptions{
 		BaseUrl:     testAddress,
 		Constraints: c,
 		Intervals:   newIntervals(),
@@ -1172,7 +1172,7 @@ func Test_creating_a_client_fails_when_a_content_type_in_Contraints_is_not_all_l
 	c := newConstraints()
 	c.AcceptedContentTypes =
 		append(c.AcceptedContentTypes, "text/HTML")
-	_, err := NewClient(nil, &ClientConfig{
+	_, err := NewClient(nil, &ProtocolOptions{
 		BaseUrl:     testAddress,
 		Constraints: c,
 		Intervals:   newIntervals(),
@@ -1838,7 +1838,7 @@ func (s *websocketServer) getHandler() http.Handler {
 			s.errors <- err
 			return
 		}
-		client, err := NewClient(conn, &ClientConfig{
+		client, err := NewClient(conn, &ProtocolOptions{
 			BaseUrl:     s.mockAddress,
 			Constraints: s.constraints,
 			Intervals:   s.intervals,
