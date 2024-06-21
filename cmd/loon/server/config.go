@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"log/slog"
@@ -26,7 +26,9 @@ var defaultConfig = &server.Config{
 		},
 	},
 	Http: &server.HttpOptions{
-		WriteWait: 10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		ReadTimeout:  10 * time.Second,
+		IdleTimeout:  30 * time.Second,
 	},
 	Log: &server.LogOptions{
 		Level: slog.LevelDebug,

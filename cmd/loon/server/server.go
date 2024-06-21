@@ -1,7 +1,8 @@
-package main
+package server
 
 import (
 	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -11,47 +12,64 @@ import (
 	"github.com/ungive/loon/pkg/server"
 )
 
+var Cmd = flag.NewFlagSet("server", flag.ExitOnError)
+var logger = defaultLogger()
+
 var (
 	defaultPort = "8080"
 	defaultAddr = ":" + defaultPort
-	addr        = flag.String("addr", defaultAddr, "http service address")
-	configPath  = flag.String("config", "", "the path to a config file")
+	serviceAddr = Cmd.String("addr", defaultAddr, "http service address")
+	configPath  = Cmd.String("config", "", "the path to a config file")
+	help        = Cmd.Bool("help", false, "print help")
 )
 
-var log *slog.Logger
+func Usage(cmd string) {
+	fmt.Println(cmd + " [options]")
+	Cmd.PrintDefaults()
+}
 
-func main() {
-	flag.Parse()
+func Main(cmd string, args []string) {
+	Cmd.Parse(args)
+	if *help {
+		Usage(cmd)
+		return
+	}
 	config := readConfig(*configPath)
-	server, err := server.NewServer(config, log)
+	server, err := server.NewServer(config, logger)
 	go server.Run()
 	if err != nil {
-		log.Error("failed to start server", "err", err)
+		logger.Error("failed to start server", "err", err)
 		abort()
 	}
 	srv := http.Server{
-		Addr:         *addr,
-		WriteTimeout: config.Http.WriteWait,
+		Addr:         *serviceAddr,
+		WriteTimeout: config.Http.WriteTimeout,
+		ReadTimeout:  config.Http.ReadTimeout,
+		IdleTimeout:  config.Http.IdleTimeout,
 		Handler:      server.Handler(),
 	}
+	logger.Info(fmt.Sprintf("serving on %v (%v)",
+		*serviceAddr, config.Protocol.BaseUrl))
 	err = srv.ListenAndServe()
 	if err != nil {
-		log.Error("failed to listen on address", "addr", *addr, "err", err)
+		logger.Error("failed to listen on address",
+			"addr", *serviceAddr, "err", err)
 		abort()
 	}
 }
 
 func readConfig(path string) *server.Config {
-	log = newLogger(slog.LevelWarn)
-	clog := log.With("context", "config")
+	logger = newLogger(slog.LevelWarn)
+	clog := logger.With("context", "config")
 	if len(*configPath) <= 0 {
-		if *addr != defaultAddr {
+		if *serviceAddr != defaultAddr {
 			clog.Error("can only use the default config" +
 				" with the default address. please supply a config path" +
 				" or use the default address for testing")
 			abort()
 		}
 		clog.Warn("using the default config, only do this during testing")
+		logger = newLogger(slog.LevelDebug)
 		return defaultConfig
 	}
 	absPath, err := filepath.Abs(path)
@@ -74,9 +92,13 @@ func readConfig(path string) *server.Config {
 		abort()
 	}
 	// Create a new logger to reflect the configured logging level.
-	log = newLogger(v.Log.Level)
-	log.Info("loaded config", "path", absPath)
+	logger = newLogger(v.Log.Level)
+	logger.Info("loaded config", "path", absPath)
 	return &v
+}
+
+func defaultLogger() *slog.Logger {
+	return newLogger(slog.LevelDebug)
 }
 
 func newLogger(defaultLevel slog.Level) *slog.Logger {
@@ -87,6 +109,6 @@ func newLogger(defaultLevel slog.Level) *slog.Logger {
 
 func abort() {
 	exit_code := 1
-	log.Error("Exiting", "exit_code", exit_code)
+	logger.Error("Exiting", "exit_code", exit_code)
 	os.Exit(exit_code)
 }

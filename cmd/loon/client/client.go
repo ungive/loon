@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"bufio"
@@ -26,13 +26,15 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// CLI interface (future):
-// loon server localhost:8080  # serves http and websocket server on port 8080
-// loon config server http://localhost:8080  # sets server in config
-// loon online ./example.txt  # serves a single file with the configured server
+var Cmd = flag.NewFlagSet("client", flag.ExitOnError)
 
-// CLI interface (test):
-// loon-client --addr http://localhost:8080 ./example.txt
+var (
+	addr        = Cmd.String("server", "", "server address")
+	contentType = Cmd.String("type", "", "explicitly set the HTTP content type")
+	attachment  = Cmd.String("download", "", "set the download filename")
+	help        = Cmd.Bool("help", false, "print help")
+	stop        = atomic.Bool{}
+)
 
 const (
 	pingInterval = 20 * time.Second
@@ -40,28 +42,25 @@ const (
 	writeWait    = 10 * time.Second
 )
 
-var addr = flag.String("server", "", "server address")
-var explicitContentType = flag.String("type", "", "explicitly set the HTTP content type")
-var downloadFilename = flag.String("download", "", "set the download filename")
-var help = flag.Bool("help", false, "print help")
-var stop = atomic.Bool{}
-
 func init() {
 	log.SetFlags(0)
 }
 
-func main() {
-	flag.Parse()
+func Usage(cmd string) {
+	fmt.Println(cmd + " -server <address> [options] <path>")
+	Cmd.PrintDefaults()
+}
+
+func Main(cmd string, args []string) {
+	Cmd.Parse(args)
 	if *help {
-		fmt.Println("usage: loon-client -server <address> [options] <path>")
-		fmt.Println("options:")
-		flag.PrintDefaults()
+		Usage(cmd)
 		return
 	}
-	if len(*addr) == 0 || flag.NArg() == 0 || len(flag.Arg(0)) == 0 {
+	if len(*addr) == 0 || Cmd.NArg() == 0 || len(Cmd.Arg(0)) == 0 {
 		log.Fatalf("invalid arguments")
 	}
-	path := flag.Arg(0)
+	path := Cmd.Arg(0)
 	file, err := os.Open(path)
 	if err != nil {
 		log.Fatalf("failed to open file: %v", err)
@@ -191,8 +190,8 @@ func (h *handler) sendContent(request *pb.Request) {
 		log.Fatalf("failed to seek to beginning of file: %v", err)
 	}
 	var filename *string
-	if len(*downloadFilename) > 0 {
-		filename = downloadFilename
+	if len(*attachment) > 0 {
+		filename = attachment
 	}
 	h.conn.write(&pb.ClientMessage{
 		Data: &pb.ClientMessage_ContentHeader{
@@ -345,8 +344,8 @@ func getServerMessage[T interface{}, P *T](message *pb.ServerMessage) P {
 }
 
 func getContentType(file *os.File) *server.ContentType {
-	if len(*explicitContentType) > 0 {
-		result := parseContentType(*explicitContentType)
+	if len(*contentType) > 0 {
+		result := parseContentType(*contentType)
 		log.Printf("using explicit content type: %v\n", result)
 		return result
 	}
