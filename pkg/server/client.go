@@ -2,9 +2,7 @@ package server
 
 import (
 	"bytes"
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -453,7 +451,7 @@ func NewClient(conn *websocket.Conn, config *ProtocolOptions) (Client, error) {
 	}
 	client := &clientImpl{
 		id:             id,
-		idStr:          id.String(),
+		idStr:          id.UrlEncode(),
 		secret:         secret[:],
 		config:         config,
 		dirty:          atomic.Bool{},
@@ -506,7 +504,7 @@ func (c *clientImpl) Run() {
 }
 
 func (c *clientImpl) ID() UUID {
-	return c.id.Clone()
+	return c.id
 }
 
 func (c *clientImpl) Request(path string, query string, mac []byte) (Request, error) {
@@ -566,38 +564,8 @@ func (c *clientImpl) Closed() <-chan struct{} {
 	return c.runDone
 }
 
-func ComputeMac(
-	clientId string,
-	clientSecret []byte,
-	path string,
-	query string,
-) ([]byte, error) {
-	path = strings.TrimLeft(path, "/")
-	query = strings.TrimLeft(query, "?")
-	mac := hmac.New(sha256.New, clientSecret)
-	items := [][]byte{
-		[]byte(clientId),
-		[]byte("/"),
-		[]byte(path),
-	}
-	if len(query) > 0 {
-		items = append(items, []byte("?"))
-		items = append(items, []byte(query))
-	}
-	for _, item := range items {
-		n, err := mac.Write(item)
-		if err != nil {
-			return nil, err
-		}
-		if n != len(item) {
-			return nil, errors.New("write did not write all bytes")
-		}
-	}
-	return mac.Sum(nil), nil
-}
-
 func (c *clientImpl) computeMac(path string, query string) ([]byte, error) {
-	return ComputeMac(c.idStr, c.secret, path, query)
+	return ComputeMac(c.idStr, path, query, c.secret)
 }
 
 // Queues a close message for this connection

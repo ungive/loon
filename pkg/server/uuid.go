@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 )
@@ -13,21 +12,8 @@ const (
 	size = 16
 )
 
-func init() {
-	assertCryptoRandAvailable()
-}
-
-func assertCryptoRandAvailable() {
-	buf := make([]byte, 1)
-	_, err := io.ReadFull(rand.Reader, buf)
-	if err != nil {
-		panic(fmt.Sprintf("crypto/rand unavailable: %#v", err))
-	}
-}
-
 type UUID [size]byte
 
-// Creates a new, random UUID.
 func NewUUID() (UUID, error) {
 	var uuid UUID
 	_, err := io.ReadFull(rand.Reader, uuid[:])
@@ -37,9 +23,8 @@ func NewUUID() (UUID, error) {
 	return uuid, nil
 }
 
-// Parses a UUID from a hex-encoded string.
-func ParseUUID(s string) (UUID, error) {
-	decoded, err := hex.DecodeString(s)
+func UrlDecodeUUID(s string) (UUID, error) {
+	decoded, err := UrlDecodeBytes(s)
 	if err != nil {
 		return UUID{}, err
 	}
@@ -51,7 +36,10 @@ func ParseUUID(s string) (UUID, error) {
 	return uuid, nil
 }
 
-// Returns the UUID as a hex-encoded string.
+func (uuid UUID) UrlEncode() string {
+	return UrlEncodeBytes(uuid[:])
+}
+
 func (uuid UUID) String() string {
 	return hex.EncodeToString(uuid[:])
 }

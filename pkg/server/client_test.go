@@ -57,7 +57,7 @@ func Test_server_sends_Hello_when_client_connects(t *testing.T) {
 	defer done()
 	m := conn.readHello()
 	assert.Equal(t, testAddress, m.BaseUrl)
-	assert.Equal(t, client.ID().String(), m.ClientId)
+	assert.Equal(t, client.ID().UrlEncode(), m.ClientId)
 	assert.Equal(t, MAC_KEY_SIZE, len(m.ConnectionSecret))
 	assert.Equal(t, defaultConstraints.MaxContentSize, m.Constraints.MaxContentSize)
 	assert.Equal(t, defaultConstraints.ChunkSize, m.Constraints.ChunkSize)
@@ -617,7 +617,7 @@ func Test_server_sends_Request_without_leading_question_mark_in_query_when_calli
 func Test_Client_Request_returns_error_when_requesting_with_invalid_MAC_hash(t *testing.T) {
 	_, _, client, hello, done := getServerConnClientHello(t)
 	defer done()
-	mac, err := computeMac(testPath, testQuery, client.ID().String(), hello.ConnectionSecret)
+	mac, err := computeMac(testPath, testQuery, client.ID().UrlEncode(), hello.ConnectionSecret)
 	assert.NoError(t, err)
 	for i := range mac {
 		mac[i] = 0
@@ -1716,7 +1716,7 @@ func (c *wrappedClient) request(path string, query string) (Request, error) {
 	if c.secret == nil {
 		return nil, errors.New("wrapped client secret may not be nil")
 	}
-	mac, err := computeMac(path, query, c.ID().String(), c.secret)
+	mac, err := computeMac(path, query, c.ID().UrlEncode(), c.secret)
 	if err != nil {
 		return nil, err
 	}

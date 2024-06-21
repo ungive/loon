@@ -108,11 +108,11 @@ func Main(cmd string, args []string) {
 
 func buildUrl(hello *pb.Hello, path string, query string) string {
 	mac, err := server.ComputeMac(
-		hello.ClientId, hello.ConnectionSecret, path, query)
+		hello.ClientId, path, query, hello.ConnectionSecret)
 	if err != nil {
 		log.Fatalf("failed to compute MAC: %v\n", err)
 	}
-	macEncoded := hex.EncodeToString(mac)
+	macEncoded := mac.UrlEncode()
 	result := formatString(
 		"{base_url}/{client_id}/{mac}/{path}",
 		"base_url", *addr,

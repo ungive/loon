@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -109,13 +108,13 @@ func (s *serverImpl) serveRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	clientIdStr := r.PathValue("client_id")
 	log = log.With("client_id", clientIdStr)
-	clientID, err := ParseUUID(clientIdStr)
+	clientID, err := UrlDecodeUUID(clientIdStr)
 	if err != nil {
 		status(w, http.StatusBadRequest, "invalid client ID", log, err)
 		return
 	}
 	macStr := r.PathValue("mac")
-	mac, err := hex.DecodeString(macStr)
+	mac, err := UrlDecodeMAC(macStr)
 	if err != nil {
 		log := log.With("mac", macStr)
 		status(w, http.StatusBadRequest, "invalid MAC", log, err)
