@@ -29,14 +29,29 @@ func (c *Config) Validate() error {
 	if err := c.Protocol.Validate(); err != nil {
 		return err
 	}
-	if c.Http.WriteWait <= 0 {
-		return errors.New("http write wait must be greater than zero")
+	if err := c.Http.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
 
 type HttpOptions struct {
-	WriteWait time.Duration `json:"write_wait"`
+	WriteTimeout time.Duration `json:"write_timeout"`
+	ReadTimeout  time.Duration `json:"read_timeout"`
+	IdleTimeout  time.Duration `json:"idle_timeout"`
+}
+
+func (h *HttpOptions) Validate() error {
+	if h.WriteTimeout < 0 {
+		return errors.New("http write wait must be greater or equal to zero")
+	}
+	if h.ReadTimeout < 0 {
+		return errors.New("http write wait must be greater or equal to zero")
+	}
+	if h.IdleTimeout < 0 {
+		return errors.New("http write wait must be greater or equal to zero")
+	}
+	return nil
 }
 
 type LogOptions struct {
