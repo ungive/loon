@@ -153,6 +153,13 @@ func (m *clientManager) Get(clientID UUID) (Client, error) {
 }
 
 func (m *clientManager) Close() {
-	m.stop <- struct{}{}
+	if !m.dirty.Load() {
+		return
+	}
+	select {
+	case m.stop <- struct{}{}:
+	case <-m.done:
+		return
+	}
 	<-m.runDone
 }
