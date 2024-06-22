@@ -126,6 +126,17 @@ which prevents the client from being spammed with arbitrary requests
 (point 3 under client abuse protection).
 Only requests with a path that contain a valid hash may be accepted.
 
+#### URL encoding
+
+While the string encoding of the client ID and MAC hash
+is left to the server implementation,
+the following reference base64 alphabet should be preferred for encoding,
+to ensure shortest-possible URLs:
+
+```
+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_
+```
+
 #### Rationale: No query parameters
 
 Query parameters are useless, if they are part of the MAC hash.
