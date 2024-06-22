@@ -2,7 +2,6 @@ package client
 
 import (
 	"bufio"
-	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
