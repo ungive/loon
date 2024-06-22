@@ -564,11 +564,12 @@ func Test_server_sends_RequestClosed_when_Request_Success_is_not_called_within_t
 	conn.readRequestClosed()
 }
 
-func Test_Client_Request_returns_error_when_requesting_empty_path(t *testing.T) {
-	_, _, client, _, done := getServerConnClientHello(t)
+func Test_Client_Request_returns_no_error_when_requesting_empty_path(t *testing.T) {
+	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
 	_, err := client.request("", testQuery)
-	assert.ErrorIs(t, err, ErrBadPath)
+	assert.NoError(t, err)
+	conn.readRequest()
 }
 
 func Test_Client_Request_returns_error_when_query_string_is_malformed(t *testing.T) {

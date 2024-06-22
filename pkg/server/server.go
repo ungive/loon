@@ -147,8 +147,6 @@ func (s *serverImpl) serveRequest(w http.ResponseWriter, r *http.Request) {
 			// by sending a 404 status code here as well (see specification).
 			log := log.With("mac", macStr)
 			statusNotFound(w, log, err)
-		} else if errors.Is(err, ErrBadPath) {
-			status(w, http.StatusBadRequest, "path is malformed", log, err)
 		} else if errors.Is(err, ErrBadQuery) {
 			status(w, http.StatusBadRequest, "query is malformed", log, err)
 		} else {

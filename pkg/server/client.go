@@ -26,7 +26,6 @@ const (
 
 var (
 	ErrClientClosed        = errors.New("client connection closed")
-	ErrBadPath             = errors.New("the path is malformed")
 	ErrBadQuery            = errors.New("the query is malformed")
 	ErrBadMac              = errors.New("the MAC hash is invalid")
 	ErrRequestDeleted      = errors.New("the request does not exist")
@@ -508,9 +507,6 @@ func (c *clientImpl) ID() UUID {
 }
 
 func (c *clientImpl) Request(path string, query string, mac []byte) (Request, error) {
-	if len(path) == 0 {
-		return nil, ErrBadPath
-	}
 	if len(query) > 0 {
 		_, err := url.ParseQuery(query)
 		if err != nil {
