@@ -85,52 +85,74 @@ Message from the server must always be encapsulated as `ServerMessage`.
 ### HTTP
 
 ```
-GET <base_url>/<client_id>/<hash>/<path>[?<query>]
+GET <base_url>/<client_id>/<hash>/<path>
 ```
 
 A GET request to the above path
-forwards a request for path `<path>` and optional query parameters `<query>`
-to the client with the ID `<client_id>`.
-`<path>` must not start with a slash
-and `<query>` must not start with a question mark.
+forwards a request for path `<path>` to the client with the ID `<client_id>`.
+The `<path>` must not start with a slash and it is allowed to be empty.
 The `client_id` must be the same value
 as the `client_id` string field in the `Hello` protocol message.
 The `<base_url>` contains protocol (HTTP or HTTPS),
-hostname, port and base URL path,
-the exact details are left to the implementation.
+hostname, port and some optional base URL path, if desired.
+The exact details are left to the server implementation.
 No other HTTP verbs are allowed or forwarded to the client.
 It is required that the hash `<hash>` is a valid cryptographic hash,
-encoded as a hexadecimal string,
+encoded in some URL-friendly way (exactly how is left to the implementation),
 which must have been computed in the following way:
 
 ```
-hash = HMAC-SHA256(client_id || '/' || path [|| '?' || query], secret)
+hash = HMAC-SHA256(client_id || '/' || path, secret)
 ```
 
 The `secret` is random sequence of bytes that has been generated
 with a cryptographically secure random number generator
 which is sent by the server to the client within the `Hello` message
 and stored on the server for the lifetime of the connection.
-`client_id`, `path` and `query` are taken from the URL above.
-The `path` must not be URL-encoded for the computation of the hash.
-The query must be a valid HTTP query, which is properly URL-encoded.
-Just like in the URL, `path` and `query`
-must not start with either a slash or a question mark respectively.
-If `query` is a string of size 0,
-the question mark preceding it is omitted,
-therefore only computing the hash of `client_id || '/' || path`.
+`client_id` and `path` are taken from the URL above.
+The `path` must neither be URL-encoded nor start with a slash
+for the computation of the hash.
 `||` is the string concatenation operator.
-The HMAC must use the SHA-256 underlying hashing function.
+The HMAC must use the SHA-256 underlying hashing function,
+or an equivalently secure hashing function.
 
 The computed hash ensures that the request URL has been created by the client
 and not by an unauthorized third party
 and that there is some guarantee that the path exists at the client.
 Any request whose hash cannot be authenticated on the server side
-is discarded immediately
-and not forwarded to the client through the websocket connection,
+must be discarded immediately
+and msut not be forwarded to the client through the websocket connection,
 which prevents the client from being spammed with arbitrary requests
 (point 3 under client abuse protection).
-Only requests with a path that contain a valid hash should be accepted.
+Only requests with a path that contain a valid hash may be accepted.
+
+#### Rationale: No query parameters
+
+Query parameters are useless, if they are part of the MAC hash.
+Such a parameter is expected to be modifiable and dynamic,
+without having to compute an entirely new MAC for the URL.
+Values for query parameters are meant to be set by the HTTP client
+and not by the server
+(or the websocket client that generates the URLs in this case).
+Possible values would be dictated by the websocket client,
+which would limit their function to such a degree,
+that one might as well not use query parameters at all.
+
+By that reasoning query parameters *should not* be part of the MAC,
+but that poses another problem, which conflicts with the design of the system:
+If the point of the MAC
+is to prevent HTTP clients from creating any number of unique request URLs
+that could circumvent any cached response,
+but we allow HTTP clients to set arbitrary query parameters
+that don't need to be part of the MAC,
+then what is the point of the MAC in the first place?
+Setting a query parameter to a unique, never-seen-before value
+requires the server to forward the request to the websocket client.
+Allowing query parameters to not be part of the MAC
+would render all caching and authentication,
+as a means of abuse prevention, useless.
+
+For that reason query parameters are never sent to a websocket client.
 
 #### Status codes
 
@@ -183,8 +205,7 @@ by sending a `RequestClosed` message.
 HTTP responses from clients may be cached
 (see point 1 under client abuse protection).
 Note that caching should be done for an entire request URL,
-including the `<base_url>`, `<client_id>`, `<hash>`, `<path>`
-and the optional query parameters `<query>`.
+including the `<base_url>`, `<client_id>`, `<hash>` and `<path>`.
 The actual HTTP request URL should be used.
 
 ## Protocol
@@ -290,13 +311,6 @@ The `path` is the path to identify the resource that is requested.
 It represents the `<path>` in the Endpoints section
 and never starts with a leading slash.
 Path components should never be URL encoded.
-
-The `query` contains the query parameters of the request.
-The query string never has a leading slash..
-Query parameters are separated by `&` symbols
-and keys and values are separated by `=` symbols.
-Values may be URL-encoded and should be decoded by the connected client,
-if they are needed.
 
 ### Closing a response
 
@@ -455,11 +469,11 @@ which encapsulates protocol communication with a websocket client.
 type Client interface {
   // Runs the clients internal run loop.
   Run()
-  // Sends a request to the client, with the given path and query.
+  // Sends a request to the client with the given path.
   // Checks whether the MAC is authentic,
   // with the client's client ID and client secret.
   // Returns a Request instance or an error when an error occurs.
-  Request(path string, query string, mac []byte) (Request, error)
+  Request(path string, mac []byte) (Request, error)
   // Closes the client, if it isn't already closed, and exits the run loop.
   Close()
   // Returns a channel that is closed once the Run loop has fully terminated.

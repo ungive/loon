@@ -25,7 +25,6 @@ const (
 	testAfterWait   = 10 * time.Millisecond
 	testContentType = "text/plain"
 	testPath        = "example.txt"
-	testQuery       = "key=value"
 	testAddress     = "http://example.com"
 )
 
@@ -77,12 +76,11 @@ func Test_server_sends_Request_when_calling_Client_Request(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
 	now := time.Now()
-	_, err := client.request(testPath, testQuery)
+	_, err := client.request(testPath)
 	assert.NoError(t, err)
 	m := conn.readRequest()
 	assert.Greater(t, m.Id, uint64(0))
 	assert.Equal(t, testPath, m.Path)
-	assert.Equal(t, testQuery, m.Query)
 	assert.WithinDuration(t, now, m.Timestamp.AsTime(), testTimeout)
 	client.expectActiveRequests(1)
 }
@@ -90,22 +88,21 @@ func Test_server_sends_Request_when_calling_Client_Request(t *testing.T) {
 func Test_server_sends_Request_with_unique_IDs_when_calling_Client_Request_twice(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	_, err := client.request(testPath, testQuery)
+	_, err := client.request(testPath)
 	assert.NoError(t, err)
-	_, err = client.request(testPath+"x", testQuery+"x")
+	_, err = client.request("x" + testPath)
 	assert.NoError(t, err)
 	m1 := conn.readRequest()
 	m2 := conn.readRequest()
 	assert.NotEqual(t, m1.Id, m2.Id)
 	assert.NotEqual(t, m1.Path, m2.Path)
-	assert.NotEqual(t, m1.Query, m2.Query)
 	client.expectActiveRequests(2)
 }
 
 func Test_server_sends_RequestClosed_when_calling_Request_Close(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	message := "MSG"
 	request.Close(message)
@@ -120,7 +117,7 @@ func Test_server_sends_RequestClosed_when_calling_Request_Close(t *testing.T) {
 func Test_Request_Response_chan_yields_nil_when_client_sends_EmptyResponse(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeEmptyResponse(&pb.EmptyResponse{
@@ -137,7 +134,7 @@ func Test_Request_Response_chan_yields_nil_when_client_sends_EmptyResponse(t *te
 func Test_Request_Response_chan_yields_Response_when_client_sends_ContentHeader(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -159,7 +156,7 @@ func Test_Request_Response_chan_yields_Response_when_client_sends_ContentHeader(
 func Test_Response_Chunks_chan_yields_empty_chunk_when_client_sends_empty_ContentHeader(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -179,7 +176,7 @@ func Test_Response_Chunks_chan_yields_empty_chunk_when_client_sends_empty_Conten
 func Test_Response_Chunks_chan_yields_single_chunk_when_client_sends_ContentChunk(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	payload := "Hello"
@@ -209,7 +206,7 @@ func Test_Response_Chunks_chan_yields_two_chunks_when_client_sends_two_ContentCh
 	server.constraints.ChunkSize = uint64(8)
 	conn, client, _, done := getConnClientHello(server)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	payload := "Hello world!"
@@ -242,7 +239,7 @@ func Test_Response_Chunks_chan_yields_two_chunks_when_client_sends_two_ContentCh
 func Test_Response_Chunks_chan_is_closed_when_all_chunks_have_been_received(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -267,7 +264,7 @@ func Test_Request_Closed_channel_is_closed_when_calling_Client_Close(t *testing.
 	server.intervals.ClientTimeout = time.Minute
 	conn, client, _, done := getConnClientHello(server)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	client.Close()
@@ -281,7 +278,7 @@ func Test_Request_Closed_channel_is_closed_when_calling_Request_Close(t *testing
 	server.intervals.ClientTimeout = time.Minute
 	conn, client, _, done := getConnClientHello(server)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	request.Close("")
@@ -293,7 +290,7 @@ func Test_Request_Closed_channel_is_closed_when_calling_Request_Close(t *testing
 func Test_Request_Closed_channel_is_closed_when_client_sends_CloseResponse(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -313,7 +310,7 @@ func Test_Request_Closed_channel_is_closed_when_client_sends_CloseResponse(t *te
 func Test_Request_Closed_channel_is_closed_when_client_times_out(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.readRequestClosed()
@@ -324,7 +321,7 @@ func Test_Request_Closed_channel_is_closed_when_client_times_out(t *testing.T) {
 func Test_Request_Closed_channel_is_closed_when_client_disconnects(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.close()
@@ -335,7 +332,7 @@ func Test_Request_Closed_channel_is_closed_when_client_disconnects(t *testing.T)
 func Test_Response_chan_yields_nil_when_client_times_out_after_EmptyResponse(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeEmptyResponse(&pb.EmptyResponse{
@@ -351,7 +348,7 @@ func Test_Response_chan_yields_nil_when_client_times_out_after_EmptyResponse(t *
 func Test_server_sends_RequestClosed_when_client_times_out_after_ContentHeader(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -366,7 +363,7 @@ func Test_server_sends_RequestClosed_when_client_times_out_after_ContentHeader(t
 func Test_server_sends_Closed_when_client_does_not_send_CloseResponse_after_server_sent_RequestClosed(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -383,7 +380,7 @@ func Test_server_sends_Closed_when_client_does_not_send_CloseResponse_after_serv
 func Test_server_sends_Success_when_calling_Request_Success_after_receiving_all_chunks(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	payload := "you are loved"
@@ -410,7 +407,7 @@ func Test_server_sends_Success_when_calling_Request_Success_after_receiving_all_
 func Test_server_sends_Success_when_calling_Request_Success_after_receiving_empty_ContentHeader(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -431,7 +428,7 @@ func Test_server_sends_Success_when_calling_Request_Success_after_receiving_empt
 func Test_Request_Success_returns_error_after_receiving_EmptyResponse(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeEmptyResponse(&pb.EmptyResponse{
@@ -446,7 +443,7 @@ func Test_Request_Success_returns_error_after_receiving_EmptyResponse(t *testing
 func Test_Request_Success_returns_error_when_some_chunks_are_pending(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -463,7 +460,7 @@ func Test_Request_Success_returns_error_when_some_chunks_are_pending(t *testing.
 func Test_Request_Success_returns_error_after_calling_Request_Close(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -482,7 +479,7 @@ func Test_Request_Success_returns_error_after_calling_Request_Close(t *testing.T
 func Test_Request_Success_returns_error_after_request_timed_out(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -501,7 +498,7 @@ func Test_Request_Success_returns_error_after_request_timed_out(t *testing.T) {
 func Test_server_has_one_active_request_when_client_timed_out_after_non_empty_ContentHeader(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -517,7 +514,7 @@ func Test_server_has_one_active_request_when_client_timed_out_after_non_empty_Co
 func Test_server_has_zero_active_requests_when_client_timed_out_after_sending_empty_ContentHeader(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -532,7 +529,7 @@ func Test_server_has_zero_active_requests_when_client_timed_out_after_sending_em
 func Test_server_has_zero_active_requests_when_client_timed_out_after_sending_last_ContentChunk(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -552,7 +549,7 @@ func Test_server_has_zero_active_requests_when_client_timed_out_after_sending_la
 func Test_server_sends_RequestClosed_when_Request_Success_is_not_called_within_timeout_period_for_completed_request(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -567,30 +564,15 @@ func Test_server_sends_RequestClosed_when_Request_Success_is_not_called_within_t
 func Test_Client_Request_returns_no_error_when_requesting_empty_path(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	_, err := client.request("", testQuery)
+	_, err := client.request("")
 	assert.NoError(t, err)
 	conn.readRequest()
-}
-
-func Test_Client_Request_returns_error_when_query_string_is_malformed(t *testing.T) {
-	_, _, client, _, done := getServerConnClientHello(t)
-	defer done()
-	_, err := client.request(testPath, "key;value")
-	assert.ErrorIs(t, err, ErrBadQuery)
 }
 
 func Test_Client_Request_returns_no_error_when_requesting_path_without_leading_slash(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	_, err := client.request(testPath, testQuery)
-	assert.NoError(t, err)
-	conn.readRequest()
-}
-
-func Test_Client_Request_returns_no_error_when_requesting_query_without_leading_question_mark(t *testing.T) {
-	_, conn, client, _, done := getServerConnClientHello(t)
-	defer done()
-	_, err := client.request(testPath, "key=value")
+	_, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 }
@@ -598,39 +580,29 @@ func Test_Client_Request_returns_no_error_when_requesting_query_without_leading_
 func Test_server_sends_Request_without_leading_slash_in_path_when_calling_Client_Request_with_it(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	_, err := client.request("/"+testPath, testQuery)
+	_, err := client.request("/" + testPath)
 	assert.NoError(t, err)
 	m := conn.readRequest()
 	assert.Equal(t, strings.TrimLeft(m.Path, "/"), m.Path,
 		"the path in the request must not start with a slash")
 }
 
-func Test_server_sends_Request_without_leading_question_mark_in_query_when_calling_Client_Request_with_it(t *testing.T) {
-	_, conn, client, _, done := getServerConnClientHello(t)
-	defer done()
-	_, err := client.request(testPath, "?"+testQuery)
-	assert.NoError(t, err)
-	m := conn.readRequest()
-	assert.Equal(t, strings.TrimLeft(m.Query, "?"), m.Query,
-		"the query in the request must not start with a question mark")
-}
-
 func Test_Client_Request_returns_error_when_requesting_with_invalid_MAC_hash(t *testing.T) {
 	_, _, client, hello, done := getServerConnClientHello(t)
 	defer done()
-	mac, err := computeMac(testPath, testQuery, client.ID().UrlEncode(), hello.ConnectionSecret)
+	mac, err := computeMac(testPath, client.ID().UrlEncode(), hello.ConnectionSecret)
 	assert.NoError(t, err)
 	for i := range mac {
 		mac[i] = 0
 	}
-	_, err = client.Request(testPath, testQuery, mac)
+	_, err = client.Request(testPath, mac)
 	assert.ErrorIs(t, err, ErrBadMac)
 }
 
 func Test_server_closes_connection_after_sending_Close_message(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeEmptyResponse(&pb.EmptyResponse{
@@ -661,7 +633,7 @@ func Test_server_sends_Close_when_client_sends_badly_encoded_protobuf_message(t 
 func Test_server_sends_Close_when_client_sends_CloseResponse_after_response_is_completed(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -680,7 +652,7 @@ func Test_server_sends_Close_when_client_sends_CloseResponse_after_response_is_c
 func Test_server_sends_Close_when_client_sends_CloseResponse_before_first_response_message(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeCloseResponse(&pb.CloseResponse{
@@ -692,7 +664,7 @@ func Test_server_sends_Close_when_client_sends_CloseResponse_before_first_respon
 func Test_server_sends_Close_when_client_sends_CloseResponse_after_EmptyResponse(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeEmptyResponse(&pb.EmptyResponse{
@@ -709,7 +681,7 @@ func Test_server_sends_Close_when_client_sends_CloseResponse_after_EmptyResponse
 func Test_server_sends_Close_when_client_sends_CloseResponse_after_empty_ContentHeader(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -726,7 +698,7 @@ func Test_server_sends_Close_when_client_sends_CloseResponse_after_empty_Content
 func Test_server_sends_Close_when_client_sends_CloseResponse_after_last_ContentChunk(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeEmptyResponse(&pb.EmptyResponse{
@@ -745,7 +717,7 @@ func Test_server_sends_Close_when_client_sends_CloseResponse_with_unknown_reques
 	server.constraints.ChunkSize = 1
 	conn, client, _, done := getConnClientHello(server)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -767,7 +739,7 @@ func Test_server_sends_Close_when_client_sends_CloseResponse_with_unknown_reques
 func Test_server_sends_Close_when_client_sends_CloseResponse_twice(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -787,7 +759,7 @@ func Test_server_sends_Close_when_client_sends_CloseResponse_twice(t *testing.T)
 func Test_server_does_not_send_Close_when_client_sends_CloseResponse_before_receiving_RequestClosed(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -829,7 +801,7 @@ func Test_server_sends_Close_when_client_sends_ContentHeader_with_unknown_reques
 func Test_server_sends_Close_when_client_sends_ContentChunk_with_unknown_request_ID(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -848,7 +820,7 @@ func Test_server_sends_Close_when_client_sends_ContentChunk_with_unknown_request
 func Test_server_sends_Close_when_client_sends_EmptyResponse_twice_for_request_ID(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeEmptyResponse(&pb.EmptyResponse{
@@ -863,7 +835,7 @@ func Test_server_sends_Close_when_client_sends_EmptyResponse_twice_for_request_I
 func Test_server_sends_Close_when_client_sends_ContentHeader_twice_for_request_ID(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -882,7 +854,7 @@ func Test_server_sends_Close_when_client_sends_ContentHeader_twice_for_request_I
 func Test_server_sends_Close_when_client_sends_EmptyResponse_after_ContentHeader(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -899,7 +871,7 @@ func Test_server_sends_Close_when_client_sends_EmptyResponse_after_ContentHeader
 func Test_server_does_not_send_Close_when_client_response_content_size_is_at_limit(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -913,7 +885,7 @@ func Test_server_does_not_send_Close_when_client_response_content_size_is_at_lim
 func Test_server_sends_Close_when_client_response_content_size_exceeds_constraints(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -927,7 +899,7 @@ func Test_server_sends_Close_when_client_response_content_size_exceeds_constrain
 func Test_server_does_not_send_Close_when_client_response_filename_is_non_empty(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -942,7 +914,7 @@ func Test_server_does_not_send_Close_when_client_response_filename_is_non_empty(
 func Test_server_sends_Close_when_client_response_filename_is_empty(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -957,7 +929,7 @@ func Test_server_sends_Close_when_client_response_filename_is_empty(t *testing.T
 func Test_server_sends_Close_when_client_response_content_type_is_not_in_constraints(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -971,7 +943,7 @@ func Test_server_sends_Close_when_client_response_content_type_is_not_in_constra
 func Test_server_does_not_send_Close_when_client_response_content_type_has_parameters(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -985,7 +957,7 @@ func Test_server_does_not_send_Close_when_client_response_content_type_has_param
 func Test_server_sends_Close_when_client_sends_ContentChunk_before_ContentHeader(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentChunk(&pb.ContentChunk{
@@ -1001,7 +973,7 @@ func Test_server_sends_Close_when_client_sends_the_same_ContentChunk_twice(t *te
 	server.constraints.ChunkSize = uint64(1)
 	conn, client, _, done := getConnClientHello(server)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -1027,7 +999,7 @@ func Test_server_sends_Close_when_client_sends_an_additional_ContentChunk(t *tes
 	server.constraints.ChunkSize = uint64(1)
 	conn, client, _, done := getConnClientHello(server)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -1053,7 +1025,7 @@ func Test_server_sends_Close_when_client_sends_out_of_sequence_ContentChunk(t *t
 	server.constraints.ChunkSize = uint64(1)
 	conn, client, _, done := getConnClientHello(server)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -1074,7 +1046,7 @@ func Test_server_sends_Close_when_client_sends_ContentChunk_with_invalid_size(t 
 	server.constraints.ChunkSize = uint64(4)
 	conn, client, _, done := getConnClientHello(server)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -1095,7 +1067,7 @@ func Test_server_sends_Close_when_client_sends_last_ContentChunk_with_invalid_si
 	server.constraints.ChunkSize = uint64(4)
 	conn, client, _, done := getConnClientHello(server)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -1148,7 +1120,7 @@ func Test_Client_Close_does_nothing_when_Client_is_already_closed(t *testing.T) 
 func Test_server_does_not_send_RequestClosed_when_client_response_is_completed_and_times_out(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -1169,7 +1141,7 @@ func Test_server_does_not_send_RequestClosed_when_client_response_is_completed_a
 func Test_Request_Success_returns_error_after_client_sent_CloseResponse(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -1189,7 +1161,7 @@ func Test_Request_Success_returns_error_after_client_sent_CloseResponse(t *testi
 func Test_Request_Success_returns_error_after_calling_Client_Close(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -1207,7 +1179,7 @@ func Test_Request_Success_returns_error_after_calling_Client_Close(t *testing.T)
 func Test_Request_Success_returns_error_when_called_twice(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -1226,7 +1198,7 @@ func Test_Request_Success_returns_error_when_called_twice(t *testing.T) {
 func Test_Request_Close_returns_no_error_when_called_twice(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	assert.NoError(t, request.Close(""))
@@ -1237,7 +1209,7 @@ func Test_Request_Close_returns_no_error_when_called_twice(t *testing.T) {
 func Test_Request_Close_returns_no_error_after_client_sent_CloseResponse(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeCloseResponse(&pb.CloseResponse{
@@ -1252,7 +1224,7 @@ func Test_Request_Close_returns_no_error_after_client_sent_CloseResponse(t *test
 func Test_Request_Close_returns_error_after_request_is_completed(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -1269,7 +1241,7 @@ func Test_Request_Close_returns_error_after_request_is_completed(t *testing.T) {
 func Test_server_does_not_send_Close_when_client_sends_empty_ContentHeader_after_request_is_closed(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	request.Close("")
@@ -1286,7 +1258,7 @@ func Test_server_does_not_send_Close_when_client_sends_empty_ContentHeader_after
 func Test_server_does_not_send_Close_when_client_sends_last_ContentChunk_after_request_is_closed(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	conn.writeContentHeader(&pb.ContentHeader{
@@ -1309,7 +1281,7 @@ func Test_server_does_not_send_Close_when_client_sends_last_ContentChunk_after_r
 func Test_server_does_not_send_Close_when_client_sends_EmptyResponse_after_request_is_closed(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
-	request, err := client.request(testPath, testQuery)
+	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
 	request.Close("")
@@ -1678,17 +1650,12 @@ func (c *websocketConn) done() {
 
 func computeMac(
 	path string,
-	query string,
 	client_id string,
 	client_secret []byte,
 ) ([]byte, error) {
 	mac := hmac.New(sha256.New, client_secret)
 	path = strings.TrimLeft(path, "/")
-	query = strings.TrimLeft(query, "?")
 	message := client_id + "/" + path
-	if len(query) > 0 {
-		message += "?" + query
-	}
 	n, err := mac.Write([]byte(message))
 	if err != nil {
 		return nil, err
@@ -1711,17 +1678,17 @@ func (c *wrappedClient) setSecret(secret []byte) {
 }
 
 // Wrapper for Client.Request(),
-// which computes a valid MAC for the given path and query,
+// which computes a valid MAC for the given path,
 // so that the caller does not have to.
-func (c *wrappedClient) request(path string, query string) (Request, error) {
+func (c *wrappedClient) request(path string) (Request, error) {
 	if c.secret == nil {
 		return nil, errors.New("wrapped client secret may not be nil")
 	}
-	mac, err := computeMac(path, query, c.ID().UrlEncode(), c.secret)
+	mac, err := computeMac(path, c.ID().UrlEncode(), c.secret)
 	if err != nil {
 		return nil, err
 	}
-	return c.Request(path, query, mac)
+	return c.Request(path, mac)
 }
 
 // Waits for the client to have exited the run loop.

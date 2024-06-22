@@ -27,7 +27,6 @@ message Request {
   uint64 id = 1;
   google.protobuf.Timestamp timestamp = 2;
   string path = 3;
-  string query = 4;
 }
 
 // Responses

@@ -131,12 +131,8 @@ func (s *serverImpl) serveRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := r.PathValue("path")
-	query := r.URL.RawQuery
 	log = log.With("path", path)
-	if len(query) > 0 {
-		log = log.With("query", query)
-	}
-	clientRequest, err := client.Request(path, query, mac)
+	clientRequest, err := client.Request(path, mac)
 	if err != nil {
 		if errors.Is(err, ErrClientClosed) {
 			// The client has been closed in the meantime,
@@ -147,8 +143,6 @@ func (s *serverImpl) serveRequest(w http.ResponseWriter, r *http.Request) {
 			// by sending a 404 status code here as well (see specification).
 			log := log.With("mac", macStr)
 			statusNotFound(w, log, err)
-		} else if errors.Is(err, ErrBadQuery) {
-			status(w, http.StatusBadRequest, "query is malformed", log, err)
 		} else {
 			log := log.With("mac", macStr)
 			statusInternalServerError(w, log, fmt.Errorf(

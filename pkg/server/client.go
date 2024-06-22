@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -26,7 +25,6 @@ const (
 
 var (
 	ErrClientClosed        = errors.New("client connection closed")
-	ErrBadQuery            = errors.New("the query is malformed")
 	ErrBadMac              = errors.New("the MAC hash is invalid")
 	ErrRequestDeleted      = errors.New("the request does not exist")
 	ErrRequestClosed       = errors.New("the request is closed")
@@ -39,11 +37,11 @@ type Client interface {
 	Run()
 	// Returns the ID of this client.
 	ID() UUID
-	// Sends a request to the client, with the given path and query.
+	// Sends a request to the client with the given path.
 	// Checks whether the MAC is authentic,
 	// with the client's client ID and client secret.
 	// Returns a Request instance or an error when an error occurs.
-	Request(path string, query string, mac []byte) (Request, error)
+	Request(path string, mac []byte) (Request, error)
 	// Returns the number of requests that are currently active.
 	// May include opened, closed and incomplete requests.
 	ActiveRequests() (int, error)
@@ -58,8 +56,6 @@ type Request interface {
 	ID() uint64
 	// Returns the requested path.
 	Path() string
-	// Returns the query string of the request.
-	Query() string
 	// Returns the channel that supplies the request's response.
 	// The channel yields exactly one value and is then closed.
 	// Yields a Response instance, if the client sends a ContentHeader,
@@ -113,7 +109,6 @@ type internalRequest struct {
 	client *clientImpl
 	id     uint64
 	path   string
-	query  string
 
 	pendingResponse chan Response
 	response        *internalResponse
@@ -128,13 +123,11 @@ func newRequest(
 	client *clientImpl,
 	requestID uint64,
 	path string,
-	query string,
 ) *internalRequest {
 	return &internalRequest{
 		client: client,
 		id:     requestID,
 		path:   path,
-		query:  query,
 		// This channel must be buffered, otherwise handling a response message
 		// would block until the caller reads the response, which would prevent
 		// all further communication with the client.
@@ -157,10 +150,6 @@ func (r *internalRequest) ID() uint64 {
 
 func (r *internalRequest) Path() string {
 	return r.path
-}
-
-func (r *internalRequest) Query() string {
-	return r.query
 }
 
 func (r *internalRequest) Response() <-chan Response {
@@ -386,7 +375,6 @@ func (r *internalResponse) nextChunkInfo() (sequence uint64, size uint64, last b
 
 type forwardRequest struct {
 	path   string
-	query  string
 	out    chan Request
 	outErr chan error
 }
@@ -506,16 +494,9 @@ func (c *clientImpl) ID() UUID {
 	return c.id
 }
 
-func (c *clientImpl) Request(path string, query string, mac []byte) (Request, error) {
-	if len(query) > 0 {
-		_, err := url.ParseQuery(query)
-		if err != nil {
-			return nil, errors.Join(ErrBadQuery, err)
-		}
-	}
+func (c *clientImpl) Request(path string, mac []byte) (Request, error) {
 	path = strings.TrimSpace(strings.TrimLeft(path, "/"))
-	query = strings.TrimSpace(strings.TrimLeft(query, "?"))
-	computedMac, err := c.computeMac(path, query)
+	computedMac, err := c.computeMac(path)
 	if err != nil {
 		return nil, err
 	}
@@ -527,7 +508,6 @@ func (c *clientImpl) Request(path string, query string, mac []byte) (Request, er
 	select {
 	case c.forwardRequest <- &forwardRequest{
 		path:   path,
-		query:  query,
 		out:    out,
 		outErr: outErr,
 	}:
@@ -560,8 +540,8 @@ func (c *clientImpl) Closed() <-chan struct{} {
 	return c.runDone
 }
 
-func (c *clientImpl) computeMac(path string, query string) ([]byte, error) {
-	return ComputeMac(c.idStr, path, query, c.secret)
+func (c *clientImpl) computeMac(path string) ([]byte, error) {
+	return ComputeMac(c.idStr, path, c.secret)
 }
 
 // Queues a close message for this connection
@@ -770,7 +750,7 @@ func (c *clientImpl) protocol() {
 				panic("unknown client message type")
 			}
 		case info := <-c.forwardRequest:
-			request, err := c.sendRequest(info.path, info.query)
+			request, err := c.sendRequest(info.path)
 			if err != nil {
 				info.outErr <- err
 			} else {
@@ -827,10 +807,7 @@ func (c *clientImpl) sendMessage(message *pb.ServerMessage) bool {
 	}
 }
 
-func (c *clientImpl) sendRequest(
-	path string,
-	query string,
-) (*internalRequest, error) {
+func (c *clientImpl) sendRequest(path string) (*internalRequest, error) {
 	var id uint64
 	for {
 		id = c.nextRequestID()
@@ -838,14 +815,13 @@ func (c *clientImpl) sendRequest(
 			break
 		}
 	}
-	request := newRequest(c, id, path, query)
+	request := newRequest(c, id, path)
 	c.requests[id] = request
 	ok := c.sendMessage(&pb.ServerMessage{
 		Data: &pb.ServerMessage_Request{
 			Request: &pb.Request{
 				Id:        id,
 				Path:      path,
-				Query:     query,
 				Timestamp: timestamppb.Now(),
 			},
 		},

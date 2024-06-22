@@ -97,7 +97,7 @@ func Main(cmd string, args []string) {
 	handler := newHandler(conn, hello, file, info, fileType)
 	go handler.run()
 	// Print the URL under which the file is served.
-	log.Println(buildUrl(hello, info.Name(), ""))
+	log.Println(buildUrl(hello, info.Name()))
 	// Block until the user hits CTRL+C
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
@@ -105,9 +105,9 @@ func Main(cmd string, args []string) {
 	stop.Store(true)
 }
 
-func buildUrl(hello *pb.Hello, path string, query string) string {
+func buildUrl(hello *pb.Hello, path string) string {
 	mac, err := server.ComputeMac(
-		hello.ClientId, path, query, hello.ConnectionSecret)
+		hello.ClientId, path, hello.ConnectionSecret)
 	if err != nil {
 		log.Fatalf("failed to compute MAC: %v\n", err)
 	}
@@ -118,9 +118,6 @@ func buildUrl(hello *pb.Hello, path string, query string) string {
 		"client_id", hello.ClientId,
 		"mac", macEncoded,
 		"path", url.PathEscape(path))
-	if len(query) > 0 {
-		result += "?" + query
-	}
 	return result
 }
 
