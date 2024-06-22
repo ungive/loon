@@ -1,8 +1,8 @@
 package server
 
 import (
-	"bytes"
 	"crypto/rand"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"io"
@@ -523,7 +523,7 @@ func (c *clientImpl) Request(path string, query string, mac []byte) (Request, er
 	if err != nil {
 		return nil, err
 	}
-	if !bytes.Equal(mac, computedMac) {
+	if subtle.ConstantTimeCompare(mac, computedMac) == 0 {
 		return nil, ErrBadMac
 	}
 	out := make(chan Request)
