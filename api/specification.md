@@ -523,12 +523,6 @@ type Response interface {
 
 For tests see [pkg/server/client_test.go](../pkg/server/client_test.go).
 
-### TODO
-
-- [ ] write tests for the frontend
-- [ ] server receives full response with very large chunked data
-- [ ] server receives all responses when client answers requests in parallel
-
 ## Client Capabilities
 
 Any websocket client needs the following capabilities:

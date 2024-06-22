@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	CONTENT_TYPE_SEP         = ","
-	CONTENT_TYPE_PARAM_SEP   = ";"
-	CONTENT_TYPE_SUBTYPE_SEP = "/"
+	ContentTypeSeparator        = ","
+	ContentTypeParamSeparator   = ";"
+	ContentTypeSubtypeSeparator = "/"
 )
 
 var ErrInvalidContentType = errors.New("invalid content type")
@@ -27,7 +27,7 @@ func NewContentType(value string) (*ContentType, error) {
 	if err != nil {
 		return nil, err
 	}
-	root, sub, found := strings.Cut(parsed, CONTENT_TYPE_SUBTYPE_SEP)
+	root, sub, found := strings.Cut(parsed, ContentTypeSubtypeSeparator)
 	if !found {
 		return nil, ErrInvalidContentType
 	}
@@ -167,7 +167,7 @@ func (r *ContentTypeRegistry) Contains(contentType *ContentType) bool {
 
 // Checks whether any of the accepted content types are in the registry.
 func (r *ContentTypeRegistry) CanServeAccept(acceptValue string) bool {
-	acceptedContentTypes := strings.Split(acceptValue, CONTENT_TYPE_SEP)
+	acceptedContentTypes := strings.Split(acceptValue, ContentTypeSeparator)
 	for _, contentType := range acceptedContentTypes {
 		index := strings.Index(contentType, ";")
 		if index >= 0 {
