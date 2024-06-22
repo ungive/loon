@@ -68,6 +68,11 @@ func (s *serverImpl) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", s.serveWs)
 	mux.HandleFunc("GET /{client_id}/{mac}/{path...}", s.serveRequest)
+	mux.HandleFunc("HEAD /{client_id}/{mac}/{path...}",
+		func(w http.ResponseWriter, r *http.Request) {
+			// Ignore HEAD requests
+			w.WriteHeader(http.StatusNotFound)
+		})
 	return mux
 }
 
