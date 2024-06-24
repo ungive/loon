@@ -31,8 +31,10 @@ loon server -addr localhost:8080 -config examples/server/config.yaml | hl -F
 
 To run the server on your local network, change `addr` to `:8080`
 and edit the example configuration
-to contain your computer's IP address and the configured port for `base_url`:
+to contain your computer's IP address and the configured port for `base_url`,
 e.g. `http://192.168.178.2:8080`.
+Output is piped to [`hl`](https://github.com/pamburus/hl),
+which is a log formatter for JSON logs.
 
 ### Run the client
 
