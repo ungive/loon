@@ -14,6 +14,10 @@ It acts like a **tunnel for HTTP traffic**,
 but with a very minimal and lightweight implementation behind it,
 ideal to keep your client small and lean.
 
+## License
+
+Project is still a WIP, a license will be added soon!
+
 ## Usage
 
 ### Start a server
