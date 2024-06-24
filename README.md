@@ -132,6 +132,11 @@ feel free to open an issue to bring it to my attention!
 
 **`TODO`**
 
+## Future considerations
+
+- Accepting HEAD requests
+- Enabling content compression (gzip, brotli, ...)
+
 ## Copyright
 
 Copyright (c) 2024 Jonas van den Berg
