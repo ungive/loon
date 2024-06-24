@@ -46,8 +46,8 @@ loon client -server http://192.168.178.43:8080 assets/loon-small.png assets/loon
 ### Dockerized
 
 ```sh
-make docker-image
-docker run --rm -it -v $(pwd)/examples/server/config.yaml:/app/config.yaml -p 8080:80 loon:latest
+make build-image
+docker run --rm -it -v $(pwd)/examples/server/config.yaml:/app/config.yaml -p 8080:80 ungive/loon:latest
 loon client -server http://localhost:8080 assets/loon-small.png
 ```
 

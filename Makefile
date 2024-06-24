@@ -5,5 +5,8 @@ all:
 proto:
 	protoc -I=. --go_out=pkg ./api/messages.proto
 
-docker-image:
-	docker build -t loon:latest -f build/package/Dockerfile .
+build-image:
+	docker build -t ungive/loon:latest -f build/package/Dockerfile .
+
+publish-image:
+	docker push ungive/loon:latest
