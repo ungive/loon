@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/url"
 	"strings"
 	"sync"
@@ -203,6 +204,38 @@ func websocketUrlFor(baseUrl string) (string, error) {
 	return u.String() + "/ws", nil
 }
 
+func verifyBaseUrl(connectedWith string, helloContains string) error {
+	a, err := url.Parse(connectedWith)
+	if err != nil {
+		return fmt.Errorf("failed to parse URL %v: %v", connectedWith, err)
+	}
+	b, err := url.Parse(helloContains)
+	if err != nil {
+		return fmt.Errorf("failed to parse URL %v: %v", helloContains, err)
+	}
+	aAddrs, err := net.LookupHost(a.Hostname())
+	if err != nil {
+		return fmt.Errorf("failed to lookup host %v: %v", a.Hostname(), err)
+	}
+	bAddrs, err := net.LookupHost(b.Hostname())
+	if err != nil {
+		return fmt.Errorf("failed to lookup host %v: %v", b.Hostname(), err)
+	}
+	aMap := make(map[string]struct{})
+	for _, aAddr := range aAddrs {
+		aMap[aAddr] = struct{}{}
+	}
+	for _, bAddr := range bAddrs {
+		if _, ok := aMap[bAddr]; ok {
+			fmt.Println(aAddrs)
+			fmt.Println(bAddrs)
+			return nil
+		}
+	}
+	return fmt.Errorf("could not verify the server's base URL: "+
+		"%v and %v do not point to the same host", connectedWith, helloContains)
+}
+
 func NewClient(baseUrl string) (Client, error) {
 	address, err := websocketUrlFor(baseUrl)
 	if err != nil {
@@ -236,6 +269,12 @@ func NewClient(baseUrl string) (Client, error) {
 	}
 	switch m := message.Data.(type) {
 	case *pb.ServerMessage_Hello:
+		// Make sure to verify that the base URL points to the same server.
+		err := verifyBaseUrl(baseUrl, m.Hello.BaseUrl)
+		if err != nil {
+			return nil, err
+		}
+		client.baseUrl = m.Hello.BaseUrl
 		client.hello = m.Hello
 	default:
 		return nil, ErrNoHello
