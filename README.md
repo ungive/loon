@@ -51,6 +51,11 @@ docker run --rm -it -v $(pwd)/examples/server/config.yaml:/app/config.yaml -p 80
 loon client -server http://localhost:8080 assets/loon-small.png
 ```
 
+### Deployment
+
+For a deployment example, see
+[`deployments`](./deployments).
+
 ## The problem
 
 To start, here is a problem description,
