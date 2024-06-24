@@ -562,3 +562,9 @@ Any websocket client needs the following capabilities:
 
 - Accepting HEAD requests
 - Enabling content compression (gzip, brotli, ...)
+  - It might seem obvious to add compression options from the start,
+    but JPEG and PNG and probably a lot of other image formats
+    are actually already heavily compressed,
+    so that kind of content would not really benefit much
+    from compression anyway.
+    If the need is there, please open an issue.
