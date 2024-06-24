@@ -61,43 +61,6 @@ func main() {
 	}
 	defer file.Close()
 
-	// // TODO: read hello in client
-	// // TODO: check that content type is ok
-	// // TODO: proper content type from file?
-
-	// source, err := client.NewFileContentSource(file, nil)
-	// if err != nil {
-	// 	log.Fatalf("failed to create file content source: %v", err)
-	// }
-	// cli, err := client.NewClient(*addr)
-	// if err != nil {
-	// 	log.Fatalf("failed to create new client: %v", err)
-	// }
-	// defer cli.Close()
-	// go func() {
-	// 	err := cli.Run()
-	// 	if err != nil {
-	// 		log.Printf("Run() exited with error: %v\n", err)
-	// 	} else {
-	// 		log.Println("Run() exited")
-	// 	}
-	// }()
-	// var filename *string
-	// if len(*attachment) > 0 {
-	// 	filename = attachment
-	// }
-	// content, err := cli.Register(source, &client.ContentInfo{
-	// 	Path:               file.Name(),
-	// 	AttachmentFilename: filename,
-	// 	MaxCacheDuration:   0,
-	// 	UploadLimit:        0,
-	// })
-	// defer cli.Unregister(content)
-	// if err != nil {
-	// 	log.Fatalf("failed to register content: %v", err)
-	// }
-	// log.Printf("URL: %v\n", content.URL())
-
 	info, err := file.Stat()
 	if err != nil {
 		log.Fatalf("failed to stat file: %v", err)
