@@ -227,8 +227,6 @@ func verifyBaseUrl(connectedWith string, helloContains string) error {
 	}
 	for _, bAddr := range bAddrs {
 		if _, ok := aMap[bAddr]; ok {
-			fmt.Println(aAddrs)
-			fmt.Println(bAddrs)
 			return nil
 		}
 	}
