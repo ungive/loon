@@ -51,6 +51,12 @@ docker run --rm -it -v $(pwd)/examples/server/config.yaml:/app/config.yaml -p 80
 loon client -server http://localhost:8080 assets/loon-small.png
 ```
 
+or using a pre-built image from the GitHub Container Registory:
+
+```sh
+docker run --rm -it -v $(pwd)/examples/server/config.yaml:/app/config.yaml -p 8080:80 ghcr.io/ungive/loon:latest
+```
+
 ### Deployment
 
 For a deployment example, see
