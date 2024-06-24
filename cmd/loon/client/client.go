@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/ungive/loon/pkg/client"
@@ -17,6 +18,7 @@ var Cmd = flag.NewFlagSet("client", flag.ExitOnError)
 
 var (
 	addr        = Cmd.String("server", "", "server address")
+	auth        = Cmd.String("auth", "", "HTTP basic authentication string")
 	contentType = Cmd.String("type", "", "explicitly set the HTTP content type")
 	attachment  = Cmd.String("download", "", "set the download filename")
 	help        = Cmd.Bool("help", false, "print help")
@@ -37,14 +39,14 @@ func Main(cmd string, args []string) {
 		Usage(cmd)
 		return
 	}
-	validateArgs()
-	cli := runClient()
+	sanitizeArgs()
+	cli := runClient(*addr, auth)
 	defer cli.Close()
 	registerPaths(cli, Cmd.Args())
 	waitForExit()
 }
 
-func validateArgs() {
+func sanitizeArgs() {
 	if len(*addr) == 0 || Cmd.NArg() == 0 || len(Cmd.Arg(0)) == 0 {
 		log.Fatalf("invalid arguments")
 	}
@@ -63,10 +65,24 @@ func validateArgs() {
 		}
 		duplicates[base] = struct{}{}
 	}
+	if len(*auth) == 0 {
+		auth = nil
+	} else {
+		user, pass, ok := strings.Cut(*auth, ":")
+		if !ok {
+			log.Fatalf("invalid basic auth string: expected colon")
+		}
+		if len(user) == 0 {
+			log.Fatalf("invalid basic auth string: user cannot be empty")
+		}
+		if len(pass) == 0 {
+			log.Fatalf("invalid basic auth string: password cannot be empty")
+		}
+	}
 }
 
-func runClient() client.Client {
-	cli, err := client.NewClient(*addr)
+func runClient(baseUrl string, httpBasicAuth *string) client.Client {
+	cli, err := client.NewClient(baseUrl, httpBasicAuth)
 	if err != nil {
 		log.Fatalf("failed to create new client: %v", err)
 	}

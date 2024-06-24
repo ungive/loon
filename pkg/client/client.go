@@ -1,11 +1,13 @@
 package client
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -234,12 +236,17 @@ func verifyBaseUrl(connectedWith string, helloContains string) error {
 		"%v and %v do not point to the same host", connectedWith, helloContains)
 }
 
-func NewClient(baseUrl string) (Client, error) {
+func NewClient(baseUrl string, httpBasicAuth *string) (Client, error) {
 	address, err := websocketUrlFor(baseUrl)
 	if err != nil {
 		return nil, err
 	}
-	conn, _, err := websocket.DefaultDialer.Dial(address, nil)
+	var headers http.Header
+	if httpBasicAuth != nil {
+		auth := base64.StdEncoding.EncodeToString([]byte(*httpBasicAuth))
+		headers = http.Header{"Authorization": {"Basic " + auth}}
+	}
+	conn, _, err := websocket.DefaultDialer.Dial(address, headers)
 	if err != nil {
 		log.Fatalf("failed to dial websocket at %v: %v", address, err)
 	}

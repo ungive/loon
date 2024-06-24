@@ -1,0 +1,22 @@
+services:
+  loon:
+    image: loon:latest
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+  caddy:
+    image: caddy:latest
+    restart: unless-stopped
+    env_file:
+      - caddy.env
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

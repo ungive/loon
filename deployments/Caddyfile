@@ -1,0 +1,7 @@
+:80 {
+	basic_auth /ws bcrypt {
+		{$HTTP_WS_USER} {$HTTP_WS_PASS_BCRYPT}
+	}
+	reverse_proxy loon:80 {
+	}
+}
