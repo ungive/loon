@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -81,8 +82,35 @@ func sanitizeArgs() {
 	}
 }
 
+func websocketUrlFor(baseUrl string) (string, error) {
+	address := strings.TrimSuffix(baseUrl, "/")
+	u, err := url.Parse(address)
+	if err != nil {
+		log.Fatalf("failed to parse address: %v", err)
+	}
+	if len(u.Path) > 0 {
+		log.Fatalf("server address may not contain a path: %v", address)
+	}
+	if len(u.Query()) > 0 {
+		log.Fatalf("server address may not contain query params: %v", address)
+	}
+	switch u.Scheme {
+	case "http":
+		u.Scheme = "ws"
+	case "https":
+		u.Scheme = "wss"
+	default:
+		return "", fmt.Errorf("server URL must be HTTP or HTTPS: %v", u)
+	}
+	return u.String() + "/ws", nil
+}
+
 func runClient(baseUrl string, httpBasicAuth *string) client.Client {
-	cli, err := client.NewClient(baseUrl, httpBasicAuth)
+	address, err := websocketUrlFor(baseUrl)
+	if err != nil {
+		log.Fatalf("failed to create new client: %v", err)
+	}
+	cli, err := client.NewClient(address, httpBasicAuth)
 	if err != nil {
 		log.Fatalf("failed to create new client: %v", err)
 	}

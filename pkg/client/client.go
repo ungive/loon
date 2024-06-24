@@ -189,23 +189,6 @@ const (
 	requestBuffer = 16
 )
 
-func websocketUrlFor(baseUrl string) (string, error) {
-	address := strings.TrimSuffix(baseUrl, "/")
-	u, err := url.Parse(address)
-	if err != nil {
-		log.Fatalf("failed to parse address: %v", err)
-	}
-	switch u.Scheme {
-	case "http":
-		u.Scheme = "ws"
-	case "https":
-		u.Scheme = "wss"
-	default:
-		return "", fmt.Errorf("base URL must be HTTP or HTTPS: %v", u)
-	}
-	return u.String() + "/ws", nil
-}
-
 func verifyBaseUrl(connectedWith string, helloContains string) error {
 	a, err := url.Parse(connectedWith)
 	if err != nil {
@@ -236,11 +219,7 @@ func verifyBaseUrl(connectedWith string, helloContains string) error {
 		"%v and %v do not point to the same host", connectedWith, helloContains)
 }
 
-func NewClient(baseUrl string, httpBasicAuth *string) (Client, error) {
-	address, err := websocketUrlFor(baseUrl)
-	if err != nil {
-		return nil, err
-	}
+func NewClient(address string, httpBasicAuth *string) (Client, error) {
 	var headers http.Header
 	if httpBasicAuth != nil {
 		auth := base64.StdEncoding.EncodeToString([]byte(*httpBasicAuth))
@@ -255,7 +234,7 @@ func NewClient(baseUrl string, httpBasicAuth *string) (Client, error) {
 		return nil
 	})
 	client := &clientImpl{
-		baseUrl:    baseUrl,
+		baseUrl:    "",
 		conn:       conn,
 		hello:      nil,
 		content:    make(map[server.UUID]*contentHandle),
@@ -275,7 +254,7 @@ func NewClient(baseUrl string, httpBasicAuth *string) (Client, error) {
 	switch m := message.Data.(type) {
 	case *pb.ServerMessage_Hello:
 		// Make sure to verify that the base URL points to the same server.
-		err := verifyBaseUrl(baseUrl, m.Hello.BaseUrl)
+		err := verifyBaseUrl(address, m.Hello.BaseUrl)
 		if err != nil {
 			return nil, err
 		}
