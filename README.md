@@ -16,7 +16,26 @@ ideal to keep your client small and lean.
 
 ## Usage
 
-**`TODO`**
+### Start a server
+
+```sh
+git clone https://github.com/ungive/loon
+cd ./loon
+go install ./cmd/loon
+loon server -addr localhost:8080 -config examples/server/config.yaml | hl -F
+```
+
+To run the server on your local network, change `addr` to `:8080`
+and edit the example configuration
+to contain your computer's IP address and the configured port for `base_url`:
+e.g. `http://192.168.178.2:8080`.
+
+### Run the client
+
+```sh
+loon client -server http://localhost:8080 assets/loon-small.png
+loon client -server http://192.168.178.43:8080 assets/loon-small.png assets/loon-full.png
+```
 
 ## The problem
 
@@ -127,10 +146,6 @@ the number of other use cases are limited,
 but it could certainly be used for other things as well.
 If you have any ideas or if you are using this software for another use case,
 feel free to open an issue to bring it to my attention!
-
-## Usage
-
-**`TODO`**
 
 ## Future considerations
 
