@@ -557,3 +557,8 @@ Any websocket client needs the following capabilities:
     if the data is somehow not available anymore,
     in case it is needed to cancel a response
     without closing the entire websocket connection
+
+## Future considerations
+
+- Accepting HEAD requests
+- Enabling content compression (gzip, brotli, ...)
