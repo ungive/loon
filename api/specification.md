@@ -254,9 +254,11 @@ as soon as the websocket connection has been established.
 The client may not send any messages
 until it has received the `Hello` message from the server.
 
-The `base_url` field contains the base URL for creating HTTP requests.
+The `base_url` field contains the base URL for making HTTP requests.
 It represents the `<base_url>` in the Endpoints section.
 It never ends with a trailing slash.
+Clients should verify that this base URL points to the same server
+as the server they connected to when creating the websocket connection.
 
 The `client_id` is the ID for the client that is connected to the server.
 It represents the `<client_id>` in the Endpoints section.
