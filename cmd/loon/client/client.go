@@ -22,6 +22,7 @@ var (
 	auth        = Cmd.String("auth", "", "HTTP basic authentication string")
 	contentType = Cmd.String("type", "", "explicitly set the HTTP content type")
 	attachment  = Cmd.String("download", "", "set the download filename")
+	cache       = Cmd.Uint("cache", 0, "maximum cache age in seconds")
 	help        = Cmd.Bool("help", false, "print help")
 )
 
@@ -151,7 +152,7 @@ func registerPaths(cli client.Client, paths []string) {
 		content, err := cli.Register(source, &client.ContentInfo{
 			Path:               filepath.Base(file.Name()),
 			AttachmentFilename: filename,
-			MaxCacheDuration:   0,
+			MaxCacheDuration:   uint32(*cache),
 			UploadLimit:        0,
 		})
 		if err != nil {
