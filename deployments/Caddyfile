@@ -1,5 +1,5 @@
 {
-	order cache before rewrite
+	order cache after rewrite
 	order cache after header
 
 	cache {
@@ -7,30 +7,32 @@
 		api {
 			basepath /api/caddy/cache
 		}
-		key {
-			disable_body
-			disable_host
-			disable_method
-			# the query is never forwarded to the client.
-			# it should not be possible to circumvent the cache with a query.
-			disable_query
-			disable_scheme
-			headers Content-Type
-			hide
-		}
-		regex {
-			exclude /ws.*
-		}
-		stale 200s
-		ttl 5s
-		default_cache_control no-store
 	}
 }
 
 :80 {
-	basic_auth /ws bcrypt {
-		{$HTTP_WS_USER} {$HTTP_WS_PASS_BCRYPT}
+	handle /ws {
+		basic_auth bcrypt {
+			{$HTTP_WS_USER} {$HTTP_WS_PASS_BCRYPT}
+		}
+		reverse_proxy loon:80
 	}
-	cache
-	reverse_proxy loon:80
+	handle {
+		cache {
+			key {
+				disable_body
+				disable_host
+				disable_method
+				# the query is never forwarded to the client.
+				# it should not be possible to circumvent the cache
+				# by using meaningless query parameters.
+				disable_query
+				disable_scheme
+				headers Content-Type
+				hide
+			}
+			default_cache_control no-store
+		}
+		reverse_proxy loon:80
+	}
 }
