@@ -4,7 +4,9 @@ services:
     volumes:
       - ./config.yaml:/app/config.yaml:ro
   caddy:
-    image: caddy:latest
+    build:
+      context: .
+      dockerfile: caddy.dockerfile
     restart: unless-stopped
     env_file:
       - caddy.env
