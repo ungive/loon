@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync/atomic"
 
@@ -166,6 +167,10 @@ func (s *serverImpl) serve(
 	var response Response
 	select {
 	case response = <-request.Response():
+		if reflect.ValueOf(response).IsNil() {
+			statusNotFound(w, log, nil)
+			return
+		}
 	case <-request.Closed():
 		statusTimeout(w, log, nil)
 		return
