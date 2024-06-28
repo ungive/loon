@@ -18,9 +18,10 @@ public:
     /**
      * Creates a request handle for a given content source.
      *
-     * @param source The source of the content.
      * @param info The content information.
-     * @param send_function A function that should be called
+     * @param source The source of the content.
+     * @param hello The hello message that was received from the server.
+     * @param send_func A function that should be called
      * to send response client messages to the websocket peer.
      */
     RequestHandle(loon::ContentInfo const& info,
