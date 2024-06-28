@@ -15,7 +15,7 @@ class ContentHandle
 {
 public:
     /**
-     * The URL under which the content is accessible.
+     * @brief The URL under which the content is accessible.
      *
      * @returns A valid HTTP or HTTPS url.
      */
@@ -26,22 +26,25 @@ class IClient
 {
 public:
     /**
-     * Connects to the server and maintains a websocket connection.
+     * @brief Connects to the server and maintains a connection.
+     *
      * Attempts to reconnect on connection failure or disconnect,
-     * until the stop method is called.
-     * Returns immediately and does nothing, if already connecting or connected.
+     * until stop() is called.
+     * Returns immediately and does nothing, if already starting or started.
      */
     virtual void start() = 0;
 
     /**
-     * Disconnects from the server.
+     * @brief Stops the client and disconnects from the server.
+     *
      * Returns immediately and does nothing, if already disconnected.
      * Notifies all handles that registered content is not available anymore.
      */
     virtual void stop() = 0;
 
     /**
-     * Registers content with this client and returns a handle for it.
+     * @brief Registers content with this client and returns a handle for it.
+     *
      * The content remains registered across websocket reconnects,
      * until it is unregistered with unregister_content().
      * Calls to any of the methods of the source are synchronized.
@@ -53,13 +56,16 @@ public:
      * without having to worry about corrupting other ongoing requests.
      *
      * @param source The source for the content.
+     * @param info Information about how to provide the content.
+     * @returns A handle to the content.
+     * For use with unregister_content() to unregister this content again.
      * @throws NotConnectedException if the client is not connected.
      */
     virtual std::shared_ptr<ContentHandle> register_content(
         std::shared_ptr<ContentSource> source, ContentInfo const& info) = 0;
 
     /**
-     * Unregisters content from this client that is under the given handle.
+     * @brief Unregisters registered content from this client.
      *
      * @param handle The handle for which the content should be unregistered.
      * @throws ContentNotRegisteredException
@@ -101,12 +107,18 @@ private:
     std::unique_ptr<IClient> m_impl;
 };
 
+/**
+ * @brief The client is not connected to the server.
+ */
 class NotConnectedException : public std::runtime_error
 {
 public:
     using runtime_error::runtime_error;
 };
 
+/**
+ * @brief No content is registered under this handle with this client.
+ */
 class ContentNotRegisteredException : public std::runtime_error
 {
 public:
