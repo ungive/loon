@@ -1,3 +1,7 @@
 # C++ Client Implementation
 
-TODO
+## Example usage
+
+```cpp
+
+```
