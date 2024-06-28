@@ -11,7 +11,7 @@
 
 #include <hv/WebSocketClient.h>
 
-#include "loon.h"
+#include "loon/loon.h"
 #include "loon/messages.pb.h"
 
 namespace loon

@@ -7,7 +7,7 @@
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
 
-#include "loon.h"
+#include "loon/loon.h"
 
 #define RECONNECT_DELAY_POLICY_EXPONENTIAL 2
 
