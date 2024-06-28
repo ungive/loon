@@ -1,0 +1,6 @@
+/build
+/out
+/.vscode/*
+!/.vscode/extensions.json
+
+CMakePresets.json

@@ -1,0 +1,6 @@
+{
+    "recommendations": [
+        "cheshirekow.cmake-format",
+        "xaver.clang-format"
+    ]
+}
