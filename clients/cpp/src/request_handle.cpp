@@ -15,11 +15,11 @@ void RequestHandle::serve()
 {
     std::unique_lock<std::mutex> lock(mutex_data);
 
-    // Unlocks the data lock, sends the message with low priority,
+    // Unlocks the lock, sends the message with low priority,
     // so that cancellation while the message is being sent can go through,
     // locks the lock and returns whether the message was successfully sent.
     // If false is returned, the serve function should immediately terminate.
-    auto send = [this, &lock](ClientMessage const& message) {
+    auto send = [this](decltype(lock)& lock, ClientMessage const& message) {
         lock.unlock();
         auto result = send_response_message(message);
         lock.lock();
@@ -72,7 +72,7 @@ void RequestHandle::serve()
         if (info.attachment_filename.has_value()) {
             header->set_filename(info.attachment_filename.value());
         }
-        if (!send(header_message) || stop)
+        if (!send(lock, header_message))
             return;
         if (cancel_handling_request)
             continue;
@@ -93,7 +93,7 @@ void RequestHandle::serve()
             chunk->set_request_id(request.id());
             chunk->set_sequence(sequence++);
             chunk->set_data(buffer.data(), n);
-            if (!send(chunk_message) || stop)
+            if (!send(lock, chunk_message))
                 return;
             if (cancel_handling_request)
                 break;
