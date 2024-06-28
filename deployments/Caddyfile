@@ -2,10 +2,15 @@
 	order cache after rewrite
 	order cache after header
 
+	servers {
+		metrics
+	}
+
 	cache {
 		allowed_http_verbs GET
 		api {
 			basepath /api/caddy/cache
+			prometheus
 		}
 	}
 }

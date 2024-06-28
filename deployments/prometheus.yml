@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: "prometheus"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["localhost:9090"]
+  - job_name: "caddy-cache"
+    metrics_path: /api/caddy/cache/metrics
+    static_configs:
+      - targets: ["caddy:80"]
