@@ -21,7 +21,7 @@ AlignAfterOpenBracket: DontAlign
 Cpp11BracedListStyle: false
 IncludeBlocks: Regroup
 IncludeCategories:
-  - Regex: "<[[:alnum:].]+>"
+  - Regex: "<[[:alnum:]_.]+>"
     Priority: 1
   - Regex: "<.+>"
     Priority: 2
@@ -32,3 +32,4 @@ AllowShortLambdasOnASingleLine: Empty
 AlwaysBreakTemplateDeclarations: true
 AlignOperands: DontAlign
 ---
+
