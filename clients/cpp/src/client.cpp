@@ -1,3 +1,5 @@
+#include "client.h"
+
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -6,8 +8,6 @@
 #include <hv/base64.h>
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
-
-#include "internal.h"
 
 using namespace loon;
 

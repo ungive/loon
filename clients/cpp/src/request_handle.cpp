@@ -1,4 +1,6 @@
-#include "internal.h"
+#include "request_handle.h"
+
+#include <cassert>
 
 using namespace loon;
 

@@ -79,7 +79,7 @@ struct ContentInfo
 {
     ContentInfo(std::string const& path) : path{ path } {}
 
-    ContentInfo(std::string const& path, uint64_t max_cache_duration)
+    ContentInfo(std::string const& path, uint32_t max_cache_duration)
         : path{ path }, max_cache_duration{ max_cache_duration }
     {
     }
@@ -89,7 +89,7 @@ struct ContentInfo
     {
     }
 
-    ContentInfo(std::string const& path, uint64_t max_cache_duration,
+    ContentInfo(std::string const& path, uint32_t max_cache_duration,
         std::string const& attachment_filename)
         : path{ path }, max_cache_duration{ max_cache_duration },
           attachment_filename{ attachment_filename }
@@ -98,6 +98,6 @@ struct ContentInfo
 
     std::string path;
     std::optional<std::string> attachment_filename;
-    std::optional<uint64_t> max_cache_duration;
+    std::optional<uint32_t> max_cache_duration;
 };
 } // namespace loon
