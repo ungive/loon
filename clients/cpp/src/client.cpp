@@ -7,7 +7,9 @@
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
 
-#include "loon/loon.h"
+#include "internal.h"
+
+using namespace loon;
 
 #define RECONNECT_DELAY_POLICY_EXPONENTIAL 2
 
@@ -17,19 +19,19 @@
 #define _DEFAULT_RECONNECT_MAX_DELAY 30000
 #define _DEFAULT_RECONNECT_DELAY_POLICY RECONNECT_DELAY_POLICY_EXPONENTIAL
 
-loon::Client::Client(
+ClientImpl::ClientImpl(
     std::string const& address, std::optional<std::string> const& auth)
     : m_address{ address }, m_auth{ auth }
 {
-    m_conn.onopen = std::bind(&loon::Client::on_websocket_open, this);
+    m_conn.onopen = std::bind(&ClientImpl::on_websocket_open, this);
     m_conn.onmessage = std::bind(
-        &loon::Client::on_websocket_message, this, std::placeholders::_1);
-    m_conn.onclose = std::bind(&loon::Client::on_websocket_close, this);
+        &ClientImpl::on_websocket_message, this, std::placeholders::_1);
+    m_conn.onclose = std::bind(&ClientImpl::on_websocket_close, this);
     m_conn.setConnectTimeout(_DEFAULT_CONNECT_TIMEOUT);
     m_conn.setPingInterval(_DEFAULT_PING_INTERVAL);
 }
 
-void loon::Client::start()
+void ClientImpl::start()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     if (m_connected.exchange(true)) {
@@ -38,7 +40,7 @@ void loon::Client::start()
     internal_start();
 }
 
-void loon::Client::stop()
+void ClientImpl::stop()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     if (!m_connected.exchange(false)) {
@@ -81,7 +83,7 @@ static std::string base64_raw_url_encode(std::string const& text)
     return result;
 }
 
-std::string loon::Client::make_url(std::string const& path)
+std::string ClientImpl::make_url(std::string const& path)
 {
     std::ostringstream oss;
     oss << m_hello->client_id() << "/" << path;
@@ -94,8 +96,8 @@ std::string loon::Client::make_url(std::string const& path)
     return oss.str();
 }
 
-std::shared_ptr<loon::Client::ContentHandle> loon::Client::register_content(
-    std::shared_ptr<ContentSource> source, ContentInfo const& info)
+std::shared_ptr<ContentHandle> ClientImpl::register_content(
+    std::shared_ptr<loon::ContentSource> source, loon::ContentInfo const& info)
 {
     // TODO the content must be registered permanently, across restarts.
     //   actually, no: notify caller of restart, then invalidate.
@@ -111,7 +113,7 @@ std::shared_ptr<loon::Client::ContentHandle> loon::Client::register_content(
     const std::lock_guard<std::mutex> lock(m_mutex);
     auto request_handle =
         std::make_shared<RequestHandle>(info, source, m_hello.value(),
-            std::bind(&loon::Client::send, this, std::placeholders::_1));
+            std::bind(&ClientImpl::send, this, std::placeholders::_1));
     request_handle->spawn_serve_thread();
     auto handle = std::make_shared<InternalContentHandle>(
         make_url(info.path), request_handle);
@@ -119,7 +121,7 @@ std::shared_ptr<loon::Client::ContentHandle> loon::Client::register_content(
     return handle;
 }
 
-void loon::Client::unregister_content(std::shared_ptr<ContentHandle> handle)
+void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     // TODO
@@ -127,7 +129,7 @@ void loon::Client::unregister_content(std::shared_ptr<ContentHandle> handle)
     // TODO "cancel then exit", graceful exit
 }
 
-bool loon::Client::send(ClientMessage const& message)
+bool ClientImpl::send(ClientMessage const& message)
 {
     auto result = message.SerializeAsString();
     if (result.empty()) {
@@ -149,7 +151,7 @@ bool loon::Client::send(ClientMessage const& message)
     return true;
 }
 
-void loon::Client::on_request(Request const& request)
+void ClientImpl::on_request(Request const& request)
 {
     // TODO
     std::cerr << "request (" << request.id() << "): " << request.path() << "\n";
@@ -167,20 +169,20 @@ void loon::Client::on_request(Request const& request)
     handle->serve_request(request);
 }
 
-void loon::Client::on_success(Success const& success)
+void ClientImpl::on_success(Success const& success)
 {
     // TODO
     std::cerr << "success (" << success.request_id() << ")\n";
 }
 
-void loon::Client::on_request_closed(RequestClosed const& request_closed)
+void ClientImpl::on_request_closed(RequestClosed const& request_closed)
 {
     // TODO
     std::cerr << "request closed (" << request_closed.request_id()
               << "): " << request_closed.message() << "\n";
 }
 
-void loon::Client::on_close(Close const& close)
+void ClientImpl::on_close(Close const& close)
 {
     // Restart the connection, if the server closed the connection.
     internal_restart();
@@ -188,19 +190,19 @@ void loon::Client::on_close(Close const& close)
     std::cerr << "close message: " << close.message() << "\n";
 }
 
-void loon::Client::on_websocket_open()
+void ClientImpl::on_websocket_open()
 {
     // TODO better logging
     std::cerr << "connection opened\n";
 }
 
-void loon::Client::on_websocket_close()
+void ClientImpl::on_websocket_close()
 {
     // TODO better logging
     std::cerr << "connection closed\n";
 }
 
-void loon::Client::on_websocket_message(std::string const& message)
+void ClientImpl::on_websocket_message(std::string const& message)
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     ServerMessage server_message;
@@ -212,7 +214,7 @@ void loon::Client::on_websocket_message(std::string const& message)
     handle_message(server_message);
 }
 
-void loon::Client::handle_message(ServerMessage const& message)
+void ClientImpl::handle_message(ServerMessage const& message)
 {
     if (message.has_hello()) {
         if (m_hello.has_value()) {
@@ -239,7 +241,7 @@ void loon::Client::handle_message(ServerMessage const& message)
     }
 }
 
-void loon::Client::internal_start()
+void ClientImpl::internal_start()
 {
     // Reconnect
     reconn_setting_t reconnect;
@@ -261,14 +263,14 @@ void loon::Client::internal_start()
     m_conn.open(m_address.c_str(), headers);
 }
 
-inline void loon::Client::internal_stop()
+inline void ClientImpl::internal_stop()
 {
     m_conn.close();
     // Reset any per-connection state
     m_hello = std::nullopt;
 }
 
-inline void loon::Client::internal_restart()
+inline void ClientImpl::internal_restart()
 {
     internal_stop();
     internal_start();

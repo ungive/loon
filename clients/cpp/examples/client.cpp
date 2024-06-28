@@ -1,13 +1,9 @@
 #include <iostream>
 #include <thread>
 
-using namespace std::chrono_literals;
-
-#include <google/protobuf/text_format.h>
-#include <hv/WebSocketClient.h>
-#include <hv/base64.h>
-
 #include "loon/loon.h"
+
+using namespace std::chrono_literals;
 
 int main()
 {

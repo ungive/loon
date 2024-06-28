@@ -1,13 +1,15 @@
-#include "loon/loon.h"
+#include "internal.h"
 
-loon::Client::RequestHandle::RequestHandle(ContentInfo const& info,
+using namespace loon;
+
+RequestHandle::RequestHandle(ContentInfo const& info,
     std::shared_ptr<ContentSource> source, Hello const& hello,
     std::function<bool(ClientMessage const&)> send_func)
     : hello{ hello }, info{ info }, source{ source }, send_message{ send_func }
 {
 }
 
-void loon::Client::RequestHandle::serve()
+void RequestHandle::serve()
 {
     std::unique_lock<std::mutex> lock(mutex_data);
 
@@ -103,8 +105,7 @@ void loon::Client::RequestHandle::serve()
     }
 }
 
-bool loon::Client::RequestHandle::send_response_message(
-    ClientMessage const& message)
+bool RequestHandle::send_response_message(ClientMessage const& message)
 {
     // low-priority: lock L, lock N, lock M, unlock N, ..., unlock M, unlock L
     const std::lock_guard<std::mutex> lock_low(mutex_low);
@@ -114,14 +115,14 @@ bool loon::Client::RequestHandle::send_response_message(
     return send_message(message);
 }
 
-void loon::Client::RequestHandle::serve_request(Request const& request)
+void RequestHandle::serve_request(Request const& request)
 {
     const std::lock_guard<std::mutex> lock(mutex_data);
     pending_requests.push_back(request);
     cv_incoming_request.notify_one();
 }
 
-void loon::Client::RequestHandle::cancel_request(uint64_t request_id)
+void RequestHandle::cancel_request(uint64_t request_id)
 {
     // high-priority: lock N, lock M, unlock N, ..., unlock M
     mutex_next.lock();
@@ -160,7 +161,7 @@ void loon::Client::RequestHandle::cancel_request(uint64_t request_id)
     }
 }
 
-void loon::Client::RequestHandle::spawn_serve_thread()
+void RequestHandle::spawn_serve_thread()
 {
     const std::lock_guard<std::mutex> lock(mutex_data);
     if (dirty) {
@@ -169,11 +170,11 @@ void loon::Client::RequestHandle::spawn_serve_thread()
     if (stop) {
         throw std::runtime_error("request handle is stopped");
     }
-    std::thread(&loon::Client::RequestHandle::serve, this).detach();
+    std::thread(&RequestHandle::serve, this).detach();
     dirty = true;
 }
 
-void loon::Client::RequestHandle::destroy()
+void RequestHandle::destroy()
 {
     // high-priority: lock N, lock M, unlock N, ..., unlock M
     mutex_next.lock();

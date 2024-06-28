@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.8)
 project("loon")
 
-set(LIB_SOURCES src/client.cpp src/request_handle.cpp)
+set(LIB_SOURCES src/client.cpp src/request_handle.cpp src/impl.cpp)
 
 add_library(loon STATIC ${LIB_SOURCES})
-target_include_directories(loon PRIVATE ./include ./src .) # TODO remove .
+target_include_directories(loon PRIVATE ./include ./src)
 
 # openssl
 find_package(OpenSSL REQUIRED)
@@ -31,8 +31,6 @@ protobuf_generate(
     loon-proto
     OUT_VAR
     PROTOLOON_SOURCES
-    PROTOC_OUT_DIR
-    ${CMAKE_CURRENT_SOURCE_DIR} # TODO binary dir
     IMPORT_DIRS
     ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(loon protobuf::libprotobuf)
@@ -47,7 +45,7 @@ set(EXAMPLE_CLIENT_SOURCES examples/client.cpp)
 
 add_executable(loon-cli ${EXAMPLE_CLIENT_SOURCES})
 target_link_libraries(loon-cli loon)
-target_include_directories(loon-cli PRIVATE ./include .) # TODO remove .
+target_include_directories(loon-cli PRIVATE ./include)
 
 set_property(TARGET loon-cli PROPERTY CXX_STANDARD 17)
 set_property(TARGET loon-cli PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
