@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.8)
 project("loon")
 
+option(LOON_BUILD_EXAMPLES "Build loon examples" ON)
+option(LOON_BUILD_TESTS "Build loon tests" ON)
+
 set(LIB_SOURCES src/client.cpp src/request_handle.cpp src/impl.cpp)
 
 add_library(loon STATIC ${LIB_SOURCES})
@@ -39,20 +42,10 @@ target_link_libraries(loon loon-proto)
 set_property(TARGET loon PROPERTY CXX_STANDARD 17)
 set_property(TARGET loon PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# TODO move into separate CMakeLists.txt file:
+if(LOON_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
 
-set(EXAMPLE_CLIENT_SOURCES examples/client.cpp)
-
-add_executable(loon-cli ${EXAMPLE_CLIENT_SOURCES})
-target_link_libraries(loon-cli loon)
-target_include_directories(loon-cli PRIVATE ./include)
-
-set_property(TARGET loon-cli PROPERTY CXX_STANDARD 17)
-set_property(TARGET loon-cli PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
-
-add_custom_command(
-    TARGET loon-cli
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:loon-cli>
-            $<TARGET_FILE_DIR:loon-cli>
-    COMMAND_EXPAND_LISTS)
+if(LOON_BUILD_TESTS)
+    # TODO
+endif()
