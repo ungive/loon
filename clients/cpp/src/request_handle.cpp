@@ -96,7 +96,7 @@ void RequestHandle::serve()
             if (!send(chunk_message) || stop)
                 return;
             if (cancel_handling_request)
-                continue;
+                break;
         }
         if (!stream.good()) {
             // The response is complete, we do not need to cancel anymore.
