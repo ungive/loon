@@ -31,5 +31,6 @@ SeparateDefinitionBlocks: Always
 AllowShortLambdasOnASingleLine: Empty
 AlwaysBreakTemplateDeclarations: true
 AlignOperands: DontAlign
+AlignEscapedNewlines: Left
 ---
 
