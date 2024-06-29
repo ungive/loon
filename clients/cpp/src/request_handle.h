@@ -16,7 +16,7 @@ class RequestHandle
 {
 public:
     /**
-     * Creates a request handle for a given content source.
+     * @brief Creates a request handle for a given content source.
      *
      * @param info The content information.
      * @param source The source of the content.
@@ -29,8 +29,9 @@ public:
         std::function<bool(ClientMessage const&)> send_func);
 
     /**
-     * Forwards the given request to the serve thread
-     * and sends a response to the websocket peer in the background.
+     * @brief Forwards the given request to the serve thread.
+     *
+     * Sends a response to the websocket peer in the background.
      * Concurrent requests are synchronized.
      *
      * @param request The request to serve.
@@ -38,7 +39,8 @@ public:
     void serve_request(Request const& request);
 
     /**
-     * Cancels a request with the given ID that is currently being served.
+     * @brief Cancels a request with the given ID that is currently served.
+     *
      * Removes the request from the internal list of pending requests,
      * if there is no request being actively served with that ID
      * or if the currently served request has a different ID.
@@ -48,7 +50,8 @@ public:
     void cancel_request(uint64_t request_id);
 
     /**
-     * Spawns a new serve thread for this request handle.
+     * @brief Spawns a new serve thread for this request handle.
+     *
      * @throws std::runtime_error if the thread is already spawned
      * or if the request handle has already been destroyed.
      */
@@ -63,7 +66,8 @@ public:
     void exit_gracefully();
 
     /**
-     * Closes the request handle and its associated serve thread.
+     * @brief Closes the request handle and its associated serve thread.
+     *
      * Meant to be used if the connection is closed
      * and the request handler should exit forcefully.
      * If the connection should remain in a valid state,
