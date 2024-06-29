@@ -94,6 +94,47 @@ std::string ClientImpl::make_url(std::string const& path)
     return oss.str();
 }
 
+void ClientImpl::check_content_constraints(
+    std::shared_ptr<loon::ContentSource> source, loon::ContentInfo const& info)
+{
+    // Maximum content size.
+    auto max_content_size = m_hello->constraints().max_content_size();
+    if (source->size() > max_content_size) {
+        throw UnacceptableContentException(
+            "content of this size is not accepted by the server: " +
+            std::to_string(source->size()) + " bytes");
+    }
+
+    // Allowed content types.
+    // NOTE server does not support wildcard content types yet,
+    // but it should and will in the future, which needs to be handled here.
+    std::string content_type = source->content_type();
+    auto separator_index = content_type.find(';');
+    if (separator_index != std::string::npos) {
+        content_type.resize(separator_index);
+    }
+    auto const& accepted_content_types =
+        m_hello->constraints().accepted_content_types();
+    bool accepted = false;
+    for (auto const& accepted_type : accepted_content_types) {
+        if (content_type == accepted_type) {
+            accepted = true;
+            break;
+        }
+    }
+    if (!accepted) {
+        throw UnacceptableContentException(
+            "the content type is not accepted by the server");
+    }
+
+    // Attachment filename may not be empty.
+    if (info.attachment_filename.has_value() &&
+        info.attachment_filename.value().empty()) {
+        throw UnacceptableContentException(
+            "the attachment filename may not be empty");
+    }
+}
+
 std::shared_ptr<ContentHandle> ClientImpl::register_content(
     std::shared_ptr<loon::ContentSource> source, loon::ContentInfo const& info)
 {
@@ -102,12 +143,15 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
     // TODO the content must be registered permanently, across restarts.
     //   actually, no: notify caller of restart, then invalidate.
     //   caller needs to register again or not at all.
-    // TODO check that the source and info is within the constraints.
     // TODO configurable timeout until Hello should be received.
     // TODO configurable "failed too much" count,
     //   after which the client stops reconnecting
     // TODO upload speed limit (will help with testing too!)
 
+    // Check that the content is within the server's constraints.
+    check_content_constraints(source, info);
+
+    // Check if the path is already in use.
     auto const& path = info.path;
     auto it = m_content.find(path);
     if (it != m_content.end()) {

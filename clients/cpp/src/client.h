@@ -71,6 +71,8 @@ private:
     void on_request_closed(RequestClosed const& request_closed);
     void on_close(Close const& close);
     bool update_connected(bool state);
+    void check_content_constraints(std::shared_ptr<loon::ContentSource> source,
+        loon::ContentInfo const& info);
 
     std::string make_url(std::string const& path);
 
