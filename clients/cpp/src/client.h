@@ -18,6 +18,8 @@
 
 namespace loon
 {
+class InternalContentHandle;
+
 class ClientImpl : public IClient
 {
 public:
@@ -36,30 +38,6 @@ public:
 
 private:
     using request_path_t = std::string;
-
-    class InternalContentHandle : public ContentHandle
-    {
-    public:
-        InternalContentHandle(std::string const& url, std::string const& path,
-            std::shared_ptr<RequestHandle> request_handle)
-            : m_url{ url }, m_path{ path }, m_request_handle{ request_handle }
-        {
-        }
-
-        inline std::string const& url() const override { return m_url; }
-
-        inline std::string const& path() const { return m_path; }
-
-        inline std::shared_ptr<RequestHandle> request_handle()
-        {
-            return m_request_handle;
-        }
-
-    private:
-        std::string m_url{};
-        std::string m_path{};
-        std::shared_ptr<RequestHandle> m_request_handle;
-    };
 
     void on_websocket_open();
     void on_websocket_close();
@@ -107,5 +85,70 @@ private:
     std::optional<Hello> m_hello{};
     std::unordered_map<request_path_t, std::shared_ptr<InternalContentHandle>>
         m_content{};
+};
+
+class InternalContentHandle : public ContentHandle
+{
+public:
+    InternalContentHandle(std::string const& url, std::string const& path,
+        std::shared_ptr<RequestHandle> request_handle)
+        : m_url{ url }, m_path{ path }, m_request_handle{ request_handle }
+    {
+    }
+
+    inline std::string const& url() const override { return m_url; }
+
+    inline std::string const& path() const { return m_path; }
+
+    inline std::shared_ptr<RequestHandle> request_handle()
+    {
+        return m_request_handle;
+    }
+
+    void served(std::function<void()> callback) override
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        m_served_callback = callback;
+    }
+
+    void unregistered(std::function<void()> callback) override
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        if (!m_registered) {
+            return callback();
+        }
+        m_unregistered_callback = callback;
+    }
+
+    void served()
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        if (m_served_callback) {
+            m_served_callback();
+        }
+    }
+
+    /**
+     * @brief Call this method if the content handle has been unregistered.
+     */
+    void unregistered()
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        if (m_registered && m_unregistered_callback) {
+            m_unregistered_callback();
+        }
+        m_registered = false;
+        m_unregistered_callback = nullptr;
+    }
+
+private:
+    std::string m_url{};
+    std::string m_path{};
+    std::shared_ptr<RequestHandle> m_request_handle;
+
+    std::mutex m_mutex{};
+    std::function<void()> m_served_callback{};
+    std::function<void()> m_unregistered_callback{};
+    bool m_registered{ true /* considered registered until unregistered */ };
 };
 } // namespace loon

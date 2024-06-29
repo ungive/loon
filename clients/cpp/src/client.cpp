@@ -203,6 +203,9 @@ void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
         throw ClientNotConnectedException("the client is not connected");
     }
 
+    // Notify that the content is being unregistered (rather early than late).
+    it->second->unregistered();
+
     // Exit the request handle's serve thread
     // and wait for it to have terminated, then remove the handle.
     it->second->request_handle()->exit_gracefully();
@@ -264,6 +267,9 @@ void ClientImpl::on_success(Success const& success)
 {
     // TODO
     std::cerr << "success (" << success.request_id() << ")\n";
+
+    // TODO call served() on the content handle
+    // TODO get content handle by request ID (two maps: path and request ID key)
 }
 
 void ClientImpl::on_request_closed(RequestClosed const& request_closed)
@@ -373,9 +379,11 @@ void ClientImpl::internal_start()
 
 void ClientImpl::reset_connection_state()
 {
-    for (auto& [_, value] : m_content) {
+    for (auto& [_, content] : m_content) {
+        // Notify that content is not registered anymore.
+        content->unregistered();
         // Make sure all spawned request handler threads exit.
-        value->request_handle()->destroy();
+        content->request_handle()->destroy();
     }
     m_content.clear();
     m_hello = std::nullopt;

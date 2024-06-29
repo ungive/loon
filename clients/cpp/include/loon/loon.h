@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -20,6 +21,38 @@ public:
      * @returns A valid HTTP or HTTPS url.
      */
     virtual std::string const& url() const = 0;
+
+    /**
+     * @brief Sets a callback for when the content was successfully served.
+     *
+     * The callback function is called in the event that
+     * the registered content has been request and successfully served.
+     *
+     * The callback will not be called for past served requests,
+     * if it is set after the URL for this content has been requested.
+     * The callback should therefore be set first,
+     * before calling url() and request or sharing the returned URL.
+     *
+     * @param callback The callback function to set.
+     */
+    virtual void served(std::function<void()> callback) = 0;
+
+    /**
+     * @brief Sets a callback for when the content is unregistered.
+     *
+     * The callback function is called in the event that
+     * the content has been unregistered from the client manually,
+     * the connection to the server has been closed manually,
+     * the server has closed the connection to the client,
+     * an error occured that prevented the content from being served,
+     * or if the content is not registered with the client anymore,
+     * when this method was called to set the callback.
+     *
+     * Any set callback is called at most once.
+     *
+     * @param callback The callback function to set.
+     */
+    virtual void unregistered(std::function<void()> callback) = 0;
 };
 
 class IClient
