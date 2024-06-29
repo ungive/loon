@@ -57,9 +57,17 @@ public:
      *
      * @param source The source for the content.
      * @param info Information about how to provide the content.
+     *
      * @returns A handle to the content.
      * For use with unregister_content() to unregister this content again.
-     * @throws NotConnectedException if the client is not connected.
+     * @throws ClientNotConnectedException if the client is not connected
+     * when the method is called or if the client disconnected
+     * while waiting for the connection to be ready.
+     * @throws PathAlreadyRegisteredException
+     * if content has already been registered under the path
+     * that was specified in the info parameter.
+     * @throws UnacceptableContentException
+     * if the server's constraints do not allow this content.
      */
     virtual std::shared_ptr<ContentHandle> register_content(
         std::shared_ptr<ContentSource> source, ContentInfo const& info) = 0;
@@ -68,6 +76,8 @@ public:
      * @brief Unregisters registered content from this client.
      *
      * @param handle The handle for which the content should be unregistered.
+     *
+     * @throws ClientNotConnectedException if the client is not connected.
      * @throws ContentNotRegisteredException
      * if the content is not registered with this client.
      */
@@ -110,7 +120,16 @@ private:
 /**
  * @brief The client is not connected to the server.
  */
-class NotConnectedException : public std::runtime_error
+class ClientNotConnectedException : public std::runtime_error
+{
+public:
+    using runtime_error::runtime_error;
+};
+
+/**
+ * @brief Content is already registered under this path.
+ */
+class PathAlreadyRegisteredException : public std::runtime_error
 {
 public:
     using runtime_error::runtime_error;
@@ -120,6 +139,15 @@ public:
  * @brief No content is registered under this handle with this client.
  */
 class ContentNotRegisteredException : public std::runtime_error
+{
+public:
+    using runtime_error::runtime_error;
+};
+
+/**
+ * @brief The content does not conform with the server's constraints.
+ */
+class UnacceptableContentException : public std::runtime_error
 {
 public:
     using runtime_error::runtime_error;

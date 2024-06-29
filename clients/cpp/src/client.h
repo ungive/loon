@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
 #include <deque>
 #include <functional>
 #include <memory>
@@ -39,13 +40,15 @@ private:
     class InternalContentHandle : public ContentHandle
     {
     public:
-        InternalContentHandle(std::string const& url,
+        InternalContentHandle(std::string const& url, std::string const& path,
             std::shared_ptr<RequestHandle> request_handle)
-            : m_url{ url }, m_request_handle{ request_handle }
+            : m_url{ url }, m_path{ path }, m_request_handle{ request_handle }
         {
         }
 
         inline std::string const& url() const override { return m_url; }
+
+        inline std::string const& path() const { return m_path; }
 
         inline std::shared_ptr<RequestHandle> request_handle()
         {
@@ -54,6 +57,7 @@ private:
 
     private:
         std::string m_url{};
+        std::string m_path{};
         std::shared_ptr<RequestHandle> m_request_handle;
     };
 
@@ -61,10 +65,12 @@ private:
     void on_websocket_close();
     void on_websocket_message(std::string const& message);
     void handle_message(ServerMessage const& message);
+    void on_hello(Hello const& request);
     void on_request(Request const& request);
     void on_success(Success const& success);
     void on_request_closed(RequestClosed const& request_closed);
     void on_close(Close const& close);
+    bool update_connected(bool state);
 
     std::string make_url(std::string const& path);
 
@@ -81,17 +87,23 @@ private:
      */
     bool send(ClientMessage const& message);
 
+    void reset_connection_state();
     void internal_start();
     void internal_stop();
     void internal_restart();
 
-    std::string m_address{};
-    std::optional<std::string> m_auth{};
+    const std::string m_address{};
+    const std::optional<std::string> m_auth{};
+
     std::atomic<bool> m_connected{ false };
     std::mutex m_mutex{};
+    std::condition_variable m_cv_connection_ready{};
     hv::WebSocketClient m_conn{};
+
+    // Per-connection state fields
+
     std::optional<Hello> m_hello{};
     std::unordered_map<request_path_t, std::shared_ptr<InternalContentHandle>>
-        m_content;
+        m_content{};
 };
 } // namespace loon

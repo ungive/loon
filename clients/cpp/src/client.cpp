@@ -1,6 +1,8 @@
 #include "client.h"
 
+#include <cassert>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <thread>
 
@@ -8,6 +10,8 @@
 #include <hv/base64.h>
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
+
+#include "loon/loon.h"
 
 using namespace loon;
 
@@ -34,18 +38,12 @@ ClientImpl::ClientImpl(
 void ClientImpl::start()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_connected.exchange(true)) {
-        return;
-    }
     internal_start();
 }
 
 void ClientImpl::stop()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
-    if (!m_connected.exchange(false)) {
-        return;
-    }
     internal_stop();
 }
 
@@ -99,34 +97,72 @@ std::string ClientImpl::make_url(std::string const& path)
 std::shared_ptr<ContentHandle> ClientImpl::register_content(
     std::shared_ptr<loon::ContentSource> source, loon::ContentInfo const& info)
 {
+    std::unique_lock<std::mutex> lock(m_mutex);
+
     // TODO the content must be registered permanently, across restarts.
     //   actually, no: notify caller of restart, then invalidate.
     //   caller needs to register again or not at all.
-    // TODO derive URL from: client ID, client secret, computed MAC, path
-    //   using HMAC-SHA256 (use openssl?)
     // TODO check that the source and info is within the constraints.
-    // TODO check that no content is already registered under this path.
-    // TODO store the content handle in the internal map.
-    // TODO destroy all request handles on: on_close() or internal_stop().
-    // TODO spawn serve thread once hello has been received, if it hasn't yet.
+    // TODO configurable timeout until Hello should be received.
+    // TODO configurable "failed too much" count,
+    //   after which the client stops reconnecting
+    // TODO upload speed limit (will help with testing too!)
 
-    const std::lock_guard<std::mutex> lock(m_mutex);
+    auto const& path = info.path;
+    auto it = m_content.find(path);
+    if (it != m_content.end()) {
+        throw ContentNotRegisteredException(
+            "content under this path is already registered with this client");
+    }
+
+    // Wait until the connection is ready for content registration.
+    m_cv_connection_ready.wait(lock, [this] {
+        return !m_connected.load() || m_hello.has_value();
+    });
+    if (!m_connected.load()) {
+        throw ClientNotConnectedException("the client is not connected");
+    }
+    assert(m_hello.has_value());
+
+    // Serve requests for this content, register it and return a handle.
+    auto send = std::bind(&ClientImpl::send, this, std::placeholders::_1);
     auto request_handle =
-        std::make_shared<RequestHandle>(info, source, m_hello.value(),
-            std::bind(&ClientImpl::send, this, std::placeholders::_1));
+        std::make_shared<RequestHandle>(info, source, m_hello.value(), send);
     request_handle->spawn_serve_thread();
     auto handle = std::make_shared<InternalContentHandle>(
-        make_url(info.path), request_handle);
-    m_content[info.path] = handle;
+        make_url(info.path), path, request_handle);
+    m_content.emplace(path, handle);
     return handle;
 }
 
 void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
 {
-    const std::lock_guard<std::mutex> lock(m_mutex);
-    // TODO
-    // TODO cancel all ongoing and pending requests.
-    // TODO "cancel then exit", graceful exit
+    std::unique_lock<std::mutex> lock(m_mutex);
+
+    // Verify that the content is valid and that it is registered.
+    auto ptr = std::dynamic_pointer_cast<InternalContentHandle>(handle);
+    if (!ptr) {
+        throw ContentNotRegisteredException(
+            "failed to cast handle to internal content handle type");
+    }
+    auto it = m_content.find(ptr->path());
+    if (it == m_content.end()) {
+        throw ContentNotRegisteredException(
+            "this content is not registered with this client");
+    }
+
+    // Wait until the connection is ready.
+    m_cv_connection_ready.wait(lock, [this] {
+        return !m_connected.load() || m_hello.has_value();
+    });
+    if (!m_connected.load()) {
+        throw ClientNotConnectedException("the client is not connected");
+    }
+
+    // Exit the request handle's serve thread
+    // and wait for it to have terminated, then remove the handle.
+    it->second->request_handle()->exit_gracefully();
+    m_content.erase(it);
 }
 
 bool ClientImpl::send(ClientMessage const& message)
@@ -149,6 +185,17 @@ bool ClientImpl::send(ClientMessage const& message)
     std::cerr << "send (" << n << "/" << result.size()
               << "): " << output.substr(0, output.find_first_of('{')) << "\n";
     return true;
+}
+
+void ClientImpl::on_hello(Hello const& hello)
+{
+    if (m_hello.has_value()) {
+        // Already received a Hello message for this connection.
+        // TODO log invalid second hello message
+        return internal_restart();
+    }
+    m_hello = hello;
+    m_cv_connection_ready.notify_all();
 }
 
 void ClientImpl::on_request(Request const& request)
@@ -180,31 +227,42 @@ void ClientImpl::on_request_closed(RequestClosed const& request_closed)
     // TODO
     std::cerr << "request closed (" << request_closed.request_id()
               << "): " << request_closed.message() << "\n";
+
+    // TODO cancel sending response.
 }
 
 void ClientImpl::on_close(Close const& close)
 {
-    // Restart the connection, if the server closed the connection.
-    internal_restart();
     // TODO log close reason
     std::cerr << "close message: " << close.message() << "\n";
+
+    // Restart the connection, if the server closed the connection.
+    internal_restart();
 }
 
 void ClientImpl::on_websocket_open()
 {
+    const std::lock_guard<std::mutex> lock(m_mutex);
+
     // TODO better logging
     std::cerr << "connection opened\n";
 }
 
 void ClientImpl::on_websocket_close()
 {
+    const std::lock_guard<std::mutex> lock(m_mutex);
+
     // TODO better logging
     std::cerr << "connection closed\n";
+
+    update_connected(false);
+    reset_connection_state();
 }
 
 void ClientImpl::on_websocket_message(std::string const& message)
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
+
     ServerMessage server_message;
     if (!server_message.ParseFromString(message)) {
         // Failed to parse message, restart the connection.
@@ -216,16 +274,9 @@ void ClientImpl::on_websocket_message(std::string const& message)
 
 void ClientImpl::handle_message(ServerMessage const& message)
 {
-    if (message.has_hello()) {
-        if (m_hello.has_value()) {
-            // Already received a Hello message for this connection.
-            // TODO log invalid second hello message
-            return internal_restart();
-        }
-        m_hello = message.hello();
-        return;
-    }
     switch (message.data_case()) {
+    case ServerMessage::kHello:
+        return on_hello(message.hello());
     case ServerMessage::kRequest:
         return on_request(message.request());
     case ServerMessage::kSuccess:
@@ -241,8 +292,21 @@ void ClientImpl::handle_message(ServerMessage const& message)
     }
 }
 
+bool ClientImpl::update_connected(bool state)
+{
+    auto old_state = m_connected.exchange(state);
+    // Notify any thread that might be waiting for connection state changes.
+    if (old_state != state) {
+        m_cv_connection_ready.notify_all();
+    }
+    return old_state;
+}
+
 void ClientImpl::internal_start()
 {
+    if (update_connected(true)) {
+        return;
+    }
     // Reconnect
     reconn_setting_t reconnect;
     reconn_setting_init(&reconnect);
@@ -263,11 +327,23 @@ void ClientImpl::internal_start()
     m_conn.open(m_address.c_str(), headers);
 }
 
-inline void ClientImpl::internal_stop()
+void ClientImpl::reset_connection_state()
 {
-    m_conn.close();
-    // Reset any per-connection state
+    for (auto& [_, value] : m_content) {
+        // Make sure all spawned request handler threads exit.
+        value->request_handle()->destroy();
+    }
+    m_content.clear();
     m_hello = std::nullopt;
+}
+
+void ClientImpl::internal_stop()
+{
+    if (!update_connected(false)) {
+        return;
+    }
+    m_conn.close();
+    reset_connection_state();
 }
 
 inline void ClientImpl::internal_restart()
