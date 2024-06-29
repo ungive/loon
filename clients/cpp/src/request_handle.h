@@ -55,7 +55,19 @@ public:
     void spawn_serve_thread();
 
     /**
+     * @brief Exits the serve loop gracefully and blocks until it exited.
+     *
+     * Cancels any ongoing requests in the process,
+     * such that the connection remains in a valid state.
+     */
+    void exit_gracefully();
+
+    /**
      * Closes the request handle and its associated serve thread.
+     * Meant to be used if the connection is closed
+     * and the request handler should exit forcefully.
+     * If the connection should remain in a valid state,
+     * use exit_gracefully() instead.
      */
     void destroy();
 
@@ -86,14 +98,9 @@ private:
 
     // The remaining fields are all default-initialized.
 
-    // Using three mutex variables for a thread with priority.
-    // Reference: https://stackoverflow.com/a/11673600/6748004
-    // When a thread calls cancel_request(), it should always have priority
-    // in changing the state of the request handle,
-    // so that after sending a message, we always immediately know
-    // whether it has been cancelled from the outside or not.
-
-    std::mutex mutex_data{}; // Mutex for data fields.
+    // Using three mutex variables for threads with priority.
+    // More information at the top of request_handle.cpp.
+    std::mutex mutex{};      // Mutex for data fields.
     std::mutex mutex_next{}; // Mutex for next-to-access threads.
     std::mutex mutex_low{};  // Mutex for low-priority access threads.
 
@@ -103,5 +110,7 @@ private:
     bool cancel_handling_request{ false };
     bool dirty{ false };
     bool stop{ false };
+    bool done{ false };
+    std::condition_variable cv_done{};
 };
 } // namespace loon

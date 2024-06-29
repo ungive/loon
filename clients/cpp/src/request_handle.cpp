@@ -4,6 +4,27 @@
 
 using namespace loon;
 
+// Macros for locking with low and high priority threads.
+// Reference: https://stackoverflow.com/a/11673600/6748004
+
+// Locks the request handle for the lifetime of the current scope
+// with low priority, such that high priority threads run next.
+// order: lock L, lock N, lock M, unlock N, ..., unlock M, unlock L
+#define mutex_lock_low_priority()                          \
+    const std::lock_guard<std::mutex> lock_low(mutex_low); \
+    mutex_next.lock();                                     \
+    const std::lock_guard<std::mutex> lock_data(mutex);    \
+    mutex_next.unlock();
+
+// Locks the request handle for the lifetime of the current scope
+// with high priority, such that this thread runs next,
+// before other threads that also acquired the data lock.
+// order: lock N, lock M, unlock N, ..., unlock M
+#define mutex_lock_high_priority()                      \
+    mutex_next.lock();                                  \
+    const std::lock_guard<std::mutex> lock_data(mutex); \
+    mutex_next.unlock();
+
 RequestHandle::RequestHandle(ContentInfo const& info,
     std::shared_ptr<ContentSource> source, Hello const& hello,
     std::function<bool(ClientMessage const&)> send_func)
@@ -13,7 +34,16 @@ RequestHandle::RequestHandle(ContentInfo const& info,
 
 void RequestHandle::serve()
 {
-    std::unique_lock<std::mutex> lock(mutex_data);
+    std::unique_lock<std::mutex> lock(mutex);
+
+    std::shared_ptr<void> defer(nullptr, std::bind([this] {
+        // Notify that the serve loop has exited once the function returns.
+        // Note that "defer" needs to be constructed after the lock,
+        // so that it is destructed before the lock
+        // and therefore "done" is changed while the lock is still being held.
+        done = true;
+        cv_done.notify_all();
+    }));
 
     // Unlocks the lock, sends the message with low priority,
     // so that cancellation while the message is being sent can go through,
@@ -26,11 +56,9 @@ void RequestHandle::serve()
         return result;
     };
 
-    // Serve requests until the request handler is stopped.
-    while (!stop) {
-        if (cancel_handling_request && !handling_request_id.has_value()) {
-            assert(false && "no handled request ID to cancel");
-        }
+    // The loop condition needs to be true,
+    // since the request cancellation is always done after an iteration.
+    while (true) {
         if (cancel_handling_request && handling_request_id.has_value()) {
             // Close the response if the currently handled request
             // was canceled during the previous loop iteration.
@@ -76,6 +104,8 @@ void RequestHandle::serve()
             return;
         if (cancel_handling_request)
             continue;
+        if (stop)
+            return;
 
         // Send the chunks.
         uint64_t sequence = 0;
@@ -97,6 +127,8 @@ void RequestHandle::serve()
                 return;
             if (cancel_handling_request)
                 break;
+            if (stop)
+                return;
         }
         if (!stream.good()) {
             // The response is complete, we do not need to cancel anymore.
@@ -107,29 +139,25 @@ void RequestHandle::serve()
     }
 }
 
-bool RequestHandle::send_response_message(ClientMessage const& message)
+inline bool RequestHandle::send_response_message(ClientMessage const& message)
 {
-    // low-priority: lock L, lock N, lock M, unlock N, ..., unlock M, unlock L
-    const std::lock_guard<std::mutex> lock_low(mutex_low);
-    mutex_next.lock();
-    const std::lock_guard<std::mutex> lock_data(mutex_data);
-    mutex_next.unlock();
+    mutex_lock_low_priority();
     return send_message(message);
 }
 
 void RequestHandle::serve_request(Request const& request)
 {
-    const std::lock_guard<std::mutex> lock(mutex_data);
+    // Neither high, nor low priority.
+    const std::lock_guard<std::mutex> lock(mutex);
+
     pending_requests.push_back(request);
     cv_incoming_request.notify_one();
 }
 
 void RequestHandle::cancel_request(uint64_t request_id)
 {
-    // high-priority: lock N, lock M, unlock N, ..., unlock M
-    mutex_next.lock();
-    const std::lock_guard<std::mutex> lock(mutex_data);
-    mutex_next.unlock();
+    // Response cancellation has high priority.
+    mutex_lock_high_priority();
 
     // This request ID is currently being handled.
     // It's the responsibility of the serve function
@@ -165,7 +193,7 @@ void RequestHandle::cancel_request(uint64_t request_id)
 
 void RequestHandle::spawn_serve_thread()
 {
-    const std::lock_guard<std::mutex> lock(mutex_data);
+    const std::lock_guard<std::mutex> lock(mutex);
     if (dirty) {
         throw std::runtime_error("serve thread has already been spawned");
     }
@@ -176,14 +204,36 @@ void RequestHandle::spawn_serve_thread()
     dirty = true;
 }
 
+void loon::RequestHandle::exit_gracefully()
+{
+    {
+        // Exiting gracefully is high priority.
+        mutex_lock_high_priority();
+
+        if (stop || done) {
+            throw std::runtime_error("request handle is already destroyed");
+        }
+        if (handling_request_id.has_value()) {
+            // Cancel the request that is being handled before before stopping.
+            cancel_handling_request = true;
+        }
+        stop = true;
+    }
+    {
+        // Block until the serve loop has exited.
+        std::unique_lock<std::mutex> lock(mutex);
+        cv_done.wait(lock, [this] {
+            return done;
+        });
+    }
+}
+
 void RequestHandle::destroy()
 {
-    // high-priority: lock N, lock M, unlock N, ..., unlock M
-    mutex_next.lock();
-    const std::lock_guard<std::mutex> lock(mutex_data);
-    mutex_next.unlock();
+    // Destroying the request handle has high priority.
+    mutex_lock_high_priority();
 
-    if (stop) {
+    if (stop || done) {
         throw std::runtime_error("request handle is already destroyed");
     }
     stop = true;
