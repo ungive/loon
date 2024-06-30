@@ -26,6 +26,8 @@ public:
     ClientImpl(
         std::string const& address, std::optional<std::string> const& auth);
 
+    ~ClientImpl();
+
     void start() override;
 
     void stop() override;

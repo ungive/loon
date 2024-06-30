@@ -35,6 +35,8 @@ ClientImpl::ClientImpl(
     m_conn.setPingInterval(_DEFAULT_PING_INTERVAL);
 }
 
+loon::ClientImpl::~ClientImpl() { stop(); }
+
 void ClientImpl::start()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
