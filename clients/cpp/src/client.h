@@ -43,7 +43,7 @@ protected:
 
     inline bool send(ClientMessage const& message)
     {
-        std::unique_lock<std::mutex> lock(m_mutex);
+        std::unique_lock<std::recursive_mutex> lock(m_mutex);
         return internal_send(message);
     }
 
@@ -87,8 +87,13 @@ private:
     const std::optional<std::string> m_auth{};
 
     std::atomic<bool> m_connected{ false };
-    std::mutex m_mutex{};
-    std::condition_variable m_cv_connection_ready{};
+    // Use a recursive mutex, since many methods could trigger a reconnect,
+    // which would call close and would trigger the close callback,
+    // which locks this mutex again.
+    std::recursive_mutex m_mutex{};
+    // Use an "any" condition variable, so it works with a recursive mutex.
+    // It must only be used if it is known that the mutex is only locked once.
+    std::condition_variable_any m_cv_connection_ready{};
 
     // Per-connection state fields
 

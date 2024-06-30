@@ -43,13 +43,13 @@ loon::ClientImpl::~ClientImpl() { stop(); }
 
 void ClientImpl::start()
 {
-    const std::lock_guard<std::mutex> lock(m_mutex);
+    const std::lock_guard<std::recursive_mutex> lock(m_mutex);
     internal_start();
 }
 
 void ClientImpl::stop()
 {
-    const std::lock_guard<std::mutex> lock(m_mutex);
+    const std::lock_guard<std::recursive_mutex> lock(m_mutex);
     internal_stop();
 }
 
@@ -144,7 +144,7 @@ void ClientImpl::check_content_constraints(
 std::shared_ptr<ContentHandle> ClientImpl::register_content(
     std::shared_ptr<loon::ContentSource> source, loon::ContentInfo const& info)
 {
-    std::unique_lock<std::mutex> lock(m_mutex);
+    std::unique_lock<std::recursive_mutex> lock(m_mutex);
 
     // TODO the content must be registered permanently, across restarts.
     //   actually, no: notify caller of restart, then invalidate.
@@ -187,7 +187,7 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
 
 void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
 {
-    std::unique_lock<std::mutex> lock(m_mutex);
+    std::unique_lock<std::recursive_mutex> lock(m_mutex);
 
     // Verify that the content is valid and that it is registered.
     auto ptr = std::dynamic_pointer_cast<InternalContentHandle>(handle);
@@ -298,7 +298,7 @@ void ClientImpl::on_close(Close const& close)
 
 void ClientImpl::on_websocket_open()
 {
-    const std::lock_guard<std::mutex> lock(m_mutex);
+    const std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
     // TODO better logging
     std::cerr << "connection opened\n";
@@ -306,7 +306,7 @@ void ClientImpl::on_websocket_open()
 
 void ClientImpl::on_websocket_close()
 {
-    const std::lock_guard<std::mutex> lock(m_mutex);
+    const std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
     // TODO better logging
     std::cerr << "connection closed\n";
@@ -317,7 +317,7 @@ void ClientImpl::on_websocket_close()
 
 void ClientImpl::on_websocket_message(std::string const& message)
 {
-    const std::lock_guard<std::mutex> lock(m_mutex);
+    const std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
     ServerMessage server_message;
     if (!server_message.ParseFromString(message)) {
