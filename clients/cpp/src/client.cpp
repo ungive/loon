@@ -214,7 +214,7 @@ void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
     m_content.erase(it);
 }
 
-bool ClientImpl::send(ClientMessage const& message)
+bool ClientImpl::internal_send(ClientMessage const& message)
 {
     auto result = message.SerializeAsString();
     if (result.empty()) {
@@ -257,7 +257,7 @@ void ClientImpl::on_request(Request const& request)
         ClientMessage message;
         auto empty_response = message.mutable_empty_response();
         empty_response->set_request_id(request.id());
-        send(message);
+        internal_send(message);
         return;
     }
 

@@ -38,6 +38,15 @@ public:
 
     void unregister_content(std::shared_ptr<ContentHandle> handle) override;
 
+protected:
+    // Methods that should be accessible from tests.
+
+    inline bool send(ClientMessage const& message)
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return internal_send(message);
+    }
+
 private:
     using request_path_t = std::string;
 
@@ -67,7 +76,7 @@ private:
      * @returns A boolean indicating that the message has been sent
      * or that an error occured and the connection is in an invalid state.
      */
-    bool send(ClientMessage const& message);
+    bool internal_send(ClientMessage const& message);
 
     void reset_connection_state();
     void internal_start();
