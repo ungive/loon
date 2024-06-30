@@ -136,6 +136,8 @@ private:
  */
 struct ContentInfo
 {
+    ContentInfo() = default;
+
     ContentInfo(std::string const& path) : path{ path } {}
 
     ContentInfo(std::string const& path, uint32_t max_cache_duration)
