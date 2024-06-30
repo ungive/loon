@@ -25,7 +25,8 @@ public:
      * to send response client messages to the websocket peer.
      */
     RequestHandle(loon::ContentInfo const& info,
-        std::shared_ptr<loon::ContentSource> source, Hello const& hello,
+        std::shared_ptr<loon::ContentSource> source,
+        Hello const& hello,
         std::function<bool(ClientMessage const&)> send_func);
 
     /**

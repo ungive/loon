@@ -32,5 +32,6 @@ AllowShortLambdasOnASingleLine: Empty
 AlwaysBreakTemplateDeclarations: true
 AlignOperands: DontAlign
 AlignEscapedNewlines: Left
+BinPackParameters: false
 ---
 
