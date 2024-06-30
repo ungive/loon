@@ -220,8 +220,10 @@ void loon::RequestHandle::exit_gracefully()
         stop = true;
     }
     {
-        // Block until the serve loop has exited.
         std::unique_lock<std::mutex> lock(mutex);
+        // Wake the serve thread up, in case it is waiting for a request.
+        cv_incoming_request.notify_all();
+        // Block until the serve loop has exited.
         cv_done.wait(lock, [this] {
             return done;
         });
