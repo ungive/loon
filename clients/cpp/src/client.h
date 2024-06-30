@@ -89,13 +89,18 @@ private:
     std::atomic<bool> m_connected{ false };
     std::mutex m_mutex{};
     std::condition_variable m_cv_connection_ready{};
-    hv::WebSocketClient m_conn{};
 
     // Per-connection state fields
 
     std::optional<Hello> m_hello{};
     std::unordered_map<request_path_t, std::shared_ptr<InternalContentHandle>>
         m_content{};
+
+    // The underlying websocket client is constructed last.
+    // This must be done, so that it is destructed first,
+    // since its callbacks might use data of this class instance.
+    // Destructing other fields first would cause undefined behaviour.
+    hv::WebSocketClient m_conn{};
 };
 
 class InternalContentHandle : public ContentHandle
