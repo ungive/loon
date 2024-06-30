@@ -47,5 +47,35 @@ if(LOON_BUILD_EXAMPLES)
 endif()
 
 if(LOON_BUILD_TESTS)
-    # TODO
+    # For Windows:
+    # Prevent overriding the parent project's compiler/linker settings
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
+    include(GoogleTest)
+    enable_testing()
+    set(TEST_SOURCES test/client_test.cpp)
+
+    add_executable(unittest ${TEST_SOURCES})
+    target_link_libraries(unittest loon)
+    target_include_directories(unittest PRIVATE ./include ./src)
+    target_include_directories(unittest PRIVATE ${Protobuf_INCLUDE_DIRS})
+    target_include_directories(unittest PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+    target_link_libraries(unittest protobuf::libprotobuf)
+    target_link_libraries(unittest loon-proto)
+    target_link_libraries(unittest GTest::gmock_main)
+    target_include_directories(unittest PRIVATE ${gtest_SOURCE_DIR}/include
+                                                ${gtest_SOURCE_DIR})
+    find_package(CURL CONFIG REQUIRED)
+    target_link_libraries(unittest CURL::libcurl)
+    set_property(TARGET unittest PROPERTY CXX_STANDARD 17)
+    set_property(TARGET unittest PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
+    add_test(unittest unittest)
+    gtest_discover_tests(unittest)
+
+    add_custom_command(
+        TARGET unittest
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_RUNTIME_DLLS:unittest> $<TARGET_FILE_DIR:unittest>
+        COMMAND_EXPAND_LISTS)
 endif()
