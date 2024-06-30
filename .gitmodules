@@ -2,7 +2,3 @@
 	path = clients/cpp/third_party/googletest
 	url = git@github.com:google/googletest.git
 	branch = v1.14.x
-[submodule "clients/cpp/third_party/cpr"]
-	path = clients/cpp/third_party/cpr
-	url = https://github.com/libcpr/cpr
-	branch = 1.10.x
