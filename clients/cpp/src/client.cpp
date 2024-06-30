@@ -33,6 +33,10 @@ ClientImpl::ClientImpl(
     m_conn.onclose = std::bind(&ClientImpl::on_websocket_close, this);
     m_conn.setConnectTimeout(_DEFAULT_CONNECT_TIMEOUT);
     m_conn.setPingInterval(_DEFAULT_PING_INTERVAL);
+
+    // Disable logs (to file).
+    // TODO log handler: protobuf + outside
+    hlog_disable();
 }
 
 loon::ClientImpl::~ClientImpl() { stop(); }
