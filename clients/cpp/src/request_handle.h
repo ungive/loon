@@ -7,7 +7,7 @@
 #include <memory>
 #include <optional>
 
-#include "loon/loon.h"
+#include "loon/client.h"
 #include "loon/messages.pb.h"
 
 namespace loon

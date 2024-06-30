@@ -4,7 +4,7 @@ project("loon")
 option(LOON_BUILD_EXAMPLES "Build loon examples" ON)
 option(LOON_BUILD_TESTS "Build loon tests" ON)
 
-set(LIB_SOURCES src/client.cpp src/request_handle.cpp src/impl.cpp)
+set(LIB_SOURCES src/client.cpp src/request_handle.cpp)
 
 add_library(loon STATIC ${LIB_SOURCES})
 target_include_directories(loon PRIVATE ./include ./src)

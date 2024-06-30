@@ -12,7 +12,7 @@
 
 #include <hv/WebSocketClient.h>
 
-#include "loon/loon.h"
+#include "loon/client.h"
 #include "loon/messages.pb.h"
 #include "request_handle.h"
 

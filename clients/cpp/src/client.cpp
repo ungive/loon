@@ -11,7 +11,7 @@
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
 
-#include "loon/loon.h"
+#include "loon/client.h"
 
 using namespace loon;
 
@@ -402,4 +402,29 @@ inline void ClientImpl::internal_restart()
 {
     internal_stop();
     internal_start();
+}
+
+Client::Client(std::string const& address)
+    : m_impl{ std::make_unique<ClientImpl>(address, std::nullopt) }
+{
+}
+
+loon::Client::Client(std::string const& address, std::string const& auth)
+    : m_impl{ std::make_unique<ClientImpl>(address, auth) }
+{
+}
+
+void Client::start() { return m_impl->start(); }
+
+void Client::stop() { return m_impl->stop(); }
+
+std::shared_ptr<ContentHandle> Client::register_content(
+    std::shared_ptr<loon::ContentSource> source, loon::ContentInfo const& info)
+{
+    return m_impl->register_content(source, info);
+}
+
+void Client::unregister_content(std::shared_ptr<ContentHandle> handle)
+{
+    return m_impl->unregister_content(handle);
 }
