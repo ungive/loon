@@ -148,9 +148,6 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
     //   after which the client stops reconnecting
     // TODO upload speed limit (will help with testing too!)
 
-    // Check that the content is within the server's constraints.
-    check_content_constraints(source, info);
-
     // Check if the path is already in use.
     auto const& path = info.path;
     auto it = m_content.find(path);
@@ -167,6 +164,9 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
         throw ClientNotConnectedException("the client is not connected");
     }
     assert(m_hello.has_value());
+
+    // Check that the content is within the server's constraints.
+    check_content_constraints(source, info);
 
     // Serve requests for this content, register it and return a handle.
     auto send = std::bind(&ClientImpl::send, this, std::placeholders::_1);
