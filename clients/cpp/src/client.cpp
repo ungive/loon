@@ -218,8 +218,9 @@ void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
     m_content.erase(it);
 }
 
-bool ClientImpl::internal_send(ClientMessage const& message)
+bool ClientImpl::send(ClientMessage const& message)
 {
+    std::lock_guard<std::mutex> lock(m_write_mutex);
     auto result = message.SerializeAsString();
     if (result.empty()) {
         std::cerr << "loon/send: failed to serialize message";
@@ -261,7 +262,7 @@ void ClientImpl::on_request(Request const& request)
         ClientMessage message;
         auto empty_response = message.mutable_empty_response();
         empty_response->set_request_id(request.id());
-        internal_send(message);
+        send(message);
         return;
     }
 
@@ -388,8 +389,13 @@ void ClientImpl::reset_connection_state()
     for (auto& [_, content] : m_content) {
         // Notify that content is not registered anymore.
         content->unregistered();
-        // Make sure all spawned request handler threads exit.
-        content->request_handle()->destroy();
+        // Make sure all spawned request handler threads exit
+        // and wait until they exited.
+        // This method is used from the destructor,
+        // so after this method returns, the object will be destroyed.
+        // Request handlers use pointers to data in this object,
+        // so this object must remain valid until each handler exited.
+        content->request_handle()->exit_gracefully();
     }
     m_content.clear();
     m_hello = std::nullopt;
@@ -400,8 +406,8 @@ void ClientImpl::internal_stop()
     if (!update_connected(false)) {
         return;
     }
-    m_conn.close();
     reset_connection_state();
+    m_conn.close();
 }
 
 inline void ClientImpl::internal_restart()

@@ -41,11 +41,18 @@ public:
 protected:
     // Methods that should be accessible from tests.
 
-    inline bool send(ClientMessage const& message)
-    {
-        std::unique_lock<std::recursive_mutex> lock(m_mutex);
-        return internal_send(message);
-    }
+    /**
+     * Serializes a client message and sends to the websocket peer.
+     * Returns true if the message was successfully sent.
+     * Returns false if an error occured and the connection is restarted.
+     * If false is returned, any handling function should terminate immediately,
+     * without doing any further operations on the current connection.
+     *
+     * @param message The client message to send.
+     * @returns A boolean indicating that the message has been sent
+     * or that an error occured and the connection is in an invalid state.
+     */
+    bool send(ClientMessage const& message);
 
 private:
     using request_path_t = std::string;
@@ -65,19 +72,6 @@ private:
 
     std::string make_url(std::string const& path);
 
-    /**
-     * Serializes a client message and sends to the websocket peer.
-     * Returns true if the message was successfully sent.
-     * Returns false if an error occured and the connection is restarted.
-     * If false is returned, any handling function should terminate immediately,
-     * without doing any further operations on the current connection.
-     *
-     * @param message The client message to send.
-     * @returns A boolean indicating that the message has been sent
-     * or that an error occured and the connection is in an invalid state.
-     */
-    bool internal_send(ClientMessage const& message);
-
     void reset_connection_state();
     void internal_start();
     void internal_stop();
@@ -91,6 +85,8 @@ private:
     // which would call close and would trigger the close callback,
     // which locks this mutex again.
     std::recursive_mutex m_mutex{};
+    // Connection write mutex.
+    std::mutex m_write_mutex{};
     // Use an "any" condition variable, so it works with a recursive mutex.
     // It must only be used if it is known that the mutex is only locked once.
     std::condition_variable_any m_cv_connection_ready{};
