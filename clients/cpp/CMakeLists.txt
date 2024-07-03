@@ -69,8 +69,6 @@ if(LOON_BUILD_TESTS)
     target_link_libraries(unittest CURL::libcurl)
     set_property(TARGET unittest PROPERTY CXX_STANDARD 17)
     set_property(TARGET unittest PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
-    add_test(unittest unittest)
-    gtest_discover_tests(unittest)
 
     add_custom_command(
         TARGET unittest
@@ -78,4 +76,7 @@ if(LOON_BUILD_TESTS)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 $<TARGET_RUNTIME_DLLS:unittest> $<TARGET_FILE_DIR:unittest>
         COMMAND_EXPAND_LISTS)
+
+    add_test(unittest unittest)
+    gtest_discover_tests(unittest)
 endif()
