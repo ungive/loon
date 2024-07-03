@@ -6,7 +6,6 @@
 #include <thread>
 #include <utility>
 
-// #include <cpr/cpr.h>
 #include <curl/curl.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -17,8 +16,8 @@ using namespace loon;
 using namespace testing;
 using namespace std::chrono_literals;
 
-#define TEST_ADDRESS "ws://127.0.0.1:80/ws"
-#define TEST_AUTH "loon-client:qadjB4GeRyUSEjbj6ZFWwOiDtjLq"
+#define TEST_ADDRESS "ws://127.0.0.1:8071/ws"
+#define TEST_AUTH std::nullopt
 
 class TestClient : public loon::ClientImpl
 {

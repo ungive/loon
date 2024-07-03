@@ -1,0 +1,21 @@
+# Config for the server that should be used during tests.
+protocol:
+  base_url: http://localhost:8071
+  constraints:
+    chunk_size: 16 # 16 Bytes
+    max_content_size: 128 # 128 Bytes
+    accepted_content_types:
+      - text/plain
+      - text/html
+  intervals:
+    write_wait: 10s
+    pong_wait: 20s
+    ping_interval: 10s
+    timeout_duration: 2s
+    timeout_interval: 1s
+http:
+  write_timeout: 2s
+  read_timeout: 2s
+  idle_timeout: 5s
+log:
+  level: DEBUG
