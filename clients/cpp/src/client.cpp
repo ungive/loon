@@ -7,11 +7,9 @@
 #include <thread>
 
 #include <google/protobuf/text_format.h>
-#include <hv/base64.h>
-#include <openssl/hmac.h>
-#include <openssl/sha.h>
 
 #include "loon/client.h"
+#include "util.h"
 
 using namespace loon;
 
@@ -53,46 +51,12 @@ void ClientImpl::stop()
     internal_stop();
 }
 
-static std::string hmac_sha256(std::string_view msg, std::string_view key)
-{
-    std::array<unsigned char, EVP_MAX_MD_SIZE> hash;
-    unsigned int size;
-    HMAC(EVP_sha256(), key.data(), static_cast<int>(key.size()),
-        reinterpret_cast<unsigned char const*>(msg.data()),
-        static_cast<int>(msg.size()), hash.data(), &size);
-    return std::string{ reinterpret_cast<char const*>(hash.data()), size };
-}
-
-static std::string base64_raw_url_encode(std::string const& text)
-{
-    auto data = reinterpret_cast<const unsigned char*>(text.data());
-    auto result = hv::Base64Encode(data, text.size());
-    size_t new_size = result.size();
-    for (size_t i = 0; i < result.size(); i++) {
-        if (result[i] == '=') {
-            // Strip the padding at the end.
-            new_size = i;
-            break;
-        }
-        switch (result[i]) {
-        case '+':
-            result[i] = '-';
-            break;
-        case '/':
-            result[i] = '_';
-            break;
-        }
-    }
-    result.resize(new_size);
-    return result;
-}
-
 std::string ClientImpl::make_url(std::string const& path)
 {
     std::ostringstream oss;
     oss << m_hello->client_id() << "/" << path;
-    auto mac = hmac_sha256(oss.str(), m_hello->connection_secret());
-    auto mac_encoded = base64_raw_url_encode(mac);
+    auto mac = util::hmac_sha256(oss.str(), m_hello->connection_secret());
+    auto mac_encoded = util::base64_raw_url_encode(mac);
     oss.str("");
     oss.clear();
     oss << m_hello->base_url() << "/" << m_hello->client_id() << "/"
@@ -430,9 +394,7 @@ void ClientImpl::internal_start()
     http_headers headers;
     if (m_auth.has_value()) {
         auto value = m_auth.value();
-        std::string auth = hv::Base64Encode(
-            reinterpret_cast<const unsigned char*>(value.c_str()),
-            value.size());
+        std::string auth = util::base64_encode(value);
         headers["Authorization"] = "Basic " + auth;
     }
     // Open the connection
