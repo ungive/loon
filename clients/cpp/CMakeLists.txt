@@ -73,8 +73,8 @@ if(LOON_BUILD_TESTS)
     add_custom_command(
         TARGET unittest
         POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                $<TARGET_RUNTIME_DLLS:unittest> $<TARGET_FILE_DIR:unittest>
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+                $<TARGET_RUNTIME_DLL_DIRS:unittest> $<TARGET_FILE_DIR:unittest>
         COMMAND_EXPAND_LISTS)
 
     add_test(unittest unittest)
