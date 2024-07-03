@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
@@ -21,23 +22,28 @@ public:
      * @param info The content information.
      * @param source The source of the content.
      * @param hello The hello message that was received from the server.
+     * @param chunk_sleep Time to sleep inbetween chunk sends.
      * @param send_func A function that should be called
      * to send response client messages to the websocket peer.
      */
     RequestHandle(loon::ContentInfo const& info,
         std::shared_ptr<loon::ContentSource> source,
         Hello const& hello,
+        std::chrono::milliseconds chunk_sleep,
         std::function<bool(ClientMessage const&)> send_func);
 
     /**
      * @brief Forwards the given request to the serve thread.
      *
-     * Sends a response to the websocket peer in the background.
-     * Concurrent requests are synchronized.
+     * Sends a response to the websocket peer in the background,
+     * then calls the callback.
+     * Concurrent requests are always synchronized and served in order.
      *
      * @param request The request to serve.
+     * @param callback The calback that is called,
+     * once the response for the request has been fully sent.
      */
-    void serve_request(Request const& request);
+    void serve_request(Request const& request, std::function<void()> callback);
 
     /**
      * @brief Cancels a request with the given ID that is currently served.
@@ -79,8 +85,6 @@ public:
 private:
     void serve();
 
-    using request_id_t = uint64_t;
-
     /**
      * Sends a serving response message with low priority.
      * If a request is being canceled while this message is sent,
@@ -96,9 +100,23 @@ private:
      */
     bool send_response_message(ClientMessage const& message);
 
+    struct ServeRequest
+    {
+        ServeRequest(Request request, std::function<void()> callback)
+            : request{ request }, callback{ callback }
+        {
+        }
+
+        Request request;
+        std::function<void()> callback;
+    };
+
+    using request_id_t = uint64_t;
+
     Hello hello;
     loon::ContentInfo info;
     std::shared_ptr<loon::ContentSource> source;
+    std::chrono::milliseconds chunk_sleep;
     std::function<bool(ClientMessage const&)> send_message;
 
     // The remaining fields are all default-initialized.
@@ -110,7 +128,7 @@ private:
     std::mutex mutex_low{};  // Mutex for low-priority access threads.
 
     std::condition_variable cv_incoming_request{};
-    std::deque<Request> pending_requests{};
+    std::deque<ServeRequest> pending_requests{};
     std::optional<request_id_t> handling_request_id{};
     bool cancel_handling_request{ false };
     bool dirty{ false };

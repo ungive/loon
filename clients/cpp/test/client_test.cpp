@@ -24,9 +24,19 @@ class TestClient : public loon::ClientImpl
 public:
     using ClientImpl::ClientImpl;
 
-    bool send(ClientMessage const& message)
+    inline bool send(ClientMessage const& message)
     {
         return ClientImpl::send(message);
+    }
+
+    inline size_t active_requests() { return ClientImpl::active_requests(); }
+
+    inline Hello current_hello() { return ClientImpl::current_hello(); }
+
+    inline void chunk_sleep(
+        std::chrono::milliseconds duration = std::chrono::milliseconds::zero())
+    {
+        ClientImpl::chunk_sleep(duration);
     }
 };
 
@@ -69,10 +79,30 @@ static Content example_content()
     return create_content("example.txt", "text/html", "test");
 }
 
-static size_t curl_receive_body(
-    void* ptr, size_t size, size_t nmemb, std::string* data)
+static Content example_content(size_t n_bytes)
 {
-    data->append((char*)ptr, size * nmemb);
+    std::vector<char> data(n_bytes, 0);
+    const std::string alphabet = "abcdefghijklmnopqrstuvwxyz";
+    for (size_t i = 0; i < n_bytes; i++) {
+        data[i] = alphabet[i % alphabet.size()];
+    }
+    std::string content(data.begin(), data.end());
+    return create_content("example-bytes.txt", "text/html", content);
+}
+
+struct CurlWriteFunctionData
+{
+    std::string* result;
+    std::function<void(std::string const&)> callback;
+};
+
+static size_t curl_receive_body(
+    void* ptr, size_t size, size_t nmemb, CurlWriteFunctionData* data)
+{
+    data->result->append((char*)ptr, size * nmemb);
+    if (data->callback) {
+        data->callback(std::string((char*)ptr, size * nmemb));
+    }
     return size * nmemb;
 }
 
@@ -103,19 +133,36 @@ struct CurlResponse
     std::map<std::string, std::string> headers;
 };
 
-#define HTTP_GET_TIMEOUT_MS 500
+struct CurlOptions
+{
+    // See https://curl.se/libcurl/c/CURLOPT_BUFFERSIZE.html
+    static constexpr size_t MIN_BUFFER_SIZE{ 1024 };
+    static constexpr size_t DEFAULT_BUFFER_SIZE{ MIN_BUFFER_SIZE };
+    static constexpr size_t DEFAULT_TIMEOUT_MS{ 250 };
 
-CurlResponse http_get(std::string const& url)
+    size_t download_speed_bytes{ 0 };
+    size_t download_buffer_size{ DEFAULT_BUFFER_SIZE };
+    std::chrono::milliseconds timeout{ DEFAULT_TIMEOUT_MS };
+    decltype(CurlWriteFunctionData::callback) callback{ nullptr };
+};
+
+CurlResponse http_get(std::string const& url, CurlOptions options = {})
 {
     auto curl = curl_easy_init();
     if (!curl) {
         throw std::runtime_error("failed to init curl");
     }
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, HTTP_GET_TIMEOUT_MS);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, options.timeout.count());
+    curl_easy_setopt(
+        curl, CURLOPT_MAX_RECV_SPEED_LARGE, options.download_speed_bytes);
+    curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, options.download_buffer_size);
     CurlResponse response{};
+    CurlWriteFunctionData data{};
+    data.result = &response.body;
+    data.callback = options.callback;
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_receive_body);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response.body);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
     curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, curl_receive_header);
     curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response.headers);
     auto result = curl_easy_perform(curl);
@@ -226,4 +273,37 @@ TEST(Client, unregistered_callback_is_called_when_client_closes_connection)
     handle->unregistered(callback.get());
     client->stop();
     EXPECT_TRUE(callback.was_called());
+}
+
+TEST(Client, served_callback_is_called_when_content_handle_url_is_requested)
+{
+    auto client = create_client();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    ExpectCalled callback;
+    handle->served(callback.get());
+    http_get(handle->url());
+    EXPECT_TRUE(callback.was_called());
+}
+
+TEST(Client, no_active_requests_when_handle_url_request_is_canceled)
+{
+    auto client = create_client();
+    auto hello = client->current_hello();
+    auto chunk_size = hello.constraints().chunk_size();
+    auto content = example_content(3 * chunk_size);
+    client->chunk_sleep(25ms); // 3 chunks => 75ms to send everything
+    auto handle = client->register_content(content.source, content.info);
+    CurlOptions options{};
+    // Force a send failure by timing out before everything is sent.
+    options.timeout = 60ms;
+    options.callback = [&client](std::string const& chunk) {
+        EXPECT_EQ(1, client->active_requests());
+    };
+    EXPECT_EQ(0, client->active_requests());
+    EXPECT_THROW(http_get(handle->url(), options), std::exception);
+    std::this_thread::sleep_for(5ms);
+    EXPECT_EQ(0, client->active_requests());
+
+    int x = 1 + 1;
 }

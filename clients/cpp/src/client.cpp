@@ -39,7 +39,7 @@ ClientImpl::ClientImpl(
     hlog_disable();
 }
 
-loon::ClientImpl::~ClientImpl() { stop(); }
+ClientImpl::~ClientImpl() { stop(); }
 
 void ClientImpl::start()
 {
@@ -163,21 +163,15 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
     }
 
     // Wait until the connection is ready for content registration.
-    m_cv_connection_ready.wait(lock, [this] {
-        return !m_connected.load() || m_hello.has_value();
-    });
-    if (!m_connected.load()) {
-        throw ClientNotConnectedException("the client is not connected");
-    }
-    assert(m_hello.has_value());
+    wait_until_ready(lock);
 
     // Check that the content is within the server's constraints.
     check_content_constraints(source, info);
 
     // Serve requests for this content, register it and return a handle.
     auto send = std::bind(&ClientImpl::send, this, std::placeholders::_1);
-    auto request_handle =
-        std::make_shared<RequestHandle>(info, source, m_hello.value(), send);
+    auto request_handle = std::make_shared<RequestHandle>(
+        info, source, m_hello.value(), m_chunk_sleep_duration, send);
     request_handle->spawn_serve_thread();
     auto handle = std::make_shared<InternalContentHandle>(
         make_url(info.path), path, request_handle);
@@ -202,12 +196,7 @@ void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
     }
 
     // Wait until the connection is ready.
-    m_cv_connection_ready.wait(lock, [this] {
-        return !m_connected.load() || m_hello.has_value();
-    });
-    if (!m_connected.load()) {
-        throw ClientNotConnectedException("the client is not connected");
-    }
+    wait_until_ready(lock);
 
     // Notify that the content is being unregistered (rather early than late).
     it->second->unregistered();
@@ -257,6 +246,13 @@ void ClientImpl::on_request(Request const& request)
     // TODO
     std::cerr << "request (" << request.id() << "): " << request.path() << "\n";
 
+    std::lock_guard<std::mutex> lock(m_request_mutex);
+
+    if (m_requests.find(request.id()) != m_requests.end()) {
+        // TODO log protocol error: request ID already in use
+        return internal_restart();
+    }
+
     auto it = m_content.find(request.path());
     if (it == m_content.end()) {
         ClientMessage message;
@@ -266,8 +262,35 @@ void ClientImpl::on_request(Request const& request)
         return;
     }
 
-    auto handle = it->second->request_handle();
-    handle->serve_request(request);
+    auto content = it->second;
+    m_requests.emplace(request.id(), std::make_pair(content, false));
+    content->request_handle()->serve_request(
+        request, std::bind(&ClientImpl::response_sent, this, request.id()));
+}
+
+inline void ClientImpl::call_served_callback(decltype(m_requests)::iterator it)
+{
+    if (!it->second.second) {
+        it->second.second = true;
+        return;
+    }
+    auto content_handle = it->second.first;
+    // assert(m_content.find(content_handle->path()) != m_content.end());
+    m_requests.erase(it);
+    content_handle->served();
+}
+
+void ClientImpl::response_sent(uint64_t request_id)
+{
+    const std::lock_guard<std::mutex> lock(m_request_mutex);
+
+    auto it = m_requests.find(request_id);
+    if (it == m_requests.end()) {
+        // TODO log error
+        assert(false && "served a request that is not registered anymore");
+        return;
+    }
+    call_served_callback(it);
 }
 
 void ClientImpl::on_success(Success const& success)
@@ -275,8 +298,16 @@ void ClientImpl::on_success(Success const& success)
     // TODO
     std::cerr << "success (" << success.request_id() << ")\n";
 
-    // TODO call served() on the content handle
-    // TODO get content handle by request ID (two maps: path and request ID key)
+    const std::lock_guard<std::mutex> lock(m_request_mutex);
+
+    auto request_id = success.request_id();
+    auto it = m_requests.find(request_id);
+    if (it == m_requests.end()) {
+        // TODO log error
+        assert(false && "received success for an unknown request id");
+        return;
+    }
+    call_served_callback(it);
 }
 
 void ClientImpl::on_request_closed(RequestClosed const& request_closed)
@@ -285,7 +316,20 @@ void ClientImpl::on_request_closed(RequestClosed const& request_closed)
     std::cerr << "request closed (" << request_closed.request_id()
               << "): " << request_closed.message() << "\n";
 
-    // TODO cancel sending response.
+    const std::lock_guard<std::mutex> lock(m_request_mutex);
+
+    auto request_id = request_closed.request_id();
+    auto it = m_requests.find(request_id);
+    if (it == m_requests.end()) {
+        // protocol error
+        // TODO log
+        assert(false && "received request closed for an unknown request id");
+        return;
+    }
+
+    auto content_handle = it->second.first;
+    content_handle->request_handle()->cancel_request(request_id);
+    m_requests.erase(it);
 }
 
 void ClientImpl::on_close(Close const& close)
@@ -295,6 +339,17 @@ void ClientImpl::on_close(Close const& close)
 
     // Restart the connection, if the server closed the connection.
     internal_restart();
+}
+
+void ClientImpl::wait_until_ready(std::unique_lock<std::recursive_mutex>& lock)
+{
+    m_cv_connection_ready.wait(lock, [this] {
+        return !m_connected.load() || m_hello.has_value();
+    });
+    if (!m_connected.load()) {
+        throw ClientNotConnectedException("the client is not connected");
+    }
+    assert(m_hello.has_value());
 }
 
 void ClientImpl::on_websocket_open()

@@ -28,8 +28,10 @@ using namespace loon;
 RequestHandle::RequestHandle(ContentInfo const& info,
     std::shared_ptr<ContentSource> source,
     Hello const& hello,
+    std::chrono::milliseconds chunk_sleep,
     std::function<bool(ClientMessage const&)> send_func)
-    : hello{ hello }, info{ info }, source{ source }, send_message{ send_func }
+    : hello{ hello }, info{ info }, source{ source },
+      chunk_sleep{ chunk_sleep }, send_message{ send_func }
 {
 }
 
@@ -85,14 +87,14 @@ void RequestHandle::serve()
         }
 
         // Read the next request from the queue.
-        auto request = pending_requests.front();
+        auto serve_request = pending_requests.front();
         pending_requests.pop_front();
-        handling_request_id = request.id();
+        handling_request_id = serve_request.request.id();
 
         // Send the response header.
         ClientMessage header_message;
         auto header = header_message.mutable_content_header();
-        header->set_request_id(request.id());
+        header->set_request_id(serve_request.request.id());
         header->set_content_type(source->content_type());
         header->set_content_size(source->size());
         if (info.max_cache_duration.has_value()) {
@@ -114,6 +116,9 @@ void RequestHandle::serve()
         auto const chunk_size = hello.constraints().chunk_size();
         std::vector<char> buffer(chunk_size);
         while (stream.good()) {
+            if (chunk_sleep > std::chrono::milliseconds::zero()) {
+                std::this_thread::sleep_for(chunk_sleep);
+            }
             stream.read(buffer.data(), buffer.size());
             std::streamsize n = stream.gcount();
             if (n <= 0) {
@@ -121,7 +126,7 @@ void RequestHandle::serve()
             }
             ClientMessage chunk_message;
             auto chunk = chunk_message.mutable_content_chunk();
-            chunk->set_request_id(request.id());
+            chunk->set_request_id(serve_request.request.id());
             chunk->set_sequence(sequence++);
             chunk->set_data(buffer.data(), n);
             if (!send(lock, chunk_message))
@@ -131,12 +136,16 @@ void RequestHandle::serve()
             if (stop)
                 return;
         }
+        if (!cancel_handling_request) {
+            // The request was fully sent, without being cancelled.
+            lock.unlock();
+            serve_request.callback();
+            lock.lock();
+        }
         if (!stream.good()) {
             // The response is complete, we do not need to cancel anymore.
             cancel_handling_request = false;
         }
-        if (cancel_handling_request)
-            continue;
     }
 }
 
@@ -146,12 +155,13 @@ inline bool RequestHandle::send_response_message(ClientMessage const& message)
     return send_message(message);
 }
 
-void RequestHandle::serve_request(Request const& request)
+void RequestHandle::serve_request(
+    Request const& request, std::function<void()> callback)
 {
     // Neither high, nor low priority.
     const std::lock_guard<std::mutex> lock(mutex);
 
-    pending_requests.push_back(request);
+    pending_requests.push_back(ServeRequest(request, callback));
     cv_incoming_request.notify_one();
 }
 
@@ -173,8 +183,8 @@ void RequestHandle::cancel_request(uint64_t request_id)
     // See if a response is pending for it,
     // then remove it and close the response immediately.
     auto it = std::find_if(pending_requests.begin(), pending_requests.end(),
-        [request_id](Request const& request) {
-            return request.id() == request_id;
+        [request_id](ServeRequest const& request) {
+            return request.request.id() == request_id;
         });
     if (it != pending_requests.end()) {
         pending_requests.erase(it);
