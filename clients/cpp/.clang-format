@@ -33,5 +33,7 @@ AlwaysBreakTemplateDeclarations: true
 AlignOperands: DontAlign
 AlignEscapedNewlines: Left
 BinPackParameters: false
+BreakBeforeBinaryOperators: All
 ---
-
+# Notes:
+# Designated initializer list formatting: Write a ',' after the last item.
