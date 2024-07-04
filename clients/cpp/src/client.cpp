@@ -37,11 +37,19 @@ ClientImpl::ClientImpl(std::string const& address,
     ClientOptions options)
     : m_address{ address }, m_auth{ auth }, m_options{ options }
 {
-    // if (m_options.max_simultaneous_requests.has_value() &&
-    //     m_options.max_simultaneous_requests.value() == 0) {
-    //     throw std::runtime_error(
-    //         "the maximum number of simultaneous requests cannot be zero");
-    // }
+    if (m_options.min_cache_duration.has_value() &&
+        m_options.min_cache_duration.value() == 0) {
+        throw std::runtime_error("the minimum cache duration cannot be zero");
+    }
+    if (m_options.max_requests_per_second.has_value() &&
+        m_options.max_requests_per_second.value() <= 0.001) {
+        throw std::runtime_error(
+            "maximum requests per second must be larger than zero");
+    }
+    if (m_options.max_upload_speed.has_value() &&
+        m_options.max_upload_speed.value() == 0) {
+        throw std::runtime_error("maximum upload speed may not be zero");
+    }
 
     m_conn.onopen = std::bind(&ClientImpl::on_websocket_open, this);
     m_conn.onmessage = std::bind(
