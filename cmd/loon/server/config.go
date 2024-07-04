@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/ungive/loon/pkg/pb"
 	"github.com/ungive/loon/pkg/server"
 )
 
@@ -12,10 +11,11 @@ import (
 var defaultConfig = &server.Options{
 	Protocol: &server.ProtocolOptions{
 		BaseUrl: "localhost:" + defaultPort,
-		Constraints: &pb.Constraints{
+		Constraints: &server.ProtocolConstraints{
 			MaxContentSize:       64 * 1024 * 1024, // 64 MiB
 			ChunkSize:            64 * 1024,        // 64 KiB
 			AcceptedContentTypes: defaultContentTypes,
+			ResponseCaching:      boolPtr(false),
 		},
 		Intervals: &server.ProtocolIntervals{
 			WriteTimeout:          10 * time.Second,
@@ -31,8 +31,16 @@ var defaultConfig = &server.Options{
 		IdleTimeout:  30 * time.Second,
 	},
 	Log: &server.LogOptions{
-		Level: slog.LevelDebug,
+		Level: logLevelPtr(slog.LevelDebug),
 	},
+}
+
+func logLevelPtr(level slog.Level) *slog.Level {
+	return &level
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }
 
 // Some common MIME types/HTTP content types. Not exhaustive.

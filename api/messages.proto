@@ -12,6 +12,7 @@ message Constraints {
   uint64 chunk_size = 1;
   uint64 max_content_size = 2;
   repeated string accepted_content_types = 4;
+  bool response_caching = 5;
 }
 
 // <-

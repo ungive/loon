@@ -49,6 +49,7 @@ var defaultConstraints = &pb.Constraints{
 	AcceptedContentTypes: []string{
 		testContentType,
 	},
+	ResponseCaching: false,
 }
 
 func Test_server_sends_Hello_when_client_connects(t *testing.T) {
@@ -61,6 +62,7 @@ func Test_server_sends_Hello_when_client_connects(t *testing.T) {
 	assert.Equal(t, defaultConstraints.MaxContentSize, m.Constraints.MaxContentSize)
 	assert.Equal(t, defaultConstraints.ChunkSize, m.Constraints.ChunkSize)
 	assert.Equal(t, defaultConstraints.AcceptedContentTypes, m.Constraints.AcceptedContentTypes)
+	assert.Equal(t, defaultConstraints.ResponseCaching, m.Constraints.ResponseCaching)
 }
 
 func Test_base_URL_of_Hello_message_does_not_end_in_trailing_slash_when_client_connects(t *testing.T) {
@@ -1772,7 +1774,7 @@ func (s *websocketServer) getHandler() http.Handler {
 		}
 		client, err := NewClient(conn, &ProtocolOptions{
 			BaseUrl:     s.mockAddress,
-			Constraints: s.constraints,
+			Constraints: constraintsFromProto(s.constraints),
 			Intervals:   s.intervals,
 		})
 		if err != nil {
@@ -1905,6 +1907,17 @@ func unmarshalServerMessage[T interface{}, P *T](data []byte) (P, error) {
 
 func newConstraints() *pb.Constraints {
 	return proto.Clone(defaultConstraints).(*pb.Constraints)
+}
+
+func constraintsFromProto(
+	c *pb.Constraints,
+) *ProtocolConstraints {
+	return &ProtocolConstraints{
+		ChunkSize:            c.ChunkSize,
+		MaxContentSize:       c.MaxContentSize,
+		AcceptedContentTypes: c.AcceptedContentTypes,
+		ResponseCaching:      &c.ResponseCaching,
+	}
 }
 
 func newIntervals() *ProtocolIntervals {

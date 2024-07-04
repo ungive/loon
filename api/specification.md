@@ -304,6 +304,10 @@ The server must define the following constraints:
   but not the "parameters" (anything after the first semicolon)
   of a content type
   (see https://www.w3.org/Protocols/rfc1341/4_Content-Type.html)
+- `response_caching` -
+  Whether the server caches responses,
+  both content responses and empty responses.
+  Clients should fail if caching is required but this field is set to false.
 
 ### Creating URLs
 

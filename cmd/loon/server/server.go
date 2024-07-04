@@ -92,7 +92,7 @@ func readConfig(path string) *server.Options {
 		abort()
 	}
 	// Create a new logger to reflect the configured logging level.
-	logger = newLogger(v.Log.Level)
+	logger = newLogger(*v.Log.Level)
 	logger.Info("loaded config", "path", absPath)
 	return &v
 }

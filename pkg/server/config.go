@@ -7,51 +7,79 @@ import (
 	"mime"
 	"time"
 
+	"github.com/fatih/structs"
 	"github.com/ungive/loon/pkg/pb"
 )
+
+var ErrUnsetConfigFields = errors.New("config has unset fields")
 
 // Root object for any server configuration file.
 type Options struct {
 	Protocol *ProtocolOptions `json:"protocol"`
 	Http     *HttpOptions     `json:"http"`
-	Log      *LogOptions      `json:"log"`
+	Log      *LogOptions      `json:"log" structs:"-"`
 }
 
 type ProtocolOptions struct {
-	BaseUrl     string             `json:"base_url"`
-	Constraints *pb.Constraints    `json:"constraints"`
-	Intervals   *ProtocolIntervals `json:"intervals"`
+	BaseUrl     string               `json:"base_url"`
+	Constraints *ProtocolConstraints `json:"constraints"`
+	Intervals   *ProtocolIntervals   `json:"intervals"`
+}
+
+type ProtocolConstraints struct {
+	ChunkSize            uint64   `json:"chunk_size"`
+	MaxContentSize       uint64   `json:"max_content_size"`
+	AcceptedContentTypes []string `json:"accepted_content_types"`
+	ResponseCaching      *bool    `json:"response_caching"`
+}
+
+func (c *ProtocolConstraints) Proto() *pb.Constraints {
+	return &pb.Constraints{
+		ChunkSize:            c.ChunkSize,
+		MaxContentSize:       c.MaxContentSize,
+		AcceptedContentTypes: c.AcceptedContentTypes,
+		ResponseCaching:      *c.ResponseCaching,
+	}
 }
 
 type HttpOptions struct {
+	// Write timeout. A zero value indicates no timeout (default).
 	WriteTimeout time.Duration `json:"write_timeout"`
-	ReadTimeout  time.Duration `json:"read_timeout"`
-	IdleTimeout  time.Duration `json:"idle_timeout"`
+	// Read timeout. A zero value indicates no timeout (default).
+	ReadTimeout time.Duration `json:"read_timeout"`
+	// Idle timeout. A zero value indicates no timeout (default).
+	IdleTimeout time.Duration `json:"idle_timeout"`
 }
 
 type LogOptions struct {
-	Level slog.Level `json:"level"`
+	Level *slog.Level `json:"level"`
 }
 
 func (c *Options) Validate() error {
 	if err := c.Protocol.Validate(); err != nil {
-		return err
+		return fmt.Errorf("failed to validate protocol options: %w", err)
 	}
 	if err := c.Http.Validate(); err != nil {
-		return err
+		return fmt.Errorf("failed to validate http options: %w", err)
+	}
+	if structs.HasZero(c.Log) {
+		return ErrUnsetConfigFields
 	}
 	return nil
 }
 
 func (c *ProtocolOptions) Validate() error {
+	if err := c.Intervals.Validate(); err != nil {
+		return fmt.Errorf("failed to validate intervals: %w", err)
+	}
+	if err := c.Constraints.Validate(); err != nil {
+		return fmt.Errorf("failed to validate constraints: %w", err)
+	}
+	if structs.HasZero(c) {
+		return ErrUnsetConfigFields
+	}
 	if len(c.BaseUrl) == 0 {
 		return errors.New("base URL cannot be empty")
-	}
-	if err := c.Intervals.Validate(); err != nil {
-		return err
-	}
-	if err := ValidateConstraints(c.Constraints); err != nil {
-		return err
 	}
 	return nil
 }
@@ -110,15 +138,18 @@ func (i *ProtocolIntervals) Validate() error {
 	return nil
 }
 
-func ValidateConstraints(constraints *pb.Constraints) error {
-	if constraints.ChunkSize > constraints.MaxContentSize {
+func (c *ProtocolConstraints) Validate() error {
+	if c.MaxContentSize == 0 {
+		return errors.New("maximum content size cannot be zero")
+	}
+	if c.ChunkSize > c.MaxContentSize {
 		return errors.New(
 			"chunk size cannot be larger than maximum content size")
 	}
-	if len(constraints.AcceptedContentTypes) == 0 {
+	if len(c.AcceptedContentTypes) == 0 {
 		return errors.New("accepted content types cannot be empty")
 	}
-	for _, contentType := range constraints.AcceptedContentTypes {
+	for _, contentType := range c.AcceptedContentTypes {
 		sanitized, params, err := mime.ParseMediaType(contentType)
 		if err != nil {
 			return fmt.Errorf("invalid accepted content type: %w", err)
@@ -130,6 +161,9 @@ func ValidateConstraints(constraints *pb.Constraints) error {
 			return errors.New(
 				"content type must be lowercase and contain no spaces")
 		}
+	}
+	if structs.HasZero(c) {
+		return ErrUnsetConfigFields
 	}
 	return nil
 }

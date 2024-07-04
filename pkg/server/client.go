@@ -465,7 +465,7 @@ func NewClient(conn *websocket.Conn, config *ProtocolOptions) (Client, error) {
 	client.send <- &pb.ServerMessage{
 		Data: &pb.ServerMessage_Hello{
 			Hello: &pb.Hello{
-				Constraints:      client.config.Constraints,
+				Constraints:      client.config.Constraints.Proto(),
 				ClientId:         client.idStr,
 				ConnectionSecret: client.secret,
 				BaseUrl:          strings.TrimSuffix(config.BaseUrl, "/"),
