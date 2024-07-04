@@ -1,6 +1,8 @@
 # Config for the server that should be used during tests.
 protocol:
-  base_url: http://localhost:8071
+  # Use 127.0.01 here instead of "localhost"
+  # because CURL requests somehow take >200ms when localhost is used.
+  base_url: http://127.0.0.1:8071
   constraints:
     chunk_size: 16 # 16 Bytes
     max_content_size: 128 # 128 Bytes

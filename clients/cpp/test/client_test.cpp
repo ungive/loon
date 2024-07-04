@@ -1,5 +1,6 @@
 #include <atomic>
 #include <chrono>
+#include <ctime>
 #include <map>
 #include <memory>
 #include <stdexcept>
@@ -171,6 +172,9 @@ CurlResponse http_get(std::string const& url, CurlOptions options = {})
         throw std::runtime_error("failed to init curl");
     }
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);
+    curl_easy_setopt(curl, CURLOPT_TCP_KEEPIDLE, 120L);
+    curl_easy_setopt(curl, CURLOPT_TCP_KEEPINTVL, 60L);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, options.timeout.count());
     curl_easy_setopt(
         curl, CURLOPT_MAX_RECV_SPEED_LARGE, options.download_speed_bytes);
@@ -220,6 +224,11 @@ private:
 
     std::atomic<bool> m_called{ false };
 };
+
+static inline std::chrono::system_clock::time_point time_now()
+{
+    return std::chrono::system_clock::now();
+}
 
 TEST(Client, ServerServesContentWhenRegisteredWithClient)
 {
@@ -310,21 +319,25 @@ TEST(Client, ServedCallbackIsCalledWhenContentHandleUrlIsRequested)
 
 TEST(Client, NoActiveRequestsWhenHandleUrlRequestIsCanceled)
 {
+    const auto chunk_sleep = 20ms;
+    const auto chunk_count = 3;
+    const auto total_sleep = chunk_sleep * chunk_count;
+    const auto cancel_delta = chunk_sleep;
     auto client = create_client();
     auto hello = client->current_hello();
     auto chunk_size = hello.constraints().chunk_size();
     auto content = example_content_large(3 * chunk_size);
-    client->chunk_sleep(25ms); // 3 chunks => 75ms to send everything
+    client->chunk_sleep(chunk_sleep);
     auto handle = client->register_content(content.source, content.info);
     CurlOptions options{};
     // Force a send failure by timing out before everything is sent.
-    options.timeout = 60ms;
+    options.timeout = total_sleep - chunk_sleep / 2;
     options.callback = [&client](std::string const& chunk) {
         EXPECT_EQ(1, client->active_requests());
     };
     EXPECT_EQ(0, client->active_requests());
     EXPECT_THROW(http_get(handle->url(), options), std::exception);
-    std::this_thread::sleep_for(5ms);
+    std::this_thread::sleep_for(total_sleep + chunk_sleep);
     EXPECT_EQ(0, client->active_requests());
 }
 
@@ -364,12 +377,78 @@ TEST(Client, FailsWhenMinCacheDurationIsSetButResponseIsNotCached)
     ExpectCalled failed;
     client->failed(failed.get());
     client->start();
-    auto content1 = example_content(cache_duration);
-    auto handle = client->register_content(content1.source, content1.info);
+    auto content = example_content(cache_duration);
+    auto handle = client->register_content(content.source, content.info);
     // The served callback should only be called once,
     // since it is expected to be cached on the server.
     ExpectCalled served(1);
     handle->served(served.get());
     http_get(handle->url());
+    http_get(handle->url());
+}
+
+static void print_timestamp(std::string const& prefix = "")
+{
+    using namespace std::chrono;
+
+    auto t = system_clock::now();
+    auto t_ = system_clock::to_time_t(t);
+    auto ms = duration_cast<milliseconds>(t.time_since_epoch()) % 1000;
+    if (prefix.size() > 0) {
+        std::cerr << prefix << ": ";
+    }
+    std::cerr << std::put_time(gmtime(&t_), "%F %T") << '.' << std::setfill('0')
+              << std::setw(3) << ms.count() << std::endl;
+}
+
+TEST(Client, FailsWhenMaxRequestsPerSecondIsSetAndRequestsAreSentTooQuickly)
+{
+    using namespace std::chrono;
+    const auto one_request_within = 25ms;
+    ClientOptions options;
+    options.max_requests_per_second =
+        static_cast<double>(duration_cast<milliseconds>(1s).count()) /
+        one_request_within.count();
+    auto client = create_client(options, false);
+    ExpectCalled failed(1);
+    client->failed(failed.get());
+    client->start();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    auto start = time_now();
+    http_get(handle->url());
+    auto diff = duration_cast<milliseconds>(time_now() - start);
+    auto sleep = one_request_within / 2 - diff;
+    if (sleep > 0ms) {
+        std::this_thread::sleep_for(sleep);
+    } else {
+        FAIL() << "the first request took too long";
+    }
+    http_get(handle->url());
+}
+
+TEST(Client, DoesNotFailWhenMaxRequestsPerSecondIsSetAndRequestsAreSentSlowly)
+{
+    using namespace std::chrono;
+    const auto one_request_within = 25ms;
+    ClientOptions options;
+    options.max_requests_per_second =
+        static_cast<double>(duration_cast<milliseconds>(1s).count()) /
+        one_request_within.count();
+    auto client = create_client(options, false);
+    ExpectCalled failed(0);
+    client->failed(failed.get());
+    client->start();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    auto start = time_now();
+    http_get(handle->url());
+    auto diff = duration_cast<milliseconds>(time_now() - start);
+    auto sleep = one_request_within * 3 / 2 - diff;
+    if (sleep > 0ms) {
+        std::this_thread::sleep_for(sleep);
+    } else {
+        FAIL() << "the first request took too long";
+    }
     http_get(handle->url());
 }

@@ -266,6 +266,26 @@ void ClientImpl::on_request(Request const& request)
         return internal_restart();
     }
 
+    if (m_options.max_requests_per_second.has_value()) {
+        auto requests_per_second = m_options.max_requests_per_second.value();
+        auto milliseconds_per_request = std::chrono::milliseconds{
+            static_cast<long long>(1000.0 / requests_per_second)
+        };
+        auto now = std::chrono::system_clock::now();
+        for (auto it = request_history.begin(); it != request_history.end();) {
+            auto then = *it;
+            assert(then <= now);
+            if (now - then <= milliseconds_per_request) {
+                break;
+            }
+            it = request_history.erase(it);
+        }
+        request_history.push_back(now);
+        if (request_history.size() > 1) {
+            return fail("maximum number of requests per second exceeded");
+        }
+    }
+
     auto it = m_content.find(request.path());
     if (it == m_content.end()) {
         ClientMessage message;
@@ -301,6 +321,8 @@ inline void ClientImpl::call_served_callback(decltype(m_requests)::iterator it)
 void ClientImpl::response_sent(uint64_t request_id)
 {
     const std::lock_guard<std::mutex> lock(m_request_mutex);
+
+    std::cerr << "response sent!\n";
 
     auto it = m_requests.find(request_id);
     if (it == m_requests.end()) {

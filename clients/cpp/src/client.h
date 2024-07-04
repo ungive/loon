@@ -160,6 +160,7 @@ private:
     std::chrono::milliseconds m_chunk_sleep_duration{
         std::chrono::milliseconds::zero()
     };
+    std::deque<std::chrono::system_clock::time_point> request_history{};
     std::function<void(Hello&)> m_injected_hello_modifer{};
     std::function<void()> m_failed_callback{};
 
