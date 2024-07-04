@@ -21,10 +21,28 @@ using namespace loon;
 #define _DEFAULT_RECONNECT_MAX_DELAY 30000
 #define _DEFAULT_RECONNECT_DELAY_POLICY RECONNECT_DELAY_POLICY_EXPONENTIAL
 
-ClientImpl::ClientImpl(
-    std::string const& address, std::optional<std::string> const& auth)
-    : m_address{ address }, m_auth{ auth }
+Client::Client(std::string const& address, ClientOptions options)
+    : m_impl{ std::make_unique<ClientImpl>(address, std::nullopt, options) }
 {
+}
+
+loon::Client::Client(
+    std::string const& address, std::string const& auth, ClientOptions options)
+    : m_impl{ std::make_unique<ClientImpl>(address, auth, options) }
+{
+}
+
+ClientImpl::ClientImpl(std::string const& address,
+    std::optional<std::string> const& auth,
+    ClientOptions options)
+    : m_address{ address }, m_auth{ auth }, m_options{ options }
+{
+    // if (m_options.max_simultaneous_requests.has_value() &&
+    //     m_options.max_simultaneous_requests.value() == 0) {
+    //     throw std::runtime_error(
+    //         "the maximum number of simultaneous requests cannot be zero");
+    // }
+
     m_conn.onopen = std::bind(&ClientImpl::on_websocket_open, this);
     m_conn.onmessage = std::bind(
         &ClientImpl::on_websocket_message, this, std::placeholders::_1);
@@ -201,7 +219,27 @@ void ClientImpl::on_hello(Hello const& hello)
         // TODO log invalid second hello message
         return internal_restart();
     }
-    m_hello = hello;
+    if (m_injected_hello_modifer) {
+        Hello modified = hello;
+        m_injected_hello_modifer(modified);
+        m_hello = modified;
+    } else {
+        m_hello = hello;
+    }
+
+    auto fail = [this](std::string const& message) {
+        // Make sure to notify all waiting threads on failure,
+        // such that they resume operation.
+        this->fail(message);
+        m_cv_connection_ready.notify_all();
+    };
+
+    assert(m_hello->has_constraints());
+    if (m_options.min_cache_duration.has_value() &&
+        !m_hello->constraints().response_caching()) {
+        return fail("the server does not support response caching");
+    }
+
     m_cv_connection_ready.notify_all();
 }
 
@@ -415,6 +453,7 @@ void ClientImpl::reset_connection_state()
         content->request_handle()->exit_gracefully();
     }
     m_content.clear();
+    m_requests.clear();
     m_hello = std::nullopt;
 }
 
@@ -424,6 +463,7 @@ void ClientImpl::internal_stop()
         return;
     }
     reset_connection_state();
+    m_conn.setReconnect(nullptr);
     m_conn.close();
 }
 
@@ -433,27 +473,11 @@ inline void ClientImpl::internal_restart()
     internal_start();
 }
 
-Client::Client(std::string const& address)
-    : m_impl{ std::make_unique<ClientImpl>(address, std::nullopt) }
+void loon::ClientImpl::fail(std::string const& message)
 {
-}
-
-loon::Client::Client(std::string const& address, std::string const& auth)
-    : m_impl{ std::make_unique<ClientImpl>(address, auth) }
-{
-}
-
-void Client::start() { return m_impl->start(); }
-
-void Client::stop() { return m_impl->stop(); }
-
-std::shared_ptr<ContentHandle> Client::register_content(
-    std::shared_ptr<loon::ContentSource> source, loon::ContentInfo const& info)
-{
-    return m_impl->register_content(source, info);
-}
-
-void Client::unregister_content(std::shared_ptr<ContentHandle> handle)
-{
-    return m_impl->unregister_content(handle);
+    // TODO log message
+    internal_stop();
+    if (m_failed_callback) {
+        m_failed_callback();
+    }
 }

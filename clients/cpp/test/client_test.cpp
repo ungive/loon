@@ -33,6 +33,11 @@ public:
 
     inline Hello current_hello() { return ClientImpl::current_hello(); }
 
+    inline void inject_hello_modifier(std::function<void(Hello&)> modifier)
+    {
+        ClientImpl::inject_hello_modifier(modifier);
+    }
+
     inline void chunk_sleep(
         std::chrono::milliseconds duration = std::chrono::milliseconds::zero())
     {
@@ -40,28 +45,36 @@ public:
     }
 };
 
-static std::shared_ptr<TestClient> create_client(bool started = true)
+static std::shared_ptr<TestClient> create_client(
+    ClientOptions options = {}, bool started = true)
 {
-    auto client = std::make_shared<TestClient>(TEST_ADDRESS, TEST_AUTH);
+    auto client =
+        std::make_shared<TestClient>(TEST_ADDRESS, TEST_AUTH, options);
     if (started) {
         client->start();
     }
     return client;
 }
 
+static std::shared_ptr<TestClient> create_client(bool started)
+{
+    return create_client({}, started);
+}
+
 struct Content
 {
-    std::string path;
-    std::string content_type;
-    std::string data;
+    std::string path{};
+    std::string content_type{};
+    std::string data{};
 
-    std::shared_ptr<loon::BufferContentSource> source;
-    loon::ContentInfo info;
+    std::shared_ptr<loon::BufferContentSource> source{ nullptr };
+    loon::ContentInfo info{};
 };
 
 static Content create_content(std::string const& path,
     std::string const& content_type,
-    std::string const& content)
+    std::string const& content,
+    std::optional<uint32_t> max_cache_duration = std::nullopt)
 {
     Content result;
     result.path = path;
@@ -70,16 +83,21 @@ static Content create_content(std::string const& path,
     std::vector<char> content_data(content.begin(), content.end());
     result.source =
         std::make_shared<loon::BufferContentSource>(content_data, content_type);
-    result.info = loon::ContentInfo(path, 0);
+    result.info.path = path;
+    result.info.max_cache_duration = max_cache_duration;
     return result;
 }
 
-static Content example_content()
+static Content example_content(
+    std::optional<uint32_t> max_cache_duration = std::nullopt,
+    std::string const& path = "example.txt")
 {
-    return create_content("example.txt", "text/html", "test");
+    return create_content(path, "text/plain", "test", max_cache_duration);
 }
 
-static Content example_content(size_t n_bytes)
+static Content example_content_large(size_t n_bytes,
+    std::string const& path = "example.txt",
+    std::optional<uint32_t> max_cache_duration = std::nullopt)
 {
     std::vector<char> data(n_bytes, 0);
     const std::string alphabet = "abcdefghijklmnopqrstuvwxyz";
@@ -87,7 +105,7 @@ static Content example_content(size_t n_bytes)
         data[i] = alphabet[i % alphabet.size()];
     }
     std::string content(data.begin(), data.end());
-    return create_content("example-bytes.txt", "text/html", content);
+    return create_content(path, "text/plain", content, max_cache_duration);
 }
 
 struct CurlWriteFunctionData
@@ -178,7 +196,7 @@ CurlResponse http_get(std::string const& url, CurlOptions options = {})
 class ExpectCalled
 {
 public:
-    ExpectCalled() { EXPECT_CALL(*this, callback()); }
+    ExpectCalled(int n = 1) { EXPECT_CALL(*this, callback()).Times(n); }
 
     auto operator()() { wrap_callback(); }
 
@@ -212,10 +230,14 @@ TEST(Client, server_serves_content_when_registered_with_client)
     std::string content_type = "text/html";
 
     auto client = create_client();
+    ContentInfo info;
+    info.path = path;
+    info.max_cache_duration = cache_duration;
+    info.attachment_filename = filename;
     auto handle = client->register_content(
         std::make_shared<loon::BufferContentSource>(
             std::vector<char>(content.begin(), content.end()), content_type),
-        loon::ContentInfo(path, cache_duration, filename));
+        info);
     ASSERT_THAT(handle->url(), EndsWith(path));
 
     auto response = http_get(handle->url());
@@ -291,7 +313,7 @@ TEST(Client, no_active_requests_when_handle_url_request_is_canceled)
     auto client = create_client();
     auto hello = client->current_hello();
     auto chunk_size = hello.constraints().chunk_size();
-    auto content = example_content(3 * chunk_size);
+    auto content = example_content_large(3 * chunk_size);
     client->chunk_sleep(25ms); // 3 chunks => 75ms to send everything
     auto handle = client->register_content(content.source, content.info);
     CurlOptions options{};
@@ -304,6 +326,22 @@ TEST(Client, no_active_requests_when_handle_url_request_is_canceled)
     EXPECT_THROW(http_get(handle->url(), options), std::exception);
     std::this_thread::sleep_for(5ms);
     EXPECT_EQ(0, client->active_requests());
+}
 
-    int x = 1 + 1;
+TEST(Client, FailsWhenMinCacheDurationIsSetAndServerDoesNotCacheResponses)
+{
+    ClientOptions options;
+    options.min_cache_duration = 10;
+    auto client = create_client(options, false);
+    client->inject_hello_modifier([](Hello& hello) {
+        hello.mutable_constraints()->set_response_caching(false);
+    });
+    ExpectCalled callback;
+    client->failed(callback.get());
+    client->start();
+    // Wait for the Hello message to have been handled.
+    // It's expected that the client is not connected anymore,
+    // since the client should be in a failed state.
+    EXPECT_THROW(client->current_hello(), ClientNotConnectedException);
+    EXPECT_TRUE(callback.was_called());
 }

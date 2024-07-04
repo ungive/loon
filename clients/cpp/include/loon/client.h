@@ -76,6 +76,21 @@ public:
     virtual void stop() = 0;
 
     /**
+     * @brief Sets a callback for when the client has unrecoverably failed.
+     *
+     * This callback is only called when an abnormal event occurs,
+     * like an unacceptable server configuration that does not allow
+     * the client to continue operation.
+     * The callback is not called when the client is stopped with stop()
+     * or when the Client instance is destructed in the destructor.
+     *
+     * If failure should be detected, this method must be called before start().
+     *
+     * @param callback The function to call when the client failed.
+     */
+    virtual void failed(std::function<void()> callback) = 0;
+
+    /**
      * @brief Registers content with this client and returns a handle for it.
      *
      * The content remains registered across websocket reconnects,
@@ -117,6 +132,58 @@ public:
     virtual void unregister_content(std::shared_ptr<ContentHandle> handle) = 0;
 };
 
+struct ClientOptions
+{
+    /**
+     * @brief The minimum duration for which
+     * responses must be cached by the server.
+     *
+     * This means that when another request comes in for the same content,
+     * within the time period of this duration,
+     * the client will fail and stop with an error.
+     *
+     * The client also fails if the server does not support caching.
+     */
+    std::optional<uint32_t> min_cache_duration{};
+
+    /**
+     * @brief The maximum number of requests to handle per second.
+     *
+     * If this number is exceeded, the client restarts.
+     * Any registered content will be unregistered and must be registered again.
+     * Unregistered callbacks will be called on each piece of content.
+     *
+     * If fail_on_too_many_requests is set, the client fails instead.
+     *
+     * This option exists in the case that a malicious third party
+     * attempts to spam this client with requests,
+     * which might cause an extraneous
+     */
+    std::optional<float> max_requests_per_second{};
+
+    /**
+     * @brief If set to true, this client fails on too many requests.
+     *
+     * How many requests exactly consitute as "too many requests"
+     * is determined by the value for max_requests_per_second,
+     * which must be set if this flag is true.
+     *
+     * On failure, the client stops with an error
+     * and must be started again manually to continue.
+     */
+    bool fail_on_too_many_requests{ false };
+
+    /**
+     * @brief Maximum total upload speed for the client in bytes per second.
+     *
+     * Limits the upload speed for all requests that are served by the client.
+     * If multiple requests are served simultaneously,
+     * this limit is evenly split across every response
+     * on a best-effort basis.
+     */
+    std::optional<size_t> max_upload_speed{};
+};
+
 class Client : public IClient
 {
 public:
@@ -126,25 +193,41 @@ public:
      * @param address The websocket address to connect to.
      * @param auth The HTTP Basic authentication string,
      * a username and a password, separated by a colon.
+     * @param options Additional client options.
      */
-    Client(std::string const& address, std::string const& auth);
+    Client(std::string const& address,
+        std::string const& auth,
+        ClientOptions options = {});
 
     /**
      * Creates a new loon client without any authentication.
      *
      * @param address The websocket address to connect to.
+     * @param options Additional client options.
      */
-    Client(std::string const& address);
+    Client(std::string const& address, ClientOptions options = {});
 
-    void start() override;
+    void Client::start() override { return m_impl->start(); }
 
-    void stop() override;
+    void Client::stop() override { return m_impl->stop(); }
 
-    std::shared_ptr<ContentHandle> register_content(
-        std::shared_ptr<ContentSource> source,
-        ContentInfo const& info) override;
+    void loon::Client::failed(std::function<void()> callback) override
+    {
+        return m_impl->failed(callback);
+    }
 
-    void unregister_content(std::shared_ptr<ContentHandle> handle) override;
+    std::shared_ptr<ContentHandle> Client::register_content(
+        std::shared_ptr<loon::ContentSource> source,
+        loon::ContentInfo const& info) override
+    {
+        return m_impl->register_content(source, info);
+    }
+
+    void Client::unregister_content(
+        std::shared_ptr<ContentHandle> handle) override
+    {
+        return m_impl->unregister_content(handle);
+    }
 
 private:
     std::unique_ptr<IClient> m_impl;

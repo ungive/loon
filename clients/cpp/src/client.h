@@ -23,14 +23,21 @@ class InternalContentHandle;
 class ClientImpl : public IClient
 {
 public:
-    ClientImpl(
-        std::string const& address, std::optional<std::string> const& auth);
+    ClientImpl(std::string const& address,
+        std::optional<std::string> const& auth,
+        ClientOptions options = {});
 
     ~ClientImpl();
 
     void start() override;
 
     void stop() override;
+
+    inline void failed(std::function<void()> callback) override
+    {
+        std::lock_guard<std::recursive_mutex> lock(m_mutex);
+        m_failed_callback = callback;
+    }
 
     std::shared_ptr<ContentHandle> register_content(
         std::shared_ptr<loon::ContentSource> source,
@@ -85,6 +92,20 @@ protected:
     }
 
     /**
+     * @brief Injects a Hello message modifer into the server communication.
+     *
+     * After calling this method, when start() is called,
+     * the server's Hello message may be modified with the given function.
+     *
+     * @param hello A function that modifies the server's hello message.
+     */
+    inline void inject_hello_modifier(std::function<void(Hello&)> modifier)
+    {
+        std::unique_lock<std::recursive_mutex> lock(m_mutex);
+        m_injected_hello_modifer = modifier;
+    }
+
+    /**
      * @brief How long to sleep inbetween chunks.
      *
      * A zero value indicates no sleeping inbetween chunks, the default.
@@ -123,9 +144,22 @@ private:
     void internal_stop();
     void internal_restart();
 
+    /**
+     * @brief Puts the client in a failed state and closes any connection.
+     *
+     * After calling this method, the client is guaranteed to not be connected
+     * and not attempt any reconnects.
+     *
+     * @param message A message describing what happened.
+     */
+    void fail(std::string const& message);
+
     const std::string m_address{};
     const std::optional<std::string> m_auth{};
+    const ClientOptions m_options{};
     std::chrono::milliseconds m_chunk_sleep_duration{};
+    std::function<void(Hello&)> m_injected_hello_modifer{};
+    std::function<void()> m_failed_callback{};
 
     std::atomic<bool> m_connected{ false };
     // Use a recursive mutex, since many methods could trigger a reconnect,

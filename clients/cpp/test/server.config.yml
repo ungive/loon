@@ -7,6 +7,7 @@ protocol:
     accepted_content_types:
       - text/plain
       - text/html
+    response_caching: false
   intervals:
     write_wait: 10s
     pong_wait: 20s

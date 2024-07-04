@@ -136,28 +136,6 @@ private:
  */
 struct ContentInfo
 {
-    ContentInfo() = default;
-
-    ContentInfo(std::string const& path) : path{ path } {}
-
-    ContentInfo(std::string const& path, uint32_t max_cache_duration)
-        : path{ path }, max_cache_duration{ max_cache_duration }
-    {
-    }
-
-    ContentInfo(std::string const& path, std::string const& attachment_filename)
-        : path{ path }, attachment_filename{ attachment_filename }
-    {
-    }
-
-    ContentInfo(std::string const& path,
-        uint32_t max_cache_duration,
-        std::string const& attachment_filename)
-        : path{ path }, max_cache_duration{ max_cache_duration },
-          attachment_filename{ attachment_filename }
-    {
-    }
-
     /**
      * @brief The path under which the content should be available.
      *
@@ -180,7 +158,7 @@ struct ContentInfo
      *
      * A zero value indicates that the content should not be stored in caches.
      */
-    std::optional<uint32_t> max_cache_duration{ 0 };
+    std::optional<uint32_t> max_cache_duration{};
 
     /**
      * @brief The attachment filename.
