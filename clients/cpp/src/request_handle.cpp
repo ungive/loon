@@ -28,11 +28,13 @@ using namespace loon;
 RequestHandle::RequestHandle(ContentInfo const& info,
     std::shared_ptr<ContentSource> source,
     Hello const& hello,
-    std::chrono::milliseconds chunk_sleep,
+    Options options,
     std::function<bool(ClientMessage const&)> send_func)
-    : hello{ hello }, info{ info }, source{ source },
-      chunk_sleep{ chunk_sleep }, send_message{ send_func }
+    : hello{ hello }, info{ info }, source{ source }, options{ options },
+      send_message{ send_func }
 {
+    // No need to validate the options again here,
+    // since the values are already validated by the client implementation.
 }
 
 void RequestHandle::serve()
@@ -116,8 +118,8 @@ void RequestHandle::serve()
         auto const chunk_size = hello.constraints().chunk_size();
         std::vector<char> buffer(chunk_size);
         while (stream.good()) {
-            if (chunk_sleep > std::chrono::milliseconds::zero()) {
-                std::this_thread::sleep_for(chunk_sleep);
+            if (options.chunk_sleep > std::chrono::milliseconds::zero()) {
+                std::this_thread::sleep_for(options.chunk_sleep);
             }
             stream.read(buffer.data(), buffer.size());
             std::streamsize n = stream.gcount();
@@ -158,8 +160,25 @@ inline bool RequestHandle::send_response_message(ClientMessage const& message)
 void RequestHandle::serve_request(
     Request const& request, std::function<void()> callback)
 {
+    using namespace std::chrono_literals;
+
     // Neither high, nor low priority.
     const std::lock_guard<std::mutex> lock(mutex);
+
+    // Check if the previous response should have been cached by the server.
+    auto now = std::chrono::system_clock::now();
+    if (options.min_cache_duration.has_value() && last_request.has_value()) {
+        auto then = last_request.value();
+        auto elapsed = now - then;
+        assert(now - then >= 0ms);
+        std::chrono::seconds duration{ options.min_cache_duration.value() };
+        if (elapsed <= duration) {
+            throw ResponseNotCachedException(
+                "the server does not seem to cache previous responses for a "
+                "sufficient amount of time");
+        }
+    }
+    last_request = now;
 
     pending_requests.push_back(ServeRequest(request, callback));
     cv_incoming_request.notify_one();

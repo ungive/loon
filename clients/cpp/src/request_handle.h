@@ -16,20 +16,28 @@ namespace loon
 class RequestHandle
 {
 public:
+    struct Options
+    {
+        std::chrono::milliseconds chunk_sleep{
+            std::chrono::milliseconds::zero()
+        };
+        std::optional<uint32_t> min_cache_duration{};
+    };
+
     /**
      * @brief Creates a request handle for a given content source.
      *
      * @param info The content information.
      * @param source The source of the content.
      * @param hello The hello message that was received from the server.
-     * @param chunk_sleep Time to sleep inbetween chunk sends.
+     * @param options Options for this request handle
      * @param send_func A function that should be called
      * to send response client messages to the websocket peer.
      */
     RequestHandle(loon::ContentInfo const& info,
         std::shared_ptr<loon::ContentSource> source,
         Hello const& hello,
-        std::chrono::milliseconds chunk_sleep,
+        Options options,
         std::function<bool(ClientMessage const&)> send_func);
 
     /**
@@ -42,6 +50,9 @@ public:
      * @param request The request to serve.
      * @param callback The calback that is called,
      * once the response for the request has been fully sent.
+     *
+     * @throws ResponseNotCachedException if a request is made too quickly,
+     * while the server should have cached the response instead.
      */
     void serve_request(Request const& request, std::function<void()> callback);
 
@@ -112,11 +123,12 @@ private:
     };
 
     using request_id_t = uint64_t;
+    using time_point_t = std::chrono::time_point<std::chrono::system_clock>;
 
     Hello hello;
     loon::ContentInfo info;
     std::shared_ptr<loon::ContentSource> source;
-    std::chrono::milliseconds chunk_sleep;
+    Options options;
     std::function<bool(ClientMessage const&)> send_message;
 
     // The remaining fields are all default-initialized.
@@ -128,6 +140,7 @@ private:
     std::mutex mutex_low{};  // Mutex for low-priority access threads.
 
     std::condition_variable cv_incoming_request{};
+    std::optional<time_point_t> last_request;
     std::deque<ServeRequest> pending_requests{};
     std::optional<request_id_t> handling_request_id{};
     bool cancel_handling_request{ false };
@@ -135,5 +148,17 @@ private:
     bool stop{ false };
     bool done{ false };
     std::condition_variable cv_done{};
+};
+
+/**
+ * @brief The response has not been cached by the server.
+ *
+ * This happens when a request is made too quickly before the last request,
+ * when instead it is expected to have been cached by the server.
+ */
+class ResponseNotCachedException : public std::runtime_error
+{
+public:
+    using runtime_error::runtime_error;
 };
 } // namespace loon

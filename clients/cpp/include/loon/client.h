@@ -136,7 +136,7 @@ struct ClientOptions
 {
     /**
      * @brief The minimum duration for which
-     * responses must be cached by the server.
+     * responses must be cached by the server, in seconds.
      *
      * This means that when another request comes in for the same content,
      * within the time period of this duration,
@@ -159,7 +159,7 @@ struct ClientOptions
      * attempts to spam this client with requests,
      * which might cause an extraneous
      */
-    std::optional<float> max_requests_per_second{};
+    std::optional<double> max_requests_per_second{};
 
     /**
      * @brief If set to true, this client fails on too many requests.

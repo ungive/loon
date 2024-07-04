@@ -157,7 +157,9 @@ private:
     const std::string m_address{};
     const std::optional<std::string> m_auth{};
     const ClientOptions m_options{};
-    std::chrono::milliseconds m_chunk_sleep_duration{};
+    std::chrono::milliseconds m_chunk_sleep_duration{
+        std::chrono::milliseconds::zero()
+    };
     std::function<void(Hello&)> m_injected_hello_modifer{};
     std::function<void()> m_failed_callback{};
 

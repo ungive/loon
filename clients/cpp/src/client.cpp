@@ -160,8 +160,11 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
 
     // Serve requests for this content, register it and return a handle.
     auto send = std::bind(&ClientImpl::send, this, std::placeholders::_1);
+    RequestHandle::Options options;
+    options.chunk_sleep = m_chunk_sleep_duration;
+    options.min_cache_duration = m_options.min_cache_duration;
     auto request_handle = std::make_shared<RequestHandle>(
-        info, source, m_hello.value(), m_chunk_sleep_duration, send);
+        info, source, m_hello.value(), options, send);
     request_handle->spawn_serve_thread();
     auto handle = std::make_shared<InternalContentHandle>(
         make_url(info.path), path, request_handle);
@@ -274,8 +277,13 @@ void ClientImpl::on_request(Request const& request)
 
     auto content = it->second;
     m_requests.emplace(request.id(), std::make_pair(content, false));
-    content->request_handle()->serve_request(
-        request, std::bind(&ClientImpl::response_sent, this, request.id()));
+    try {
+        content->request_handle()->serve_request(
+            request, std::bind(&ClientImpl::response_sent, this, request.id()));
+    }
+    catch (ResponseNotCachedException const& e) {
+        return fail(e.what());
+    }
 }
 
 inline void ClientImpl::call_served_callback(decltype(m_requests)::iterator it)

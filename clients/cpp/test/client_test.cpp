@@ -345,3 +345,31 @@ TEST(Client, FailsWhenMinCacheDurationIsSetAndServerDoesNotCacheResponses)
     EXPECT_THROW(client->current_hello(), ClientNotConnectedException);
     EXPECT_TRUE(callback.was_called());
 }
+
+TEST(Client, FailsWhenMinCacheDurationIsSetButResponseIsNotCached)
+{
+    uint32_t cache_duration = 10;
+    ClientOptions options;
+    options.min_cache_duration = cache_duration / 2;
+    auto client = create_client(options, false);
+    client->inject_hello_modifier([](Hello& hello) {
+        if (hello.constraints().response_caching()) {
+            FAIL() << "the test server is expected to not cache responses";
+        }
+        // The real test server does not cache responses,
+        // but for the sake of the test, we pretend it does.
+        // This would resemble a server that claims to cache, but doesn't.
+        hello.mutable_constraints()->set_response_caching(true);
+    });
+    ExpectCalled failed;
+    client->failed(failed.get());
+    client->start();
+    auto content1 = example_content(cache_duration);
+    auto handle = client->register_content(content1.source, content1.info);
+    // The served callback should only be called once,
+    // since it is expected to be cached on the server.
+    ExpectCalled served(1);
+    handle->served(served.get());
+    http_get(handle->url());
+    http_get(handle->url());
+}
