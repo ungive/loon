@@ -219,6 +219,15 @@ Note that caching should be done for an entire request URL,
 including the `<base_url>`, `<client_id>`, `<hash>` and `<path>`.
 The actual HTTP request URL should be used.
 
+Next to caching content responses from clients,
+empty responses should be cached too,
+to prevent clients from continuously receiving requests
+which lead to empty responses.
+It is unlikely that a requests URL for which there is not content
+ever has valid content again,
+if it never had content in the first place
+or if the content was removed by the client.
+
 ## Protocol
 
 This section describes the protocol over a websocket connection
