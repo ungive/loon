@@ -221,7 +221,7 @@ private:
     std::atomic<bool> m_called{ false };
 };
 
-TEST(Client, server_serves_content_when_registered_with_client)
+TEST(Client, _server_serves_content_when_registered_with_client)
 {
     std::string path = "index.html";
     uint32_t cache_duration = 23;
@@ -250,7 +250,7 @@ TEST(Client, server_serves_content_when_registered_with_client)
     EXPECT_EQ(200, response.status);
 }
 
-TEST(Client, unregistered_callback_is_called_when_unregistering)
+TEST(Client, UnregisteredCallbackIsCalledWhenUnregistering)
 {
     auto client = create_client();
     auto content = example_content();
@@ -260,7 +260,7 @@ TEST(Client, unregistered_callback_is_called_when_unregistering)
     client->unregister_content(handle);
 }
 
-TEST(Client, unregistered_callback_is_called_when_set_after_unregistering)
+TEST(Client, UnregisteredCallbackIsCalledWhenSetAfterUnregistering)
 {
     auto client = create_client();
     auto content = example_content();
@@ -270,7 +270,7 @@ TEST(Client, unregistered_callback_is_called_when_set_after_unregistering)
     handle->unregistered(callback.get());
 }
 
-TEST(Client, unregistered_callback_is_called_when_server_closes_connection)
+TEST(Client, UnregisteredCallbackIsCalledWhenServerClosesConnection)
 {
     auto client = create_client();
     auto content = example_content();
@@ -286,7 +286,7 @@ TEST(Client, unregistered_callback_is_called_when_server_closes_connection)
     EXPECT_TRUE(callback.was_called());
 }
 
-TEST(Client, unregistered_callback_is_called_when_client_closes_connection)
+TEST(Client, UnregisteredCallbackIsCalledWhenClientClosesConnection)
 {
     auto client = create_client();
     auto content = example_content();
@@ -297,7 +297,7 @@ TEST(Client, unregistered_callback_is_called_when_client_closes_connection)
     EXPECT_TRUE(callback.was_called());
 }
 
-TEST(Client, served_callback_is_called_when_content_handle_url_is_requested)
+TEST(Client, ServedCallbackIsCalledWhenContentHandleUrlIsRequested)
 {
     auto client = create_client();
     auto content = example_content();
@@ -308,7 +308,7 @@ TEST(Client, served_callback_is_called_when_content_handle_url_is_requested)
     EXPECT_TRUE(callback.was_called());
 }
 
-TEST(Client, no_active_requests_when_handle_url_request_is_canceled)
+TEST(Client, NoActiveRequestsWhenHandleUrlRequestIsCanceled)
 {
     auto client = create_client();
     auto hello = client->current_hello();
