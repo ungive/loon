@@ -10,28 +10,28 @@ using namespace loon;
 // Locks the request handle for the lifetime of the current scope
 // with low priority, such that high priority threads run next.
 // order: lock L, lock N, lock M, unlock N, ..., unlock M, unlock L
-#define mutex_lock_low_priority()                          \
-    const std::lock_guard<std::mutex> lock_low(mutex_low); \
-    mutex_next.lock();                                     \
-    const std::lock_guard<std::mutex> lock_data(mutex);    \
-    mutex_next.unlock();
+#define mutex_lock_low_priority()                            \
+    const std::lock_guard<std::mutex> lock_low(m_mutex_low); \
+    m_mutex_next.lock();                                     \
+    const std::lock_guard<std::mutex> lock_data(m_mutex);    \
+    m_mutex_next.unlock();
 
 // Locks the request handle for the lifetime of the current scope
 // with high priority, such that this thread runs next,
 // before other threads that also acquired the data lock.
 // order: lock N, lock M, unlock N, ..., unlock M
-#define mutex_lock_high_priority()                      \
-    mutex_next.lock();                                  \
-    const std::lock_guard<std::mutex> lock_data(mutex); \
-    mutex_next.unlock();
+#define mutex_lock_high_priority()                        \
+    m_mutex_next.lock();                                  \
+    const std::lock_guard<std::mutex> lock_data(m_mutex); \
+    m_mutex_next.unlock();
 
 RequestHandle::RequestHandle(ContentInfo const& info,
     std::shared_ptr<ContentSource> source,
     Hello const& hello,
     Options options,
     std::function<bool(ClientMessage const&)> send_func)
-    : hello{ hello }, info{ info }, source{ source }, options{ options },
-      send_message{ send_func }
+    : m_hello{ hello }, m_info{ info }, m_source{ source },
+      m_options{ options }, m_send_message{ send_func }
 {
     // No need to validate the options again here,
     // since the values are already validated by the client implementation.
@@ -39,15 +39,15 @@ RequestHandle::RequestHandle(ContentInfo const& info,
 
 void RequestHandle::serve()
 {
-    std::unique_lock<std::mutex> lock(mutex);
+    std::unique_lock<std::mutex> lock(m_mutex);
 
     std::shared_ptr<void> defer(nullptr, std::bind([this] {
         // Notify that the serve loop has exited once the function returns.
         // Note that "defer" needs to be constructed after the lock,
         // so that it is destructed before the lock
         // and therefore "done" is changed while the lock is still being held.
-        done = true;
-        cv_done.notify_all();
+        m_done = true;
+        m_cv_done.notify_all();
     }));
 
     // Unlocks the lock, sends the message with low priority,
@@ -64,62 +64,62 @@ void RequestHandle::serve()
     // The loop condition needs to be true,
     // since the request cancellation is always done after an iteration.
     while (true) {
-        if (cancel_handling_request && handling_request_id.has_value()) {
+        if (m_cancel_handling_request && m_handling_request_id.has_value()) {
             // Close the response if the currently handled request
             // was canceled during the previous loop iteration.
             ClientMessage message;
             auto close_response = message.mutable_close_response();
-            close_response->set_request_id(handling_request_id.value());
-            if (!send_message(message)) {
+            close_response->set_request_id(m_handling_request_id.value());
+            if (!m_send_message(message)) {
                 return;
             }
         }
 
         // Reset any request handling state.
-        handling_request_id = std::nullopt;
-        cancel_handling_request = false;
+        m_handling_request_id = std::nullopt;
+        m_cancel_handling_request = false;
 
         // Wait for incoming or pending requests
         // or until the request handler is stopped.
-        cv_incoming_request.wait(lock, [this] {
-            return stop || pending_requests.size() > 0;
+        m_cv_incoming_request.wait(lock, [this] {
+            return m_stop || m_pending_requests.size() > 0;
         });
-        if (stop) {
+        if (m_stop) {
             return;
         }
 
         // Read the next request from the queue.
-        auto serve_request = pending_requests.front();
-        pending_requests.pop_front();
-        handling_request_id = serve_request.request.id();
+        auto serve_request = m_pending_requests.front();
+        m_pending_requests.pop_front();
+        m_handling_request_id = serve_request.request.id();
 
         // Send the response header.
         ClientMessage header_message;
         auto header = header_message.mutable_content_header();
         header->set_request_id(serve_request.request.id());
-        header->set_content_type(source->content_type());
-        header->set_content_size(source->size());
-        if (info.max_cache_duration.has_value()) {
-            header->set_max_cache_duration(info.max_cache_duration.value());
+        header->set_content_type(m_source->content_type());
+        header->set_content_size(m_source->size());
+        if (m_info.max_cache_duration.has_value()) {
+            header->set_max_cache_duration(m_info.max_cache_duration.value());
         }
-        if (info.attachment_filename.has_value()) {
-            header->set_filename(info.attachment_filename.value());
+        if (m_info.attachment_filename.has_value()) {
+            header->set_filename(m_info.attachment_filename.value());
         }
         if (!send(lock, header_message))
             return;
-        if (cancel_handling_request)
+        if (m_cancel_handling_request)
             continue;
-        if (stop)
+        if (m_stop)
             return;
 
         // Send the chunks.
         uint64_t sequence = 0;
-        auto& stream = source->data();
-        auto const chunk_size = hello.constraints().chunk_size();
+        auto& stream = m_source->data();
+        auto const chunk_size = m_hello.constraints().chunk_size();
         std::vector<char> buffer(chunk_size);
         while (stream.good()) {
-            if (options.chunk_sleep > std::chrono::milliseconds::zero()) {
-                std::this_thread::sleep_for(options.chunk_sleep);
+            if (m_options.chunk_sleep > std::chrono::milliseconds::zero()) {
+                std::this_thread::sleep_for(m_options.chunk_sleep);
             }
             stream.read(buffer.data(), buffer.size());
             std::streamsize n = stream.gcount();
@@ -133,12 +133,12 @@ void RequestHandle::serve()
             chunk->set_data(buffer.data(), n);
             if (!send(lock, chunk_message))
                 return;
-            if (cancel_handling_request)
+            if (m_cancel_handling_request)
                 break;
-            if (stop)
+            if (m_stop)
                 return;
         }
-        if (!cancel_handling_request) {
+        if (!m_cancel_handling_request) {
             // The request was fully sent, without being cancelled.
             lock.unlock();
             serve_request.callback();
@@ -146,7 +146,7 @@ void RequestHandle::serve()
         }
         if (!stream.good()) {
             // The response is complete, we do not need to cancel anymore.
-            cancel_handling_request = false;
+            m_cancel_handling_request = false;
         }
     }
 }
@@ -154,7 +154,7 @@ void RequestHandle::serve()
 inline bool RequestHandle::send_response_message(ClientMessage const& message)
 {
     mutex_lock_low_priority();
-    return send_message(message);
+    return m_send_message(message);
 }
 
 void RequestHandle::serve_request(
@@ -163,25 +163,26 @@ void RequestHandle::serve_request(
     using namespace std::chrono_literals;
 
     // Neither high, nor low priority.
-    const std::lock_guard<std::mutex> lock(mutex);
+    const std::lock_guard<std::mutex> lock(m_mutex);
 
     // Check if the previous response should have been cached by the server.
     auto now = std::chrono::system_clock::now();
-    if (options.min_cache_duration.has_value() && last_request.has_value()) {
-        auto then = last_request.value();
+    if (m_options.min_cache_duration.has_value() &&
+        m_last_request.has_value()) {
+        auto then = m_last_request.value();
         auto elapsed = now - then;
         assert(now - then >= 0ms);
-        std::chrono::seconds duration{ options.min_cache_duration.value() };
+        std::chrono::seconds duration{ m_options.min_cache_duration.value() };
         if (elapsed <= duration) {
             throw ResponseNotCachedException(
                 "the server does not seem to cache previous responses for a "
                 "sufficient amount of time");
         }
     }
-    last_request = now;
+    m_last_request = now;
 
-    pending_requests.push_back(ServeRequest(request, callback));
-    cv_incoming_request.notify_one();
+    m_pending_requests.push_back(ServeRequest(request, callback));
+    m_cv_incoming_request.notify_one();
 }
 
 void RequestHandle::cancel_request(uint64_t request_id)
@@ -192,21 +193,21 @@ void RequestHandle::cancel_request(uint64_t request_id)
     // This request ID is currently being handled.
     // It's the responsibility of the serve function
     // to stop sending data and close the response afterwards.
-    if (handling_request_id.has_value() &&
-        request_id == handling_request_id.value()) {
-        cancel_handling_request = true;
+    if (m_handling_request_id.has_value() &&
+        request_id == m_handling_request_id.value()) {
+        m_cancel_handling_request = true;
         return;
     }
 
     // This request ID is not being actively handled.
     // See if a response is pending for it,
     // then remove it and close the response immediately.
-    auto it = std::find_if(pending_requests.begin(), pending_requests.end(),
+    auto it = std::find_if(m_pending_requests.begin(), m_pending_requests.end(),
         [request_id](ServeRequest const& request) {
             return request.request.id() == request_id;
         });
-    if (it != pending_requests.end()) {
-        pending_requests.erase(it);
+    if (it != m_pending_requests.end()) {
+        m_pending_requests.erase(it);
 
         // We are only sending the CloseResponse message here,
         // when we are sure that the response is not already completed,
@@ -215,7 +216,7 @@ void RequestHandle::cancel_request(uint64_t request_id)
         ClientMessage message;
         auto close_response = message.mutable_close_response();
         close_response->set_request_id(request_id);
-        if (!send_message(message)) {
+        if (!m_send_message(message)) {
             return;
         }
     }
@@ -223,15 +224,15 @@ void RequestHandle::cancel_request(uint64_t request_id)
 
 void RequestHandle::spawn_serve_thread()
 {
-    const std::lock_guard<std::mutex> lock(mutex);
-    if (dirty) {
+    const std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_dirty) {
         throw std::runtime_error("serve thread has already been spawned");
     }
-    if (stop) {
+    if (m_stop) {
         throw std::runtime_error("request handle is stopped");
     }
     std::thread(&RequestHandle::serve, this).detach();
-    dirty = true;
+    m_dirty = true;
 }
 
 void loon::RequestHandle::exit_gracefully()
@@ -240,22 +241,22 @@ void loon::RequestHandle::exit_gracefully()
         // Exiting gracefully is high priority.
         mutex_lock_high_priority();
 
-        if (stop || done) {
+        if (m_stop || m_done) {
             throw std::runtime_error("request handle is already destroyed");
         }
-        if (handling_request_id.has_value()) {
+        if (m_handling_request_id.has_value()) {
             // Cancel the request that is being handled before before stopping.
-            cancel_handling_request = true;
+            m_cancel_handling_request = true;
         }
-        stop = true;
+        m_stop = true;
     }
     {
-        std::unique_lock<std::mutex> lock(mutex);
+        std::unique_lock<std::mutex> lock(m_mutex);
         // Wake the serve thread up, in case it is waiting for a request.
-        cv_incoming_request.notify_all();
+        m_cv_incoming_request.notify_all();
         // Block until the serve loop has exited.
-        cv_done.wait(lock, [this] {
-            return done;
+        m_cv_done.wait(lock, [this] {
+            return m_done;
         });
     }
 }
@@ -265,8 +266,8 @@ void RequestHandle::destroy()
     // Destroying the request handle has high priority.
     mutex_lock_high_priority();
 
-    if (stop || done) {
+    if (m_stop || m_done) {
         throw std::runtime_error("request handle is already destroyed");
     }
-    stop = true;
+    m_stop = true;
 }

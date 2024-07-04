@@ -125,29 +125,29 @@ private:
     using request_id_t = uint64_t;
     using time_point_t = std::chrono::time_point<std::chrono::system_clock>;
 
-    Hello hello;
-    loon::ContentInfo info;
-    std::shared_ptr<loon::ContentSource> source;
-    Options options;
-    std::function<bool(ClientMessage const&)> send_message;
+    Hello m_hello;
+    loon::ContentInfo m_info;
+    std::shared_ptr<loon::ContentSource> m_source;
+    Options m_options;
+    std::function<bool(ClientMessage const&)> m_send_message;
 
     // The remaining fields are all default-initialized.
 
     // Using three mutex variables for threads with priority.
     // More information at the top of request_handle.cpp.
-    std::mutex mutex{};      // Mutex for data fields.
-    std::mutex mutex_next{}; // Mutex for next-to-access threads.
-    std::mutex mutex_low{};  // Mutex for low-priority access threads.
+    std::mutex m_mutex{};      // Mutex for data fields.
+    std::mutex m_mutex_next{}; // Mutex for next-to-access threads.
+    std::mutex m_mutex_low{};  // Mutex for low-priority access threads.
 
-    std::condition_variable cv_incoming_request{};
-    std::optional<time_point_t> last_request;
-    std::deque<ServeRequest> pending_requests{};
-    std::optional<request_id_t> handling_request_id{};
-    bool cancel_handling_request{ false };
-    bool dirty{ false };
-    bool stop{ false };
-    bool done{ false };
-    std::condition_variable cv_done{};
+    std::condition_variable m_cv_incoming_request{};
+    std::optional<time_point_t> m_last_request;
+    std::deque<ServeRequest> m_pending_requests{};
+    std::optional<request_id_t> m_handling_request_id{};
+    bool m_cancel_handling_request{ false };
+    bool m_dirty{ false };
+    bool m_stop{ false };
+    bool m_done{ false };
+    std::condition_variable m_cv_done{};
 };
 
 /**
