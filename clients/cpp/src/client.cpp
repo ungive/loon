@@ -50,6 +50,12 @@ ClientImpl::ClientImpl(std::string const& address,
         m_options.max_upload_speed.value() == 0) {
         throw std::runtime_error("maximum upload speed may not be zero");
     }
+    if (m_options.fail_on_too_many_requests &&
+        !m_options.max_requests_per_second.has_value()) {
+        throw std::runtime_error(
+            "to fail with too many requests, "
+            "a maximum number of requests per second must be set");
+    }
 
     m_conn.onopen = std::bind(&ClientImpl::on_websocket_open, this);
     m_conn.onmessage = std::bind(
@@ -282,7 +288,13 @@ void ClientImpl::on_request(Request const& request)
         }
         request_history.push_back(now);
         if (request_history.size() > 1) {
-            return fail("maximum number of requests per second exceeded");
+            if (m_options.fail_on_too_many_requests) {
+                std::cerr << "FAIL\n";
+                return fail("maximum number of requests per second exceeded");
+            } else {
+                std::cerr << "RESTART\n";
+                return internal_restart();
+            }
         }
     }
 

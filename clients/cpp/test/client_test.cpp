@@ -401,11 +401,12 @@ static void print_timestamp(std::string const& prefix = "")
               << std::setw(3) << ms.count() << std::endl;
 }
 
-TEST(Client, FailsWhenMaxRequestsPerSecondIsSetAndRequestsAreSentTooQuickly)
+TEST(Client, FailsWhenMaxRequestsPerSecondIsSetAndRequestsAreTooFrequent)
 {
     using namespace std::chrono;
     const auto one_request_within = 25ms;
     ClientOptions options;
+    options.fail_on_too_many_requests = true;
     options.max_requests_per_second =
         static_cast<double>(duration_cast<milliseconds>(1s).count()) /
         one_request_within.count();
@@ -424,7 +425,32 @@ TEST(Client, FailsWhenMaxRequestsPerSecondIsSetAndRequestsAreSentTooQuickly)
     } else {
         FAIL() << "the first request took too long";
     }
-    http_get(handle->url());
+    auto response = http_get(handle->url());
+    EXPECT_NE(200, response.status);
+}
+
+TEST(Client, RestartsWhenFailOnTooManyRequestsIsFalseAndRequestsAreTooFrequent)
+{
+    using namespace std::chrono;
+    const auto one_request_within = 25ms;
+    ClientOptions options;
+    options.fail_on_too_many_requests = false;
+    options.max_requests_per_second =
+        static_cast<double>(duration_cast<milliseconds>(1s).count()) /
+        one_request_within.count();
+    auto client = create_client(options, false);
+    ExpectCalled failed(0);
+    client->failed(failed.get());
+    client->start();
+    auto content = example_content();
+    auto first_hello = client->current_hello();
+    auto first_handle = client->register_content(content.source, content.info);
+    http_get(first_handle->url());
+    auto response = http_get(first_handle->url());
+    EXPECT_NE(200, response.status);
+    auto second_hello = client->current_hello();
+    // The client should have restarted, i.e. the client ID is now different.
+    ASSERT_NE(first_hello.client_id(), second_hello.client_id());
 }
 
 TEST(Client, DoesNotFailWhenMaxRequestsPerSecondIsSetAndRequestsAreSentSlowly)
@@ -432,6 +458,7 @@ TEST(Client, DoesNotFailWhenMaxRequestsPerSecondIsSetAndRequestsAreSentSlowly)
     using namespace std::chrono;
     const auto one_request_within = 25ms;
     ClientOptions options;
+    options.fail_on_too_many_requests = true;
     options.max_requests_per_second =
         static_cast<double>(duration_cast<milliseconds>(1s).count()) /
         one_request_within.count();
@@ -450,5 +477,7 @@ TEST(Client, DoesNotFailWhenMaxRequestsPerSecondIsSetAndRequestsAreSentSlowly)
     } else {
         FAIL() << "the first request took too long";
     }
-    http_get(handle->url());
+    auto response = http_get(handle->url());
+    EXPECT_EQ(200, response.status);
+    EXPECT_EQ(content.data, response.body);
 }
