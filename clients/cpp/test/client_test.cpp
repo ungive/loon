@@ -481,3 +481,10 @@ TEST(Client, DoesNotFailWhenMaxRequestsPerSecondIsSetAndRequestsAreSentSlowly)
     EXPECT_EQ(200, response.status);
     EXPECT_EQ(content.data, response.body);
 }
+
+TEST(Client, CreationFailsWhenMaxUploadSpeedIsSet)
+{
+    ClientOptions options;
+    options.max_upload_speed = 100;
+    EXPECT_THROW(create_client(options, false), std::exception);
+}

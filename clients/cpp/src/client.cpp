@@ -56,6 +56,9 @@ ClientImpl::ClientImpl(std::string const& address,
             "to fail with too many requests, "
             "a maximum number of requests per second must be set");
     }
+    if (m_options.max_upload_speed.has_value()) {
+        throw std::runtime_error("not yet implemented");
+    }
 
     m_conn.onopen = std::bind(&ClientImpl::on_websocket_open, this);
     m_conn.onmessage = std::bind(

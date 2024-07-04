@@ -173,6 +173,7 @@ struct ClientOptions
      */
     bool fail_on_too_many_requests{ false };
 
+    // TODO: not yet implemented
     /**
      * @brief Maximum total upload speed for the client in bytes per second.
      *
