@@ -221,7 +221,7 @@ private:
     std::atomic<bool> m_called{ false };
 };
 
-TEST(Client, _server_serves_content_when_registered_with_client)
+TEST(Client, ServerServesContentWhenRegisteredWithClient)
 {
     std::string path = "index.html";
     uint32_t cache_duration = 23;
