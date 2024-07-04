@@ -160,10 +160,10 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
 
     // Serve requests for this content, register it and return a handle.
     auto send = std::bind(&ClientImpl::send, this, std::placeholders::_1);
-    RequestHandle::Options options;
+    RequestHandler::Options options;
     options.chunk_sleep = m_chunk_sleep_duration;
     options.min_cache_duration = m_options.min_cache_duration;
-    auto request_handle = std::make_shared<RequestHandle>(
+    auto request_handle = std::make_shared<RequestHandler>(
         info, source, m_hello.value(), options, send);
     request_handle->spawn_serve_thread();
     auto handle = std::make_shared<InternalContentHandle>(
@@ -196,7 +196,7 @@ void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
 
     // Exit the request handle's serve thread
     // and wait for it to have terminated, then remove the handle.
-    it->second->request_handle()->exit_gracefully();
+    it->second->request_handler()->exit_gracefully();
     m_content.erase(it);
 }
 
@@ -278,7 +278,7 @@ void ClientImpl::on_request(Request const& request)
     auto content = it->second;
     m_requests.emplace(request.id(), std::make_pair(content, false));
     try {
-        content->request_handle()->serve_request(
+        content->request_handler()->serve_request(
             request, std::bind(&ClientImpl::response_sent, this, request.id()));
     }
     catch (ResponseNotCachedException const& e) {
@@ -346,7 +346,7 @@ void ClientImpl::on_request_closed(RequestClosed const& request_closed)
     }
 
     auto content_handle = it->second.first;
-    content_handle->request_handle()->cancel_request(request_id);
+    content_handle->request_handler()->cancel_request(request_id);
     m_requests.erase(it);
 }
 
@@ -466,7 +466,7 @@ void ClientImpl::reset_connection_state()
         // so after this method returns, the object will be destroyed.
         // Request handlers use pointers to data in this object,
         // so this object must remain valid until each handler exited.
-        content->request_handle()->exit_gracefully();
+        content->request_handler()->exit_gracefully();
     }
     m_content.clear();
     m_requests.clear();

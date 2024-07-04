@@ -13,7 +13,7 @@
 
 namespace loon
 {
-class RequestHandle
+class RequestHandler
 {
 public:
     struct Options
@@ -34,7 +34,7 @@ public:
      * @param send_func A function that should be called
      * to send response client messages to the websocket peer.
      */
-    RequestHandle(loon::ContentInfo const& info,
+    RequestHandler(loon::ContentInfo const& info,
         std::shared_ptr<loon::ContentSource> source,
         Hello const& hello,
         Options options,

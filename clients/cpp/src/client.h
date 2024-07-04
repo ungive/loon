@@ -14,7 +14,7 @@
 
 #include "loon/client.h"
 #include "loon/messages.pb.h"
-#include "request_handle.h"
+#include "request_handler.h"
 
 namespace loon
 {
@@ -200,8 +200,8 @@ class InternalContentHandle : public ContentHandle
 public:
     InternalContentHandle(std::string const& url,
         std::string const& path,
-        std::shared_ptr<RequestHandle> request_handle)
-        : m_url{ url }, m_path{ path }, m_request_handle{ request_handle }
+        std::shared_ptr<RequestHandler> request_handle)
+        : m_url{ url }, m_path{ path }, m_request_handler{ request_handle }
     {
     }
 
@@ -209,9 +209,9 @@ public:
 
     inline std::string const& path() const { return m_path; }
 
-    inline std::shared_ptr<RequestHandle> request_handle()
+    inline std::shared_ptr<RequestHandler> request_handler()
     {
-        return m_request_handle;
+        return m_request_handler;
     }
 
     void served(std::function<void()> callback) override
@@ -256,7 +256,7 @@ public:
 private:
     std::string m_url{};
     std::string m_path{};
-    std::shared_ptr<RequestHandle> m_request_handle;
+    std::shared_ptr<RequestHandler> m_request_handler;
 
     std::mutex m_mutex{};
     std::function<void()> m_served_callback{};

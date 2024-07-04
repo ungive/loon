@@ -1,4 +1,4 @@
-#include "request_handle.h"
+#include "request_handler.h"
 
 #include <cassert>
 
@@ -25,7 +25,7 @@ using namespace loon;
     const std::lock_guard<std::mutex> lock_data(m_mutex); \
     m_mutex_next.unlock();
 
-RequestHandle::RequestHandle(ContentInfo const& info,
+RequestHandler::RequestHandler(ContentInfo const& info,
     std::shared_ptr<ContentSource> source,
     Hello const& hello,
     Options options,
@@ -37,7 +37,7 @@ RequestHandle::RequestHandle(ContentInfo const& info,
     // since the values are already validated by the client implementation.
 }
 
-void RequestHandle::serve()
+void RequestHandler::serve()
 {
     std::unique_lock<std::mutex> lock(m_mutex);
 
@@ -151,13 +151,13 @@ void RequestHandle::serve()
     }
 }
 
-inline bool RequestHandle::send_response_message(ClientMessage const& message)
+inline bool RequestHandler::send_response_message(ClientMessage const& message)
 {
     mutex_lock_low_priority();
     return m_send_message(message);
 }
 
-void RequestHandle::serve_request(
+void RequestHandler::serve_request(
     Request const& request, std::function<void()> callback)
 {
     using namespace std::chrono_literals;
@@ -185,7 +185,7 @@ void RequestHandle::serve_request(
     m_cv_incoming_request.notify_one();
 }
 
-void RequestHandle::cancel_request(uint64_t request_id)
+void RequestHandler::cancel_request(uint64_t request_id)
 {
     // Response cancellation has high priority.
     mutex_lock_high_priority();
@@ -222,7 +222,7 @@ void RequestHandle::cancel_request(uint64_t request_id)
     }
 }
 
-void RequestHandle::spawn_serve_thread()
+void RequestHandler::spawn_serve_thread()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     if (m_dirty) {
@@ -231,11 +231,11 @@ void RequestHandle::spawn_serve_thread()
     if (m_stop) {
         throw std::runtime_error("request handle is stopped");
     }
-    std::thread(&RequestHandle::serve, this).detach();
+    std::thread(&RequestHandler::serve, this).detach();
     m_dirty = true;
 }
 
-void loon::RequestHandle::exit_gracefully()
+void loon::RequestHandler::exit_gracefully()
 {
     {
         // Exiting gracefully is high priority.
@@ -261,7 +261,7 @@ void loon::RequestHandle::exit_gracefully()
     }
 }
 
-void RequestHandle::destroy()
+void RequestHandler::destroy()
 {
     // Destroying the request handle has high priority.
     mutex_lock_high_priority();
