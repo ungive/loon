@@ -117,6 +117,7 @@ void RequestHandler::serve()
         auto& stream = m_source->data();
         auto const chunk_size = m_hello.constraints().chunk_size();
         std::vector<char> buffer(chunk_size);
+        std::size_t total = 0;
         while (stream.good()) {
             if (m_options.chunk_sleep > std::chrono::milliseconds::zero()) {
                 std::this_thread::sleep_for(m_options.chunk_sleep);
@@ -133,6 +134,7 @@ void RequestHandler::serve()
             chunk->set_data(buffer.data(), n);
             if (!send(lock, chunk_message))
                 return;
+            total += n;
             if (m_cancel_handling_request)
                 break;
             if (m_stop)
@@ -144,7 +146,8 @@ void RequestHandler::serve()
             serve_request.callback();
             lock.lock();
         }
-        if (!stream.good()) {
+        assert(total <= m_source->size());
+        if (total == m_source->size()) {
             // The response is complete, we do not need to cancel anymore.
             m_cancel_handling_request = false;
         }
