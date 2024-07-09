@@ -37,7 +37,10 @@ protobuf_generate(
     OUT_VAR
     PROTOLOON_SOURCES
     IMPORT_DIRS
-    ${CMAKE_CURRENT_BINARY_DIR})
+    ${CMAKE_CURRENT_BINARY_DIR}
+    OUT_VAR
+    PROTOLOON_SOURCES)
+set_property(SOURCE ${PROTOLOON_SOURCES} PROPERTY SKIP_AUTOGEN ON)
 target_link_libraries(loon protobuf::libprotobuf)
 target_link_libraries(loon loon-proto)
 
