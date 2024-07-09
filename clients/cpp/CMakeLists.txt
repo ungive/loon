@@ -9,7 +9,8 @@ set(LIB_SOURCES src/client.cpp src/request_handler.cpp src/util.cpp)
 add_library(loon STATIC ${LIB_SOURCES})
 add_library(loon::loon ALIAS loon)
 target_compile_definitions(loon PRIVATE NOMINMAX)
-target_include_directories(loon PRIVATE ./include ./src)
+target_include_directories(loon PUBLIC ./include)
+target_include_directories(loon PRIVATE ./src)
 
 # openssl
 find_package(OpenSSL REQUIRED)
