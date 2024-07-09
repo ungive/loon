@@ -26,14 +26,14 @@ target_include_directories(loon PRIVATE ${Protobuf_INCLUDE_DIRS})
 target_include_directories(loon PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 configure_file(../../api/messages.proto
                ${CMAKE_CURRENT_BINARY_DIR}/loon/messages.proto COPYONLY)
-add_library(loon-proto STATIC ${CMAKE_CURRENT_BINARY_DIR}/loon/messages.proto)
-target_include_directories(loon-proto PRIVATE ${Protobuf_INCLUDE_DIRS})
-target_include_directories(loon-proto PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+add_library(loon_proto STATIC ${CMAKE_CURRENT_BINARY_DIR}/loon/messages.proto)
+target_include_directories(loon_proto PRIVATE ${Protobuf_INCLUDE_DIRS})
+target_include_directories(loon_proto PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 protobuf_generate(
     LANGUAGE
     cpp
     TARGET
-    loon-proto
+    loon_proto
     OUT_VAR
     PROTOLOON_SOURCES
     IMPORT_DIRS
@@ -42,7 +42,7 @@ protobuf_generate(
     PROTOLOON_SOURCES)
 set_property(SOURCE ${PROTOLOON_SOURCES} PROPERTY SKIP_AUTOGEN ON)
 target_link_libraries(loon protobuf::libprotobuf)
-target_link_libraries(loon loon-proto)
+target_link_libraries(loon loon_proto)
 
 set_property(TARGET loon PROPERTY CXX_STANDARD 17)
 set_property(TARGET loon PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -66,7 +66,7 @@ if(LOON_BUILD_TESTS)
     target_include_directories(loon_test PRIVATE ${Protobuf_INCLUDE_DIRS})
     target_include_directories(loon_test PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_link_libraries(loon_test protobuf::libprotobuf)
-    target_link_libraries(loon_test loon-proto)
+    target_link_libraries(loon_test loon_proto)
     target_link_libraries(loon_test GTest::gmock_main)
     target_include_directories(loon_test PRIVATE ${gtest_SOURCE_DIR}/include
                                                  ${gtest_SOURCE_DIR})
