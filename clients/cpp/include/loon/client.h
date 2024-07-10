@@ -130,6 +130,17 @@ public:
      * if the content is not registered with this client.
      */
     virtual void unregister_content(std::shared_ptr<ContentHandle> handle) = 0;
+
+    /**
+     * @brief Unregisters all registered content from this client.
+     *
+     * Does nothing if the client is not connected or no content is registered.
+     * Does not throw any exception.
+     *
+     * @param with_callbacks If true, call all unregistered callbacks.
+     * Otherwise content's unregistered callbacks are not called.
+     */
+    virtual void unregister_all_content(bool with_callbacks = true) = 0;
 };
 
 struct ClientOptions
@@ -228,6 +239,11 @@ public:
         std::shared_ptr<ContentHandle> handle) override
     {
         return m_impl->unregister_content(handle);
+    }
+
+    void unregister_all_content(bool with_callbacks = true) override
+    {
+        return m_impl->unregister_all_content(with_callbacks);
     }
 
 private:

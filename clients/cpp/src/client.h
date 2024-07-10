@@ -45,6 +45,8 @@ public:
 
     void unregister_content(std::shared_ptr<ContentHandle> handle) override;
 
+    void unregister_all_content(bool with_callbacks = true) override;
+
 protected:
     // Methods that should be accessible from tests.
 

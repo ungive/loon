@@ -269,6 +269,46 @@ TEST(Client, UnregisteredCallbackIsCalledWhenUnregistering)
     client->unregister_content(handle);
 }
 
+TEST(Client, UnregisteredCallbackIsCalledWhenUnregisteringAll)
+{
+    auto client = create_client();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    ExpectCalled callback;
+    handle->unregistered(callback.get());
+    client->unregister_all_content();
+}
+
+TEST(Client, UnregisteredCallbackIsNotCalledWhenUnregisteringAllWithoutCalls)
+{
+    auto client = create_client();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    ExpectCalled callback(0);
+    handle->unregistered(callback.get());
+    client->unregister_all_content(false);
+}
+
+TEST(Client, UrlIsInvalidWhenContentIsUnregistered)
+{
+    auto client = create_client();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    client->unregister_content(handle);
+    auto response = http_get(handle->url());
+    EXPECT_NE(200, response.status);
+}
+
+TEST(Client, UrlIsInvalidWhenAllContentIsUnregistered)
+{
+    auto client = create_client();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    client->unregister_all_content();
+    auto response = http_get(handle->url());
+    EXPECT_NE(200, response.status);
+}
+
 TEST(Client, UnregisteredCallbackIsCalledWhenSetAfterUnregistering)
 {
     auto client = create_client();

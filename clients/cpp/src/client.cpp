@@ -209,6 +209,19 @@ void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
     m_content.erase(it);
 }
 
+void loon::ClientImpl::unregister_all_content(bool with_callbacks)
+{
+    std::unique_lock<std::recursive_mutex> lock(m_mutex);
+
+    for (auto& [_, content] : m_content) {
+        if (with_callbacks) {
+            content->unregistered();
+        }
+        content->request_handler()->exit_gracefully();
+    }
+    m_content.clear();
+}
+
 bool ClientImpl::send(ClientMessage const& message)
 {
     std::lock_guard<std::mutex> lock(m_write_mutex);
