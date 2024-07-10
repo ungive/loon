@@ -432,6 +432,9 @@ void ClientImpl::on_websocket_message(std::string const& message)
 
     ServerMessage server_message;
     if (!server_message.ParseFromString(message)) {
+        // TODO better logging
+        std::cerr << "failed to parse message\n";
+
         // Failed to parse message, restart the connection.
         // TODO implicitly log error with global protobuf error handler.
         return internal_restart();
@@ -529,6 +532,8 @@ inline void ClientImpl::internal_restart()
 void loon::ClientImpl::fail(std::string const& message)
 {
     // TODO log message
+    std::cerr << "failed: " << message << "\n";
+
     internal_stop();
     if (m_failed_callback) {
         m_failed_callback();
