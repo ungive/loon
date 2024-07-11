@@ -61,6 +61,8 @@ public:
 class IClient
 {
 public:
+    virtual ~IClient() {};
+
     /**
      * @brief Connects to the server and maintains a connection.
      *

@@ -13,6 +13,8 @@ namespace loon::websocket
 class IClient
 {
 public:
+    virtual ~IClient() {};
+
     /**
      * @brief Sets the callback for when the connection is opened.
      *
