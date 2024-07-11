@@ -13,29 +13,15 @@
 
 using namespace loon;
 
-#define RECONNECT_DELAY_POLICY_EXPONENTIAL 2
-
-#define _DEFAULT_CONNECT_TIMEOUT 5000
-#define _DEFAULT_PING_INTERVAL 20000
-#define _DEFAULT_RECONNECT_MIN_DELAY 1000
-#define _DEFAULT_RECONNECT_MAX_DELAY 30000
-#define _DEFAULT_RECONNECT_DELAY_POLICY RECONNECT_DELAY_POLICY_EXPONENTIAL
-
 Client::Client(std::string const& address, ClientOptions options)
-    : m_impl{ std::make_unique<ClientImpl>(address, std::nullopt, options) }
+    : m_impl{ std::make_unique<ClientImpl>(address, options) }
 {
 }
 
-loon::Client::Client(
-    std::string const& address, std::string const& auth, ClientOptions options)
-    : m_impl{ std::make_unique<ClientImpl>(address, auth, options) }
-{
-}
-
-ClientImpl::ClientImpl(std::string const& address,
-    std::optional<std::string> const& auth,
-    ClientOptions options)
-    : m_address{ address }, m_auth{ auth }, m_options{ options }
+ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
+    : m_conn{ std::make_unique<websocket::Client>(
+          address, options.websocket_options) },
+      m_options{ options }
 {
     if (m_options.min_cache_duration.has_value() &&
         m_options.min_cache_duration.value() == 0) {
@@ -59,20 +45,18 @@ ClientImpl::ClientImpl(std::string const& address,
     if (m_options.max_upload_speed.has_value()) {
         throw std::runtime_error("not yet implemented");
     }
-
-    m_conn.onopen = std::bind(&ClientImpl::on_websocket_open, this);
-    m_conn.onmessage = std::bind(
-        &ClientImpl::on_websocket_message, this, std::placeholders::_1);
-    m_conn.onclose = std::bind(&ClientImpl::on_websocket_close, this);
-    m_conn.setConnectTimeout(_DEFAULT_CONNECT_TIMEOUT);
-    m_conn.setPingInterval(_DEFAULT_PING_INTERVAL);
-
-    // Disable logs (to file).
-    // TODO log handler: protobuf + outside
-    hlog_disable();
+    // Event handlers
+    m_conn->on_open(std::bind(&ClientImpl::on_websocket_open, this));
+    m_conn->on_close(std::bind(&ClientImpl::on_websocket_close, this));
+    m_conn->on_message(std::bind(
+        &ClientImpl::on_websocket_message, this, std::placeholders::_1));
 }
 
-ClientImpl::~ClientImpl() { stop(); }
+ClientImpl::~ClientImpl()
+{
+    //
+    stop();
+}
 
 void ClientImpl::start()
 {
@@ -231,7 +215,7 @@ bool ClientImpl::send(ClientMessage const& message)
         internal_restart();
         return false;
     }
-    int n = m_conn.send(result.data(), result.size(), WS_OPCODE_BINARY);
+    size_t n = m_conn->send_binary(result.data(), result.size());
     if (n <= 0) {
         std::cerr << "loon/send: failed to send message";
         internal_restart();
@@ -490,22 +474,7 @@ void ClientImpl::internal_start()
     if (update_connected(true)) {
         return;
     }
-    // Reconnect
-    reconn_setting_t reconnect;
-    reconn_setting_init(&reconnect);
-    reconnect.min_delay = _DEFAULT_RECONNECT_MIN_DELAY;
-    reconnect.max_delay = _DEFAULT_RECONNECT_MAX_DELAY;
-    reconnect.delay_policy = _DEFAULT_RECONNECT_DELAY_POLICY;
-    m_conn.setReconnect(&reconnect);
-    // Authorization
-    http_headers headers;
-    if (m_auth.has_value()) {
-        auto value = m_auth.value();
-        std::string auth = util::base64_encode(value);
-        headers["Authorization"] = "Basic " + auth;
-    }
-    // Open the connection
-    m_conn.open(m_address.c_str(), headers);
+    m_conn->start();
 }
 
 void ClientImpl::reset_connection_state()
@@ -532,8 +501,7 @@ void ClientImpl::internal_stop()
         return;
     }
     reset_connection_state();
-    m_conn.setReconnect(nullptr);
-    m_conn.close();
+    m_conn->stop();
 }
 
 inline void ClientImpl::internal_restart()

@@ -1,7 +1,10 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
+#include <map>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 
@@ -143,8 +146,84 @@ public:
     virtual void unregister_all_content(bool with_callbacks = true) = 0;
 };
 
+struct WebsocketOptions
+{
+    /**
+     * @brief A set of HTTP headers to use during connects.
+     */
+    std::map<std::string, std::string> headers{};
+
+    /**
+     * @brief Credentials for HTTP Basic authorization.
+     *
+     * Must be a RFC 7617 compliant value for Basic authorization credentials.
+     * Must not be base64-encoded, encoding is done by the implementation.
+     * The value must be a user-id and a password, separated by a single colon
+     * or a different value that are valid credentials.
+     *
+     * If this value is set, the Authorization header will be overwritten.
+     * No exception will be thrown if both an Authorization header
+     * and this field are set.
+     */
+    std::optional<std::string> basic_authorization;
+
+    /**
+     * @brief The delay between reconnects.
+     *
+     * If not set, the client will not attempt to reconnect after a close.
+     * Otherwise reconnect attempts are made in the given interval.
+     */
+    std::optional<std::chrono::milliseconds> reconnect_delay{};
+
+    /**
+     * @brief The maximum delay between reconnects
+     *
+     * If set, the reconnect delay will be continuously increased
+     * (exactly how is left to the implementation)
+     * until the maximum reconnect delay.
+     * If not set, the reconnect delay remains constant.
+     *
+     * reconnect_delay must be set. The value of max_reconnect_delay
+     * must be greater than reconnect_delay.
+     */
+    std::optional<std::chrono::milliseconds> max_reconnect_delay{};
+
+    /**
+     * @brief An in-memory CA certificate to authenticate the server.
+     *
+     * If this value is set, ca_certificate_path must be empty.
+     */
+    std::optional<std::vector<uint8_t>> ca_certificate;
+
+    /**
+     * @brief A path to a CA certificate to authenticate the server.
+     *
+     * If this value is set, ca_certificate must be empty.
+     */
+    std::optional<std::string> ca_certificate_path;
+
+    /**
+     * @brief The time after which a connection attempt times out.
+     *
+     * If not set, a sane default value is used.
+     */
+    std::optional<std::chrono::milliseconds> connect_timeout;
+
+    /**
+     * @brief The interval in which ping messages are sent.
+     *
+     * If not set, a sane default value is used.
+     */
+    std::optional<std::chrono::milliseconds> ping_interval;
+};
+
 struct ClientOptions
 {
+    /**
+     * @brief The underlying websocket options to use.
+     */
+    WebsocketOptions websocket_options{};
+
     /**
      * @brief The minimum duration for which
      * responses must be cached by the server, in seconds.
@@ -203,19 +282,7 @@ public:
      * Creates a new loon client with authentication credentials.
      *
      * @param address The websocket address to connect to.
-     * @param auth The HTTP Basic authentication string,
-     * a username and a password, separated by a colon.
-     * @param options Additional client options.
-     */
-    Client(std::string const& address,
-        std::string const& auth,
-        ClientOptions options = {});
-
-    /**
-     * Creates a new loon client without any authentication.
-     *
-     * @param address The websocket address to connect to.
-     * @param options Additional client options.
+     * @param options Client options.
      */
     Client(std::string const& address, ClientOptions options = {});
 

@@ -10,11 +10,10 @@
 #include <stdexcept>
 #include <string>
 
-#include <hv/WebSocketClient.h>
-
 #include "loon/client.h"
 #include "loon/messages.pb.h"
 #include "request_handler.h"
+#include "websocket/client.h"
 
 namespace loon
 {
@@ -23,9 +22,7 @@ class InternalContentHandle;
 class ClientImpl : public IClient
 {
 public:
-    ClientImpl(std::string const& address,
-        std::optional<std::string> const& auth,
-        ClientOptions options = {});
+    ClientImpl(std::string const& address, ClientOptions options = {});
 
     ~ClientImpl();
 
@@ -156,8 +153,6 @@ private:
      */
     void fail(std::string const& message);
 
-    const std::string m_address{};
-    const std::optional<std::string> m_auth{};
     const ClientOptions m_options{};
     std::chrono::milliseconds m_chunk_sleep_duration{
         std::chrono::milliseconds::zero()
@@ -193,7 +188,7 @@ private:
     // This must be done, so that it is destructed first,
     // since its callbacks might use data of this class instance.
     // Destructing other fields first would cause undefined behaviour.
-    hv::WebSocketClient m_conn{};
+    std::unique_ptr<websocket::Client> m_conn;
 
     void call_served_callback(decltype(m_requests)::iterator it);
 };

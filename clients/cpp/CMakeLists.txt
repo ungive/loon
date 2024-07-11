@@ -3,8 +3,22 @@ project("loon")
 
 option(LOON_BUILD_EXAMPLES "Build loon examples" ON)
 option(LOON_BUILD_TESTS "Build loon tests" ON)
+set(LOON_WEBSOCKET_BACKEND "LIBHV" CACHE STRING "Websocket backend")
+set_property(CACHE LOON_WEBSOCKET_BACKEND PROPERTY STRINGS "LIBHV" "QT")
 
-set(LIB_SOURCES src/client.cpp src/request_handler.cpp src/util.cpp)
+set(LIB_SOURCES src/client.cpp src/request_handler.cpp src/util.cpp
+                src/websocket/client.cpp)
+if(LOON_WEBSOCKET_BACKEND STREQUAL "LIBHV")
+    message("Using libhv as websocket backend")
+    list(APPEND LIB_SOURCES src/websocket/backend_libhv.cpp)
+    set(USE_LIBHV true)
+elseif(LOON_WEBSOCKET_BACKEND STREQUAL "QT")
+    message("Using QT as websocket backend")
+    list(APPEND LIB_SOURCES src/websocket/backend_qt.cpp)
+    set(USE_QTWEBSOCKETS true)
+else()
+    message(FATAL_ERROR "Wrong value of the option 'LOON_WEBSOCKET_BACKEND'")
+endif()
 
 add_library(loon STATIC ${LIB_SOURCES})
 add_library(loon::loon ALIAS loon)
@@ -17,8 +31,15 @@ find_package(OpenSSL REQUIRED)
 target_link_libraries(loon OpenSSL::SSL OpenSSL::Crypto)
 
 # libhv
-find_package(libhv CONFIG REQUIRED)
-target_link_libraries(loon hv)
+if(DEFINED USE_LIBHV)
+    include(FetchContent)
+    set(WITH_OPENSSL ON CACHE INTERNAL "use openssl")
+    FetchContent_Declare(libhv SOURCE_DIR
+                               ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libhv)
+    FetchContent_MakeAvailable(libhv)
+    target_link_libraries(loon hv_static)
+    target_compile_definitions(loon PRIVATE USE_LIBHV)
+endif()
 
 # protobuf + protocol buffers
 set(Protobuf_USE_STATIC_LIBS ON CACHE BOOL "Override option" FORCE)

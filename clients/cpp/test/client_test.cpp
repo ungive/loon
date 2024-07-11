@@ -49,8 +49,8 @@ public:
 static std::shared_ptr<TestClient> create_client(
     ClientOptions options = {}, bool started = true)
 {
-    auto client =
-        std::make_shared<TestClient>(TEST_ADDRESS, TEST_AUTH, options);
+    options.websocket_options.basic_authorization = TEST_AUTH;
+    auto client = std::make_shared<TestClient>(TEST_ADDRESS, options);
     if (started) {
         client->start();
     }
@@ -425,20 +425,6 @@ TEST(Client, FailsWhenMinCacheDurationIsSetButResponseIsNotCached)
     handle->served(served.get());
     http_get(handle->url());
     http_get(handle->url());
-}
-
-static void print_timestamp(std::string const& prefix = "")
-{
-    using namespace std::chrono;
-
-    auto t = system_clock::now();
-    auto t_ = system_clock::to_time_t(t);
-    auto ms = duration_cast<milliseconds>(t.time_since_epoch()) % 1000;
-    if (prefix.size() > 0) {
-        std::cerr << prefix << ": ";
-    }
-    std::cerr << std::put_time(gmtime(&t_), "%F %T") << '.' << std::setfill('0')
-              << std::setw(3) << ms.count() << std::endl;
 }
 
 TEST(Client, FailsWhenMaxRequestsPerSecondIsSetAndRequestsAreTooFrequent)

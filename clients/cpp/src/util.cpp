@@ -4,9 +4,12 @@
 #include <array>
 #include <string>
 
-#include <hv/base64.h>
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
+
+#if defined(USE_LIBHV)
+#include <hv/base64.h>
+#endif
 
 std::string util::hmac_sha256(std::string_view msg, std::string_view key)
 {
@@ -43,8 +46,12 @@ std::string util::base64_raw_url_encode(std::string const& text)
 
 std::string util::base64_encode(std::string const& text)
 {
+#if defined(USE_LIBHV)
     auto str = reinterpret_cast<const unsigned char*>(text.c_str());
     auto len = static_cast<unsigned int>(std::min(text.size(),
         static_cast<size_t>(std::numeric_limits<unsigned int>::max())));
     return hv::Base64Encode(str, len);
+#else
+#error Missing base64 implementation
+#endif
 }

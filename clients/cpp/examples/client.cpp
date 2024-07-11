@@ -9,12 +9,21 @@ int main()
 {
     const uint32_t cache_duration = 30;
 
+    // std::string address = "wss://echo.websocket.org";
+    // options.min_cache_duration = (cache_duration * 4) / 5;
+    // options.max_requests_per_second = 1.0f;
+
+    std::string address = "wss://localhost/ws";
     loon::ClientOptions options;
-    options.min_cache_duration = (cache_duration * 4) / 5;
-    options.max_requests_per_second = 1.0f;
-    std::string address = "ws://127.0.0.1:80/ws";
-    std::string auth = "loon-client:qadjB4GeRyUSEjbj6ZFWwOiDtjLq";
-    loon::Client client(address, auth, options);
+    options.websocket_options.basic_authorization =
+        "loon-client:qadjB4GeRyUSEjbj6ZFWwOiDtjLq";
+    options.websocket_options.ca_certificate_path =
+        "W:\\dev\\projects\\loon\\deployments\\cert.pem";
+    options.websocket_options.connect_timeout = 5000ms;
+    options.websocket_options.ping_interval = 20000ms;
+    options.websocket_options.reconnect_delay = 1000ms;
+    options.websocket_options.max_reconnect_delay = 30000ms;
+    loon::Client client(address, options);
     client.start();
 
     std::string content = "<h1>It works!";
@@ -33,10 +42,10 @@ int main()
 
     std::cout << "URL: " << handle->url() << "\n";
 
-    std::this_thread::sleep_for(2s);
+    std::this_thread::sleep_for(300s);
 
     std::cout << "Unregistering content" << std::endl;
-    client.unregister_content(handle);
+    // client.unregister_content(handle);
     std::this_thread::sleep_for(1s);
 
     std::cout << "Stopping client" << std::endl;
