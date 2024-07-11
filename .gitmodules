@@ -5,3 +5,5 @@
 [submodule "clients/cpp/third_party/libhv"]
 	path = clients/cpp/third_party/libhv
 	url = git@github.com:ithewei/libhv.git
+	tag = v1.3.2
+	ignore = dirty
