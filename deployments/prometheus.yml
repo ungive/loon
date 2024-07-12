@@ -3,10 +3,8 @@ global:
 
 scrape_configs:
   - job_name: "prometheus"
-    metrics_path: /metrics
     static_configs:
       - targets: ["localhost:9090"]
-  - job_name: "caddy-cache"
-    metrics_path: /api/caddy/cache/metrics
+  - job_name: "caddy"
     static_configs:
-      - targets: ["caddy:80"]
+      - targets: ["caddy:8080"]

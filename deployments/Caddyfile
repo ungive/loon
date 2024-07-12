@@ -2,25 +2,39 @@
 	order cache after rewrite
 	order cache after header
 
-	servers {
+	servers :8080 {
+		name metrics
+		metrics
+	}
+
+	servers :443 {
+		name proxy
+		metrics
+	}
+
+	servers :444 {
+		name clients
 		metrics
 	}
 
 	cache {
 		allowed_http_verbs GET
-		api {
-			basepath /api/caddy/cache
-			prometheus
-		}
 	}
 }
 
+:8080 {
+	metrics /metrics
+}
+
 :80 {
+	redir https://{host}{uri}
+}
+
+:443 {
+	# use a certificate from a globally trusted CA here during production.
+	tls /cert.pem /privkey.pem
 	handle /ws {
-		basic_auth bcrypt {
-			{$HTTP_WS_USER} {$HTTP_WS_PASS_BCRYPT}
-		}
-		reverse_proxy loon:80
+		respond 401
 	}
 	handle {
 		cache {
@@ -39,5 +53,18 @@
 			default_cache_control no-store
 		}
 		reverse_proxy loon:80
+	}
+}
+
+:444 {
+	tls /cert.pem /privkey.pem
+	handle /ws {
+		basic_auth bcrypt {
+			{$HTTP_WS_USER} {$HTTP_WS_PASS_BCRYPT}
+		}
+		reverse_proxy loon:80
+	}
+	handle {
+		respond 401
 	}
 }

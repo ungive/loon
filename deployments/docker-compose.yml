@@ -12,11 +12,16 @@ services:
     env_file:
       - caddy.env
     ports:
-      - "80:80"
+      - "80:80" # http -> https
+      - "8080:8080" # metrics
       - "443:443"
       - "443:443/udp"
+      - "444:444"
+      - "444:444/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./privkey.pem:/privkey.pem
+      - ./cert.pem:/cert.pem
       - caddy_data:/data
       - caddy_config:/config
   prometheus:
