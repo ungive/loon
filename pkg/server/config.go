@@ -166,6 +166,9 @@ func (c *ProtocolConstraints) Validate() error {
 				"content type must be lowercase and contain no spaces")
 		}
 	}
+	if structs.HasZero(c) {
+		return ErrUnsetConfigFields
+	}
 	if *c.MaxCacheDuration < 0 {
 		return errors.New("maximum cache duration must be positive")
 	}
