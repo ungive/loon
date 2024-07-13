@@ -252,9 +252,16 @@ void ClientImpl::on_hello(Hello const& hello)
     };
 
     assert(m_hello->has_constraints());
-    if (m_options.min_cache_duration.has_value() &&
-        !m_hello->constraints().response_caching()) {
-        return fail("the server does not support response caching");
+    if (m_options.min_cache_duration.has_value()) {
+        auto min = m_options.min_cache_duration.value();
+        auto max = m_hello->constraints().max_cache_duration();
+        if (max == 0) {
+            return fail("the server does not support response caching");
+        }
+        if (min > max) {
+            return fail(
+                "the server does not cache responses for the desired duration");
+        }
     }
 
     m_cv_connection_ready.notify_all();

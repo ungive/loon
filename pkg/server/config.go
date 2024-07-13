@@ -27,10 +27,14 @@ type ProtocolOptions struct {
 }
 
 type ProtocolConstraints struct {
-	ChunkSize            uint64   `json:"chunk_size"`
-	MaxContentSize       uint64   `json:"max_content_size"`
-	AcceptedContentTypes []string `json:"accepted_content_types"`
-	ResponseCaching      *bool    `json:"response_caching"`
+	ChunkSize            uint64         `json:"chunk_size"`
+	MaxContentSize       uint64         `json:"max_content_size"`
+	AcceptedContentTypes []string       `json:"accepted_content_types"`
+	MaxCacheDuration     *time.Duration `json:"max_cache_duration"`
+}
+
+func (c *ProtocolConstraints) MaxCacheDurationInt() uint32 {
+	return max(0, uint32(c.MaxCacheDuration.Round(time.Second).Seconds()))
 }
 
 func (c *ProtocolConstraints) Proto() *pb.Constraints {
@@ -38,7 +42,7 @@ func (c *ProtocolConstraints) Proto() *pb.Constraints {
 		ChunkSize:            c.ChunkSize,
 		MaxContentSize:       c.MaxContentSize,
 		AcceptedContentTypes: c.AcceptedContentTypes,
-		ResponseCaching:      *c.ResponseCaching,
+		MaxCacheDuration:     c.MaxCacheDurationInt(),
 	}
 }
 
@@ -162,8 +166,12 @@ func (c *ProtocolConstraints) Validate() error {
 				"content type must be lowercase and contain no spaces")
 		}
 	}
-	if structs.HasZero(c) {
-		return ErrUnsetConfigFields
+	if *c.MaxCacheDuration < 0 {
+		return errors.New("maximum cache duration must be positive")
+	}
+	seconds := c.MaxCacheDuration.Seconds()
+	if seconds-float64(uint64(seconds)) > 0.001 {
+		return errors.New("maximum cache duration must be in seconds")
 	}
 	return nil
 }

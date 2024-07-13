@@ -215,7 +215,7 @@ func (s *serverImpl) serve(
 	// Set cache control headers.
 	maxAge := uint32(0)
 	if cacheFor := response.Header().MaxCacheDuration; cacheFor != nil {
-		maxAge = *cacheFor
+		maxAge = min(*cacheFor, s.config.Protocol.Constraints.MaxCacheDurationInt())
 	}
 	w.Header().Set("Age", "0") // The data is always recent
 	if maxAge == 0 {

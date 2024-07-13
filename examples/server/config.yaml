@@ -7,7 +7,7 @@ protocol:
       - text/html
       - image/png
       - image/jpeg
-    response_caching: false
+    max_cache_duration: 30s
   intervals:
     write_wait: 10s
     pong_wait: 60s

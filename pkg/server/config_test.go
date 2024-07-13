@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/ungive/loon/pkg/server"
@@ -38,10 +39,10 @@ func newConfigConstraints() *server.ProtocolConstraints {
 		AcceptedContentTypes: []string{
 			"text/html",
 		},
-		ResponseCaching: boolPtr(false),
+		MaxCacheDuration: durationPtr(time.Duration(0)),
 	}
 }
 
-func boolPtr(v bool) *bool {
+func durationPtr(v time.Duration) *time.Duration {
 	return &v
 }

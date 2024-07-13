@@ -252,8 +252,7 @@ TEST(Client, ServerServesContentWhenRegisteredWithClient)
     auto response = http_get(handle->url());
     EXPECT_EQ(content, response.body);
     EXPECT_EQ(content_type, response.headers["Content-Type"]);
-    EXPECT_EQ("max-age=" + std::to_string(cache_duration),
-        response.headers["Cache-Control"]);
+    EXPECT_EQ("no-store", response.headers["Cache-Control"]);
     EXPECT_EQ("attachment; filename=\"page.html\"",
         response.headers["Content-Disposition"]);
     EXPECT_EQ(200, response.status);
@@ -387,7 +386,7 @@ TEST(Client, FailsWhenMinCacheDurationIsSetAndServerDoesNotCacheResponses)
     options.min_cache_duration = 10;
     auto client = create_client(options, false);
     client->inject_hello_modifier([](Hello& hello) {
-        hello.mutable_constraints()->set_response_caching(false);
+        hello.mutable_constraints()->set_max_cache_duration(0);
     });
     ExpectCalled callback;
     client->failed(callback.get());
@@ -406,13 +405,13 @@ TEST(Client, FailsWhenMinCacheDurationIsSetButResponseIsNotCached)
     options.min_cache_duration = cache_duration / 2;
     auto client = create_client(options, false);
     client->inject_hello_modifier([](Hello& hello) {
-        if (hello.constraints().response_caching()) {
+        if (hello.constraints().max_cache_duration() > 0) {
             FAIL() << "the test server is expected to not cache responses";
         }
         // The real test server does not cache responses,
         // but for the sake of the test, we pretend it does.
         // This would resemble a server that claims to cache, but doesn't.
-        hello.mutable_constraints()->set_response_caching(true);
+        hello.mutable_constraints()->set_max_cache_duration(30);
     });
     ExpectCalled failed;
     client->failed(failed.get());

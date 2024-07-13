@@ -15,7 +15,7 @@ var defaultConfig = &server.Options{
 			MaxContentSize:       64 * 1024 * 1024, // 64 MiB
 			ChunkSize:            64 * 1024,        // 64 KiB
 			AcceptedContentTypes: defaultContentTypes,
-			ResponseCaching:      boolPtr(false),
+			MaxCacheDuration:     durationPtr(time.Duration(0)), // no caching by default
 		},
 		Intervals: &server.ProtocolIntervals{
 			WriteTimeout:          10 * time.Second,
@@ -39,8 +39,8 @@ func logLevelPtr(level slog.Level) *slog.Level {
 	return &level
 }
 
-func boolPtr(value bool) *bool {
-	return &value
+func durationPtr(v time.Duration) *time.Duration {
+	return &v
 }
 
 // Some common MIME types/HTTP content types. Not exhaustive.
