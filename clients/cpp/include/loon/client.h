@@ -170,6 +170,34 @@ struct WebsocketOptions
     std::optional<std::string> basic_authorization;
 
     /**
+     * @brief A path to a CA certificate to authenticate the server.
+     *
+     * If this value is set, ca_certificate must be empty.
+     */
+    std::optional<std::string> ca_certificate_path;
+
+    /**
+     * @brief An in-memory CA certificate to authenticate the server.
+     *
+     * If this value is set, ca_certificate_path must be empty.
+     */
+    std::optional<std::vector<uint8_t>> ca_certificate;
+
+    /**
+     * @brief The time after which a connection attempt times out.
+     *
+     * If not set, a sane default value is used.
+     */
+    std::optional<std::chrono::milliseconds> connect_timeout;
+
+    /**
+     * @brief The interval in which ping messages are sent.
+     *
+     * If not set, a sane default value is used.
+     */
+    std::optional<std::chrono::milliseconds> ping_interval;
+
+    /**
      * @brief The delay between reconnects.
      *
      * If not set, the client will not attempt to reconnect after a close.
@@ -189,34 +217,6 @@ struct WebsocketOptions
      * must be greater than reconnect_delay.
      */
     std::optional<std::chrono::milliseconds> max_reconnect_delay{};
-
-    /**
-     * @brief An in-memory CA certificate to authenticate the server.
-     *
-     * If this value is set, ca_certificate_path must be empty.
-     */
-    std::optional<std::vector<uint8_t>> ca_certificate;
-
-    /**
-     * @brief A path to a CA certificate to authenticate the server.
-     *
-     * If this value is set, ca_certificate must be empty.
-     */
-    std::optional<std::string> ca_certificate_path;
-
-    /**
-     * @brief The time after which a connection attempt times out.
-     *
-     * If not set, a sane default value is used.
-     */
-    std::optional<std::chrono::milliseconds> connect_timeout;
-
-    /**
-     * @brief The interval in which ping messages are sent.
-     *
-     * If not set, a sane default value is used.
-     */
-    std::optional<std::chrono::milliseconds> ping_interval;
 };
 
 struct ClientOptions
