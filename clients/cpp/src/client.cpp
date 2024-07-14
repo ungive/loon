@@ -24,8 +24,10 @@ ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
       m_options{ options }
 {
     if (m_options.min_cache_duration.has_value() &&
-        m_options.min_cache_duration.value() == 0) {
-        throw std::runtime_error("the minimum cache duration cannot be zero");
+        m_options.min_cache_duration.value() <=
+            std::chrono::milliseconds::zero()) {
+        throw std::runtime_error(
+            "the minimum cache duration must be greater than zero");
     }
     if (m_options.max_requests_per_second.has_value() &&
         m_options.max_requests_per_second.value() <= 0.001) {
@@ -253,7 +255,7 @@ void ClientImpl::on_hello(Hello const& hello)
 
     assert(m_hello->has_constraints());
     if (m_options.min_cache_duration.has_value()) {
-        auto min = m_options.min_cache_duration.value();
+        auto min = m_options.min_cache_duration.value().count();
         auto max = m_hello->constraints().max_cache_duration();
         if (max == 0) {
             return fail("the server does not support response caching");

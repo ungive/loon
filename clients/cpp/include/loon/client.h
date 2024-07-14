@@ -236,7 +236,7 @@ struct ClientOptions
      *
      * The client also fails if the server does not support caching.
      */
-    std::optional<uint32_t> min_cache_duration{};
+    std::optional<std::chrono::seconds> min_cache_duration{};
 
     /**
      * @brief The maximum number of requests to handle per second.

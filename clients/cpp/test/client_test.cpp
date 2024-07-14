@@ -383,7 +383,7 @@ TEST(Client, NoActiveRequestsWhenHandleUrlRequestIsCanceled)
 TEST(Client, FailsWhenMinCacheDurationIsSetAndServerDoesNotCacheResponses)
 {
     ClientOptions options;
-    options.min_cache_duration = 10;
+    options.min_cache_duration = std::chrono::seconds{ 10 };
     auto client = create_client(options, false);
     client->inject_hello_modifier([](Hello& hello) {
         hello.mutable_constraints()->set_max_cache_duration(0);
@@ -402,7 +402,7 @@ TEST(Client, FailsWhenMinCacheDurationIsSetButResponseIsNotCached)
 {
     uint32_t cache_duration = 10;
     ClientOptions options;
-    options.min_cache_duration = cache_duration / 2;
+    options.min_cache_duration = std::chrono::seconds{ cache_duration / 2 };
     auto client = create_client(options, false);
     client->inject_hello_modifier([](Hello& hello) {
         if (hello.constraints().max_cache_duration() > 0) {

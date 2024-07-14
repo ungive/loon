@@ -21,7 +21,7 @@ public:
         std::chrono::milliseconds chunk_sleep{
             std::chrono::milliseconds::zero()
         };
-        std::optional<uint32_t> min_cache_duration{};
+        std::optional<std::chrono::seconds> min_cache_duration{};
     };
 
     /**

@@ -175,7 +175,7 @@ void RequestHandler::serve_request(
         auto then = m_last_request.value();
         auto elapsed = now - then;
         assert(now - then >= 0ms);
-        std::chrono::seconds duration{ m_options.min_cache_duration.value() };
+        auto duration = m_options.min_cache_duration.value();
         if (elapsed <= duration) {
             throw ResponseNotCachedException(
                 "the server does not seem to cache previous responses for a "
