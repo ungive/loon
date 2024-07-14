@@ -288,24 +288,23 @@ public:
      */
     Client(std::string const& address, ClientOptions options = {});
 
-    void Client::start() override { return m_impl->start(); }
+    void start() override { return m_impl->start(); }
 
-    void Client::stop() override { return m_impl->stop(); }
+    void stop() override { return m_impl->stop(); }
 
-    void loon::Client::failed(std::function<void()> callback) override
+    void failed(std::function<void()> callback) override
     {
         return m_impl->failed(callback);
     }
 
-    std::shared_ptr<ContentHandle> Client::register_content(
+    std::shared_ptr<ContentHandle> register_content(
         std::shared_ptr<loon::ContentSource> source,
         loon::ContentInfo const& info) override
     {
         return m_impl->register_content(source, info);
     }
 
-    void Client::unregister_content(
-        std::shared_ptr<ContentHandle> handle) override
+    void unregister_content(std::shared_ptr<ContentHandle> handle) override
     {
         return m_impl->unregister_content(handle);
     }
