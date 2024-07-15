@@ -14,27 +14,41 @@ It acts like a **tunnel for HTTP traffic**,
 but with a very minimal and lightweight implementation behind it,
 ideal to keep your client small and lean.
 
-## License
-
-Project is still a WIP, a license will be added soon!
-
 ## Usage
 
-### Start a server
+### Run the server
+
+To expose the server to your local network,
+change the valeu after `-addr` to `:8080`
+and edit `base_url` in the example configuration
+to contain your computer's IP address and the configured port,
+e.g. `http://192.168.178.2:8080`.
+
+#### Using Go
 
 ```sh
 git clone https://github.com/ungive/loon
 cd ./loon
 go install ./cmd/loon
-loon server -addr localhost:8080 -config examples/server/config.yaml | hl -F
+loon server -addr localhost:8080 -config examples/server/config.yaml
 ```
 
-To run the server on your local network, change `addr` to `:8080`
-and edit the example configuration
-to contain your computer's IP address and the configured port for `base_url`,
-e.g. `http://192.168.178.2:8080`.
-Output is piped to [`hl`](https://github.com/pamburus/hl),
-which is a log formatter for JSON logs.
+#### Using Docker
+
+Build the image yourself:
+
+```sh
+docker build -t loon -f build/package/Dockerfile .
+docker run --rm -it -v $(pwd)/examples/server/config.yaml:/app/config.yaml -p 8080:80 ungive/loon:latest
+loon client -server http://localhost:8080 assets/loon-small.png
+```
+
+Or use a pre-built image from the GitHub Container Registry
+(not updated regularly yet):
+
+```sh
+docker run --rm -it -v $(pwd)/examples/server/config.yaml:/app/config.yaml -p 8080:80 ghcr.io/ungive/loon:latest
+```
 
 ### Run the client
 
@@ -43,29 +57,59 @@ loon client -server http://localhost:8080 assets/loon-small.png
 loon client -server http://192.168.178.43:8080 assets/loon-small.png assets/loon-full.png
 ```
 
-### Dockerized
+Example output:
 
-```sh
-make build-image
-docker run --rm -it -v $(pwd)/examples/server/config.yaml:/app/config.yaml -p 8080:80 ungive/loon:latest
-loon client -server http://localhost:8080 assets/loon-small.png
+```
+assets/loon-small.png: http://localhost:8080/BnRWzVodwVmY11V7MXQ-Mw/f7AapwFxVSwlHgiTungSpqFNkb_jAdkhvGVGaNeoWJc/loon-small.png
 ```
 
-or using a pre-built image from the GitHub Container Registory:
+Open the URL in a browser and it should show the file's contents.
 
-```sh
-docker run --rm -it -v $(pwd)/examples/server/config.yaml:/app/config.yaml -p 8080:80 ghcr.io/ungive/loon:latest
-```
+## What is in this repository?
+
+- System and protocol specification: **[api](./api)**
+- A well-tested server library written in Go: **[pkg/server](./pkg/server)**
+- A simple reference client library written in Go: **[pkg/client](./pkg/client)**
+- A CLI program to run the server and client: **[cmd/loon](./cmd/loon)**
+  - It makes use of the above server and client library
+- A more feature-complete client library written in C++:
+  **[clients/cpp](./clients/cpp)**
+  - Well-tested and has more features than the reference client implementation
+  - Dependencies: OpenSSL + libhv or Qt for websocket communication
+  - Compatible with C++17 or newer
+  - Uses the CMake build system
+- A ready to use server Docker image:
+  **[build/package/Dockerfile](./build/package/Dockerfile)**
+- A server deployment example with Docker Compose and Caddy:
+  **[deployments](./deployments)**
+- An example server configuration to quickly get started:
+  **[examples/server/config.yaml](./examples/server/config.yaml)**
+
+> **Warning!**  
+> The public API of these libraries and programs
+> is not yet stable and might change in the future.
+> Wait for the first stable release, if a stable API is required.
 
 ### Deployment
 
-For a deployment example, see
-[`deployments`](./deployments).
+For a docker compose deployment example, see [`deployments`](./deployments).
+Features:
 
-## The problem
+- Uses Caddy server (similar to nginx)
+- Client responses are cached (using Souin cache)
+- Prometheus and Grafana integration for metrics
+- The websocket endpoint is authenticated,
+  so only trusted clients can connect to the server
+- Uses a self-signed certificate for websocket connections,
+  so clients can authenticate the server
+- Generated URLs are exposed via HTTPS with a certificate from a trusted CA
+  (thanks to Caddy), so traffic is encrypted everywhere
 
-To start, here is a problem description,
-to best understand what this software does:
+## What problem does this solve?
+
+To better understand the aim of this software
+and what problem it tries to solve,
+read the following problem statement:
 
 You want a **local file** on your computer
 to be **publicly accessible from the internet**
@@ -73,63 +117,40 @@ by generating **a simple HTTP(S) URL** for it,
 which points to a well-known server
 that acts as the middleman for file transfers.
 Files should only be uploaded
-when they are actually requested via that URL.
+when they are actually requested via that URL
+and they should not be stored on the server indefinitely.
 
 This should be possible without:
 - exposing your local computer to the internet,
-- having to start an HTTP server and binding to a port locally,
+- having to start an HTTP server and binding to a port on the local device,
 - having to use sophisticated tunneling software,
-  which does more than you actually want it to.
+  which does more than you actually want it to,
+- or using some kind of image uploading service.
 
 At the same time you want to have guaranteed protection from abuse:
 - multiple requests to the same generated URL
-  should use an optionally cached response,
+  should use an optionally cached response on the server,
   so that you only have to upload your file once,
-  within a given period of time
+  within a given period of time.
 - simultaneous requests to the same URL
-  should only require you to upload once, not multiple times
+  should only require you to upload once, not multiple times.
 - requests to invalid URLs (not generated by you)
-  should be ignored by the server
+  should be ignored by the server.
 
-You do not need file contents to be end-to-end encrypted,
-it is okay for any third party to see what it is in the file
-(the intermediate server included).
+File contents do not need to be end-to-end encrypted,
+it is okay for any third party to see what it is in the file,
+including the intermediate server and anyone in possession of a generated URL.
 
 ## The solution
 
 The proposed solution is a server that acts as a middleman,
 which accepts requests to a well-known HTTPS endpoint
-and forwards them to you (the client) through a websocket connection.
-You then send the image data back through that connection,
-which is then sent to the server.
+and forwards them to a client through a websocket connection.
+The client then sends the image data back through that connection,
+which is then sent to whoever made the request.
 
 The protocol is described in full detail in
 **[api/specification.md](./api/specification.md)**.
-
-For instructions on how to use each of the following solutions,
-read the [**Usage**](#usage) section below.
-
-A reference **server implementation** is provided in `Golang`.
-The source code can be found in the [`pkg/server`](./pkg/server) directory.
-It has the following features:
-
-- A well-tested server protocol implementation
-  (89.7% test coverage for [`client.go`](./pkg/server/client.go) so far)
-  - **`TODO`** *add tests for the entire server
-    and add automated test coverage README badge*
-- A ready-to-use Docker image and docker-compose file
-  - **`TODO`** *not available yet*
-
-**`TODO`** A **client library** is provided in `C++`.
-The source code can be found in the [`clients/cpp`](./clients/cpp) directory.
-
-**`TODO`** A reference **client implementation** in `Go`
-may be provided in the future in the [`pkg/client`](./pkg/client) directory.
-
-More client implementations may follow,
-namely a JavaScript implementation for the server (Node)
-and the browser, so it can be used more widely for other use cases.
-Contributions are welcome!
 
 ## Use cases
 
@@ -171,6 +192,10 @@ the number of other use cases are limited,
 but it could certainly be used for other things as well.
 If you have any ideas or if you are using this software for another use case,
 feel free to open an issue to bring it to my attention!
+
+## License
+
+Project is still a WIP, a license will be added soon!
 
 ## Copyright
 
