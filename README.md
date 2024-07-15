@@ -75,7 +75,7 @@ Open the URL in a browser and it should show the file's contents.
 - A more feature-complete client library written in C++:
   **[clients/cpp](./clients/cpp)**
   - Well-tested and has more features than the reference client implementation
-  - Dependencies: OpenSSL + libhv or Qt for websocket communication
+  - Dependencies: libhv or Qt for websocket communication + OpenSSL + Protobuf
   - Compatible with C++17 or newer
   - Uses the CMake build system
 - A ready to use server Docker image:
