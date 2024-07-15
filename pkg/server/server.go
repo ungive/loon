@@ -107,8 +107,9 @@ func (s *serverImpl) serveWs(w http.ResponseWriter, r *http.Request) {
 func (s *serverImpl) serveRequest(w http.ResponseWriter, r *http.Request) {
 	index := requestIndex.Add(1)
 	log := s.log.With("context", "request", "index", index)
-	if !s.contentTypes.CanServeAccept(r.Header.Get("Accept")) {
-		log := s.log.With("accept", r.Header.Get("Accept"))
+	accept := r.Header.Get("Accept")
+	if len(accept) > 0 && !s.contentTypes.CanServeAccept(accept) {
+		log := s.log.With("accept", accept)
 		status(w, http.StatusNotAcceptable,
 			"not serving any acceptable content type", log, nil)
 		return
