@@ -24,6 +24,17 @@
     If there's a cache in front of it it's e.g. probably a good idea,
     to keep a connection open between the server and the cache,
     instead of opening a new connection every time.
+- [ ] Add a feature to "prepopulate" the cache:
+    The client makes a request to the URL, but maybe a special URL,
+    which causes the server to request and cache the response,
+    but the response is not unnecessarily forwarded to the client.
+    Basically a "HEAD" HTTP request, which populates the cache.
+    This would be useful to trigger an immediate upload of the data,
+    in case the upload might take longer.
+    Basically allowing loon to be an "opt-in temporary upload service".
+    Could be done with `content_handle->populate_cache();`?
+    What if the cache expires?
+    Maybe add a "minimum cache duration" *per content*?
 - [ ] Add versioning to the server and client libraries.
     Perhaps make releases on GitHub.
 
