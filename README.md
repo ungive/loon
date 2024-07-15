@@ -79,6 +79,7 @@ Open the URL in a browser and it should show the file's contents.
   - Compatible with C++17 or newer
   - Uses the CMake build system
   - Less than 2.000 lines of code: 1.319 lines for commit `751c25`
+  - Documentation: *https://ungive.github.io/loon/clients/cpp*
 - A ready to use server Docker image:
   **[build/package/Dockerfile](./build/package/Dockerfile)**
 - A server deployment example with Docker Compose and Caddy:
