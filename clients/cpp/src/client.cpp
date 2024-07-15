@@ -419,6 +419,8 @@ void ClientImpl::on_websocket_open()
 
     // TODO better logging
     std::cerr << "connection opened\n";
+
+    update_connected(true);
 }
 
 void ClientImpl::on_websocket_close()
