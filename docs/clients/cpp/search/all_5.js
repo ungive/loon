@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['max_5fcache_5fduration_12',['max_cache_duration',['../structloon_1_1_content_info.html#aeb48c220125c8223bfd262016a38234e',1,'loon::ContentInfo']]]
+  ['headers_19',['headers',['../structloon_1_1_websocket_options.html#a6a7cda44014ea6893816139541f91a51',1,'loon::WebsocketOptions']]]
 ];

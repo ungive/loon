@@ -90,14 +90,58 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a45970b702e6fae206a0ae6256323b414"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_i_client.html#a45970b702e6fae206a0ae6256323b414">stop</a> ()=0</td></tr>
 <tr class="memdesc:a45970b702e6fae206a0ae6256323b414"><td class="mdescLeft">&#160;</td><td class="mdescRight">Stops the client and disconnects from the server.  <a href="classloon_1_1_i_client.html#a45970b702e6fae206a0ae6256323b414">More...</a><br /></td></tr>
 <tr class="separator:a45970b702e6fae206a0ae6256323b414"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:afb6518e3ee658e0baa8ba2795fe020a1"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_i_client.html#afb6518e3ee658e0baa8ba2795fe020a1">failed</a> (std::function&lt; void()&gt; callback)=0</td></tr>
+<tr class="memdesc:afb6518e3ee658e0baa8ba2795fe020a1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sets a callback for when the client has unrecoverably failed.  <a href="classloon_1_1_i_client.html#afb6518e3ee658e0baa8ba2795fe020a1">More...</a><br /></td></tr>
+<tr class="separator:afb6518e3ee658e0baa8ba2795fe020a1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5d67be90fb77328d4a653e5bb256353d"><td class="memItemLeft" align="right" valign="top">virtual std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">ContentHandle</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_i_client.html#a5d67be90fb77328d4a653e5bb256353d">register_content</a> (std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_source.html">ContentSource</a> &gt; source, <a class="el" href="structloon_1_1_content_info.html">ContentInfo</a> const &amp;info)=0</td></tr>
 <tr class="memdesc:a5d67be90fb77328d4a653e5bb256353d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Registers content with this client and returns a handle for it.  <a href="classloon_1_1_i_client.html#a5d67be90fb77328d4a653e5bb256353d">More...</a><br /></td></tr>
 <tr class="separator:a5d67be90fb77328d4a653e5bb256353d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a10ddfe0d1c11db19153bd0e5ed36d94c"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_i_client.html#a10ddfe0d1c11db19153bd0e5ed36d94c">unregister_content</a> (std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">ContentHandle</a> &gt; handle)=0</td></tr>
 <tr class="memdesc:a10ddfe0d1c11db19153bd0e5ed36d94c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Unregisters registered content from this client.  <a href="classloon_1_1_i_client.html#a10ddfe0d1c11db19153bd0e5ed36d94c">More...</a><br /></td></tr>
 <tr class="separator:a10ddfe0d1c11db19153bd0e5ed36d94c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a06acee80c24d80bbe21b4ab0177b0165"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_i_client.html#a06acee80c24d80bbe21b4ab0177b0165">unregister_all_content</a> (bool with_callbacks=true)=0</td></tr>
+<tr class="memdesc:a06acee80c24d80bbe21b4ab0177b0165"><td class="mdescLeft">&#160;</td><td class="mdescRight">Unregisters all registered content from this client.  <a href="classloon_1_1_i_client.html#a06acee80c24d80bbe21b4ab0177b0165">More...</a><br /></td></tr>
+<tr class="separator:a06acee80c24d80bbe21b4ab0177b0165"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Member Function Documentation</h2>
+<a id="afb6518e3ee658e0baa8ba2795fe020a1"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#afb6518e3ee658e0baa8ba2795fe020a1">&#9670;&nbsp;</a></span>failed()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">virtual void loon::IClient::failed </td>
+          <td>(</td>
+          <td class="paramtype">std::function&lt; void()&gt;&#160;</td>
+          <td class="paramname"><em>callback</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">pure virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Sets a callback for when the client has unrecoverably failed. </p>
+<p>This callback is only called when an abnormal event occurs, like an unacceptable server configuration that does not allow the client to continue operation. The callback is not called when the client is stopped with <a class="el" href="classloon_1_1_i_client.html#a45970b702e6fae206a0ae6256323b414" title="Stops the client and disconnects from the server.">stop()</a> or when the <a class="el" href="classloon_1_1_client.html">Client</a> instance is destructed in the destructor.</p>
+<p>If failure should be detected, this method must be called before <a class="el" href="classloon_1_1_i_client.html#a65e4dcbc229a52f81c93d68b1eff41d2" title="Connects to the server and maintains a connection.">start()</a>.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">callback</td><td>The function to call when the client failed. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+<p>Implemented in <a class="el" href="classloon_1_1_client.html#a5391907516bf701481eb4c6da2ab3fc9">loon::Client</a>.</p>
+
+</div>
+</div>
 <a id="a5d67be90fb77328d4a653e5bb256353d"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a5d67be90fb77328d4a653e5bb256353d">&#9670;&nbsp;</a></span>register_content()</h2>
 
@@ -137,19 +181,19 @@ Public Member Functions</h2></td></tr>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">source</td><td>The source for the content. </td></tr>
-    <tr><td class="paramname">info</td><td>Information about how to provide the content. </td></tr>
+    <tr><td class="paramname">info</td><td>Information about how to provide the content.</td></tr>
   </table>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>A handle to the content. For use with <a class="el" href="classloon_1_1_i_client.html#a10ddfe0d1c11db19153bd0e5ed36d94c" title="Unregisters registered content from this client.">unregister_content()</a> to unregister this content again. </dd></dl>
 <dl class="exception"><dt>Exceptions</dt><dd>
   <table class="exception">
-    <tr><td class="paramname"><a class="el" href="classloon_1_1_not_connected_exception.html" title="The client is not connected to the server.">NotConnectedException</a></td><td>if the client is not connected. </td></tr>
+    <tr><td class="paramname"><a class="el" href="classloon_1_1_client_not_connected_exception.html" title="The client is not connected to the server.">ClientNotConnectedException</a></td><td>if the client is not connected when the method is called or if the client disconnected while waiting for the connection to be ready. </td></tr>
+    <tr><td class="paramname"><a class="el" href="classloon_1_1_path_already_registered_exception.html" title="Content is already registered under this path.">PathAlreadyRegisteredException</a></td><td>if content has already been registered under the path that was specified in the info parameter. </td></tr>
+    <tr><td class="paramname"><a class="el" href="classloon_1_1_unacceptable_content_exception.html" title="The content does not conform with the server&#39;s constraints.">UnacceptableContentException</a></td><td>if the server's constraints do not allow this content. </td></tr>
   </table>
   </dd>
 </dl>
-
-<p>Implemented in <a class="el" href="classloon_1_1_client.html#a13b8bb106cc2c382adf1aeb0adcf4a51">loon::Client</a>.</p>
 
 </div>
 </div>
@@ -213,6 +257,43 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
+<a id="a06acee80c24d80bbe21b4ab0177b0165"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a06acee80c24d80bbe21b4ab0177b0165">&#9670;&nbsp;</a></span>unregister_all_content()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">virtual void loon::IClient::unregister_all_content </td>
+          <td>(</td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>with_callbacks</em> = <code>true</code></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">pure virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Unregisters all registered content from this client. </p>
+<p>Does nothing if the client is not connected or no content is registered. Does not throw any exception.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">with_callbacks</td><td>If true, call all unregistered callbacks. Otherwise content's unregistered callbacks are not called. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+<p>Implemented in <a class="el" href="classloon_1_1_client.html#a4bb4a417964ed89e9b1dec35ab3d51f4">loon::Client</a>.</p>
+
+</div>
+</div>
 <a id="a10ddfe0d1c11db19153bd0e5ed36d94c"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a10ddfe0d1c11db19153bd0e5ed36d94c">&#9670;&nbsp;</a></span>unregister_content()</h2>
 
@@ -240,12 +321,13 @@ Public Member Functions</h2></td></tr>
 <p>Unregisters registered content from this client. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">handle</td><td>The handle for which the content should be unregistered. </td></tr>
+    <tr><td class="paramname">handle</td><td>The handle for which the content should be unregistered.</td></tr>
   </table>
   </dd>
 </dl>
 <dl class="exception"><dt>Exceptions</dt><dd>
   <table class="exception">
+    <tr><td class="paramname"><a class="el" href="classloon_1_1_client_not_connected_exception.html" title="The client is not connected to the server.">ClientNotConnectedException</a></td><td>if the client is not connected. </td></tr>
     <tr><td class="paramname"><a class="el" href="classloon_1_1_content_not_registered_exception.html" title="No content is registered under this handle with this client.">ContentNotRegisteredException</a></td><td>if the content is not registered with this client. </td></tr>
   </table>
   </dd>
@@ -256,7 +338,7 @@ Public Member Functions</h2></td></tr>
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following file:<ul>
-<li>include/loon/<a class="el" href="loon_8h_source.html">loon.h</a></li>
+<li>include/loon/<a class="el" href="client_8h_source.html">client.h</a></li>
 </ul>
 </div><!-- contents -->
 <!-- start footer part -->

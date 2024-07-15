@@ -84,26 +84,34 @@ Inheritance diagram for loon::Client:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:aae03d41147cada429feaaec2c913fcea"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#aae03d41147cada429feaaec2c913fcea">Client</a> (std::string const &amp;address, std::string const &amp;auth)</td></tr>
-<tr class="separator:aae03d41147cada429feaaec2c913fcea"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aec870ba77793782eb949bd3e512859a5"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#aec870ba77793782eb949bd3e512859a5">Client</a> (std::string const &amp;address)</td></tr>
-<tr class="separator:aec870ba77793782eb949bd3e512859a5"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1e5af3b12e0783bc57eb810ea74ffc7e"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#a1e5af3b12e0783bc57eb810ea74ffc7e">Client</a> (std::string const &amp;address, <a class="el" href="structloon_1_1_client_options.html">ClientOptions</a> options={})</td></tr>
+<tr class="separator:a1e5af3b12e0783bc57eb810ea74ffc7e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab956e5add223ba7a8ab6df2e4c465134"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#ab956e5add223ba7a8ab6df2e4c465134">start</a> () override</td></tr>
 <tr class="memdesc:ab956e5add223ba7a8ab6df2e4c465134"><td class="mdescLeft">&#160;</td><td class="mdescRight">Connects to the server and maintains a connection.  <a href="classloon_1_1_client.html#ab956e5add223ba7a8ab6df2e4c465134">More...</a><br /></td></tr>
 <tr class="separator:ab956e5add223ba7a8ab6df2e4c465134"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4da0243ffb3130d0e7a6f65c0a548906"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#a4da0243ffb3130d0e7a6f65c0a548906">stop</a> () override</td></tr>
 <tr class="memdesc:a4da0243ffb3130d0e7a6f65c0a548906"><td class="mdescLeft">&#160;</td><td class="mdescRight">Stops the client and disconnects from the server.  <a href="classloon_1_1_client.html#a4da0243ffb3130d0e7a6f65c0a548906">More...</a><br /></td></tr>
 <tr class="separator:a4da0243ffb3130d0e7a6f65c0a548906"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a13b8bb106cc2c382adf1aeb0adcf4a51"><td class="memItemLeft" align="right" valign="top">std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">ContentHandle</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#a13b8bb106cc2c382adf1aeb0adcf4a51">register_content</a> (std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_source.html">ContentSource</a> &gt; source, <a class="el" href="structloon_1_1_content_info.html">ContentInfo</a> const &amp;info) override</td></tr>
-<tr class="memdesc:a13b8bb106cc2c382adf1aeb0adcf4a51"><td class="mdescLeft">&#160;</td><td class="mdescRight">Registers content with this client and returns a handle for it.  <a href="classloon_1_1_client.html#a13b8bb106cc2c382adf1aeb0adcf4a51">More...</a><br /></td></tr>
-<tr class="separator:a13b8bb106cc2c382adf1aeb0adcf4a51"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5391907516bf701481eb4c6da2ab3fc9"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#a5391907516bf701481eb4c6da2ab3fc9">failed</a> (std::function&lt; void()&gt; callback) override</td></tr>
+<tr class="memdesc:a5391907516bf701481eb4c6da2ab3fc9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sets a callback for when the client has unrecoverably failed.  <a href="classloon_1_1_client.html#a5391907516bf701481eb4c6da2ab3fc9">More...</a><br /></td></tr>
+<tr class="separator:a5391907516bf701481eb4c6da2ab3fc9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a306388ae101447d7bf55b628ba8934a6"><td class="memItemLeft" align="right" valign="top"><a id="a306388ae101447d7bf55b628ba8934a6"></a>
+std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">ContentHandle</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>register_content</b> (std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_source.html">loon::ContentSource</a> &gt; source, <a class="el" href="structloon_1_1_content_info.html">loon::ContentInfo</a> const &amp;info) override</td></tr>
+<tr class="separator:a306388ae101447d7bf55b628ba8934a6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a119d5ea6cb48ee9faab2d61e24ee2c66"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#a119d5ea6cb48ee9faab2d61e24ee2c66">unregister_content</a> (std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">ContentHandle</a> &gt; handle) override</td></tr>
 <tr class="memdesc:a119d5ea6cb48ee9faab2d61e24ee2c66"><td class="mdescLeft">&#160;</td><td class="mdescRight">Unregisters registered content from this client.  <a href="classloon_1_1_client.html#a119d5ea6cb48ee9faab2d61e24ee2c66">More...</a><br /></td></tr>
 <tr class="separator:a119d5ea6cb48ee9faab2d61e24ee2c66"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4bb4a417964ed89e9b1dec35ab3d51f4"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#a4bb4a417964ed89e9b1dec35ab3d51f4">unregister_all_content</a> (bool with_callbacks=true) override</td></tr>
+<tr class="memdesc:a4bb4a417964ed89e9b1dec35ab3d51f4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Unregisters all registered content from this client.  <a href="classloon_1_1_client.html#a4bb4a417964ed89e9b1dec35ab3d51f4">More...</a><br /></td></tr>
+<tr class="separator:a4bb4a417964ed89e9b1dec35ab3d51f4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="inherit_header pub_methods_classloon_1_1_i_client"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_classloon_1_1_i_client')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="classloon_1_1_i_client.html">loon::IClient</a></td></tr>
+<tr class="memitem:a5d67be90fb77328d4a653e5bb256353d inherit pub_methods_classloon_1_1_i_client"><td class="memItemLeft" align="right" valign="top">virtual std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">ContentHandle</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_i_client.html#a5d67be90fb77328d4a653e5bb256353d">register_content</a> (std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_source.html">ContentSource</a> &gt; source, <a class="el" href="structloon_1_1_content_info.html">ContentInfo</a> const &amp;info)=0</td></tr>
+<tr class="memdesc:a5d67be90fb77328d4a653e5bb256353d inherit pub_methods_classloon_1_1_i_client"><td class="mdescLeft">&#160;</td><td class="mdescRight">Registers content with this client and returns a handle for it.  <a href="classloon_1_1_i_client.html#a5d67be90fb77328d4a653e5bb256353d">More...</a><br /></td></tr>
+<tr class="separator:a5d67be90fb77328d4a653e5bb256353d inherit pub_methods_classloon_1_1_i_client"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a id="aae03d41147cada429feaaec2c913fcea"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aae03d41147cada429feaaec2c913fcea">&#9670;&nbsp;</a></span>Client() <span class="overload">[1/2]</span></h2>
+<a id="a1e5af3b12e0783bc57eb810ea74ffc7e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1e5af3b12e0783bc57eb810ea74ffc7e">&#9670;&nbsp;</a></span>Client()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -117,8 +125,8 @@ Public Member Functions</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">std::string const &amp;&#160;</td>
-          <td class="paramname"><em>auth</em>&#160;</td>
+          <td class="paramtype"><a class="el" href="structloon_1_1_client_options.html">ClientOptions</a>&#160;</td>
+          <td class="paramname"><em>options</em> = <code>{}</code>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -131,32 +139,7 @@ Public Member Functions</h2></td></tr>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">address</td><td>The websocket address to connect to. </td></tr>
-    <tr><td class="paramname">auth</td><td>The HTTP Basic authentication string, a username and a password, separated by a colon. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-</div>
-</div>
-<a id="aec870ba77793782eb949bd3e512859a5"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aec870ba77793782eb949bd3e512859a5">&#9670;&nbsp;</a></span>Client() <span class="overload">[2/2]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">loon::Client::Client </td>
-          <td>(</td>
-          <td class="paramtype">std::string const &amp;&#160;</td>
-          <td class="paramname"><em>address</em></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-<p>Creates a new loon client without any authentication.</p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">address</td><td>The websocket address to connect to. </td></tr>
+    <tr><td class="paramname">options</td><td><a class="el" href="classloon_1_1_client.html">Client</a> options. </td></tr>
   </table>
   </dd>
 </dl>
@@ -164,8 +147,8 @@ Public Member Functions</h2></td></tr>
 </div>
 </div>
 <h2 class="groupheader">Member Function Documentation</h2>
-<a id="a13b8bb106cc2c382adf1aeb0adcf4a51"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a13b8bb106cc2c382adf1aeb0adcf4a51">&#9670;&nbsp;</a></span>register_content()</h2>
+<a id="a5391907516bf701481eb4c6da2ab3fc9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5391907516bf701481eb4c6da2ab3fc9">&#9670;&nbsp;</a></span>failed()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -174,48 +157,31 @@ Public Member Functions</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">std::shared_ptr&lt;<a class="el" href="classloon_1_1_content_handle.html">ContentHandle</a>&gt; loon::Client::register_content </td>
+          <td class="memname">void loon::Client::failed </td>
           <td>(</td>
-          <td class="paramtype">std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_source.html">ContentSource</a> &gt;&#160;</td>
-          <td class="paramname"><em>source</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
+          <td class="paramtype">std::function&lt; void()&gt;&#160;</td>
+          <td class="paramname"><em>callback</em></td><td>)</td>
           <td></td>
-          <td class="paramtype"><a class="el" href="structloon_1_1_content_info.html">ContentInfo</a> const &amp;&#160;</td>
-          <td class="paramname"><em>info</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
         </tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 
-<p>Registers content with this client and returns a handle for it. </p>
-<p>The content remains registered across websocket reconnects, until it is unregistered with <a class="el" href="classloon_1_1_client.html#a119d5ea6cb48ee9faab2d61e24ee2c66" title="Unregisters registered content from this client.">unregister_content()</a>. Calls to any of the methods of the source are synchronized. The source's data() method is only called once per request and while no other requests are being handled that are using a previous return value of it. If the source reads from a file e.g., the data() method can safely seek to the beginning of the file without having to worry about corrupting other ongoing requests.</p>
+<p>Sets a callback for when the client has unrecoverably failed. </p>
+<p>This callback is only called when an abnormal event occurs, like an unacceptable server configuration that does not allow the client to continue operation. The callback is not called when the client is stopped with <a class="el" href="classloon_1_1_client.html#a4da0243ffb3130d0e7a6f65c0a548906" title="Stops the client and disconnects from the server.">stop()</a> or when the <a class="el" href="classloon_1_1_client.html">Client</a> instance is destructed in the destructor.</p>
+<p>If failure should be detected, this method must be called before <a class="el" href="classloon_1_1_client.html#ab956e5add223ba7a8ab6df2e4c465134" title="Connects to the server and maintains a connection.">start()</a>.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">source</td><td>The source for the content. </td></tr>
-    <tr><td class="paramname">info</td><td>Information about how to provide the content. </td></tr>
-  </table>
-  </dd>
-</dl>
-<dl class="section return"><dt>Returns</dt><dd>A handle to the content. For use with <a class="el" href="classloon_1_1_client.html#a119d5ea6cb48ee9faab2d61e24ee2c66" title="Unregisters registered content from this client.">unregister_content()</a> to unregister this content again. </dd></dl>
-<dl class="exception"><dt>Exceptions</dt><dd>
-  <table class="exception">
-    <tr><td class="paramname"><a class="el" href="classloon_1_1_not_connected_exception.html" title="The client is not connected to the server.">NotConnectedException</a></td><td>if the client is not connected. </td></tr>
+    <tr><td class="paramname">callback</td><td>The function to call when the client failed. </td></tr>
   </table>
   </dd>
 </dl>
 
-<p>Implements <a class="el" href="classloon_1_1_i_client.html#a5d67be90fb77328d4a653e5bb256353d">loon::IClient</a>.</p>
+<p>Implements <a class="el" href="classloon_1_1_i_client.html#afb6518e3ee658e0baa8ba2795fe020a1">loon::IClient</a>.</p>
 
 </div>
 </div>
@@ -237,7 +203,7 @@ Public Member Functions</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
@@ -267,7 +233,7 @@ Public Member Functions</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
@@ -276,6 +242,43 @@ Public Member Functions</h2></td></tr>
 <p>Returns immediately and does nothing, if already disconnected. Notifies all handles that registered content is not available anymore. </p>
 
 <p>Implements <a class="el" href="classloon_1_1_i_client.html#a45970b702e6fae206a0ae6256323b414">loon::IClient</a>.</p>
+
+</div>
+</div>
+<a id="a4bb4a417964ed89e9b1dec35ab3d51f4"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4bb4a417964ed89e9b1dec35ab3d51f4">&#9670;&nbsp;</a></span>unregister_all_content()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void loon::Client::unregister_all_content </td>
+          <td>(</td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>with_callbacks</em> = <code>true</code></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Unregisters all registered content from this client. </p>
+<p>Does nothing if the client is not connected or no content is registered. Does not throw any exception.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">with_callbacks</td><td>If true, call all unregistered callbacks. Otherwise content's unregistered callbacks are not called. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+<p>Implements <a class="el" href="classloon_1_1_i_client.html#a06acee80c24d80bbe21b4ab0177b0165">loon::IClient</a>.</p>
 
 </div>
 </div>
@@ -298,7 +301,7 @@ Public Member Functions</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
@@ -306,12 +309,13 @@ Public Member Functions</h2></td></tr>
 <p>Unregisters registered content from this client. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">handle</td><td>The handle for which the content should be unregistered. </td></tr>
+    <tr><td class="paramname">handle</td><td>The handle for which the content should be unregistered.</td></tr>
   </table>
   </dd>
 </dl>
 <dl class="exception"><dt>Exceptions</dt><dd>
   <table class="exception">
+    <tr><td class="paramname"><a class="el" href="classloon_1_1_client_not_connected_exception.html" title="The client is not connected to the server.">ClientNotConnectedException</a></td><td>if the client is not connected. </td></tr>
     <tr><td class="paramname"><a class="el" href="classloon_1_1_content_not_registered_exception.html" title="No content is registered under this handle with this client.">ContentNotRegisteredException</a></td><td>if the content is not registered with this client. </td></tr>
   </table>
   </dd>
@@ -322,7 +326,7 @@ Public Member Functions</h2></td></tr>
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following file:<ul>
-<li>include/loon/<a class="el" href="loon_8h_source.html">loon.h</a></li>
+<li>include/loon/<a class="el" href="client_8h_source.html">client.h</a></li>
 </ul>
 </div><!-- contents -->
 <!-- start footer part -->
