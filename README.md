@@ -19,8 +19,8 @@ ideal to keep your client small and lean.
 ### Run the server
 
 To expose the server to your local network,
-change the valeu after `-addr` to `:8080`
-and edit `base_url` in the example configuration
+change the value after `-addr` to `:8080`
+and edit `base_url` in the used example configuration
 to contain your computer's IP address and the configured port,
 e.g. `http://192.168.178.2:8080`.
 
@@ -127,7 +127,7 @@ This should be possible without:
 - having to start an HTTP server and binding to a port on the local device,
 - having to use sophisticated tunneling software,
   which does more than you actually want it to,
-- or using some kind of image uploading service.
+- or using some kind of uploading service or cloud provider.
 
 At the same time you want to have guaranteed protection from abuse:
 - multiple requests to the same generated URL
