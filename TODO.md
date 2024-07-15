@@ -9,6 +9,15 @@
     and each one is requested immediately,
     then a request limit of 5 requests per minute makes the connection fail,
     which is not what should happen.
+- [ ] Properly document and implement if and how
+    content remains registered across reconnects with the C++ client.
+- [ ] Remove "with_callbacks" from "unregister_all_content" from C++ client
+    and instead add flags to the unregistered callback
+    indicating why it was unregistered (failure, disconnect, manually?).
+- [ ] Add method to iterate all content
+    and allow unregistering it while iterating.
+    That way a user can unregister e.g. all content except a selected few.
+    Once implemented, remove the "unregister_all_content" method.
 - [ ] Add config option to limit how many chunks are buffered on the server.
 - [ ] Add config option to enable TCP keep-alive or not.
     This should be a choice.
