@@ -20,6 +20,7 @@
 
 ## Normal
 
+- [ ] Automatically update docs on commit or push.
 - [ ] Add test automation via GitHub Actions.
     Run Go tests, generate coverage, run client tests.
     Add badges to README for test coverage.
