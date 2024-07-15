@@ -200,9 +200,10 @@ func (s *serverImpl) serve(
 	// Create a registry with a single content type,
 	// to check if the accept header allows us to serve this file.
 	registry := NewContentTypeRegistry(NewSingleContentTypeIndex(contentType))
-	if !registry.CanServeAccept(r.Header.Get("Accept")) {
+	accept := r.Header.Get("Accept")
+	if len(accept) > 0 && !registry.CanServeAccept(accept) {
 		request.Close("response content type not accepted by HTTP client")
-		log := log.With("content_type", contentType.Type, "accept", r.Header.Get("Accept"))
+		log := log.With("content_type", contentType.Type, "accept", accept)
 		status(w, http.StatusNotAcceptable,
 			"client response content type not acceptable", log, nil)
 		return
