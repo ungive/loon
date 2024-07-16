@@ -40,7 +40,56 @@ and to forward requests and responses between clients and third parties.
 **Third party** &ndash; Any third party can make requests to generated URLs
 to access the resource that has been registered by a client.
 
-## Usage
+## Server limitations
+
+The loon server in this repository
+is **meant to be put behind a reverse proxy and a cache**.
+The only caching mechanism that is provided by the implementation
+is control over the `max-age` value in a response's `Cache-Control` header,
+but the actual caching itself needs to be taken care of separately.
+
+The used cache and/or reverse proxy must guarantee the following
+to prevent clients from being flooded with requests:
+
+- Concurrent requests **MUST** lead to a *single request* to the client,
+  whose response should then be cached and served.
+- Any `Cache-Control` request header **MUST** be ignored,
+  otherwise third parties can bypass the cache,
+  e.g. by setting the `no-cache` directive.
+  When using a reverse proxy, this header should be deleted from all requests.
+  If not done properly, the cache is effectively rendered obsolete
+  from an attackers point of view.
+  
+A deployment example can be found in [**deployments**](./deployments).
+
+## What is in this repository?
+
+- System and protocol specification: **[api](./api)**
+- A well-tested server library written in Go: **[pkg/server](./pkg/server)**
+- A simple reference client library written in Go: **[pkg/client](./pkg/client)**
+- A CLI program to run the server and client: **[cmd/loon](./cmd/loon)**
+  - It makes use of the above server and client library
+- A more feature-complete client library written in C++:
+  **[clients/cpp](./clients/cpp)**
+  - Well-tested and has more features than the reference client implementation
+  - Dependencies: libhv or Qt for websocket communication + OpenSSL + Protobuf
+  - Compatible with C++17 or newer
+  - Uses the CMake build system
+  - Less than 2.000 lines of code: 1.319 lines for commit `751c25`
+  - Documentation: *https://ungive.github.io/loon/clients/cpp*
+- A ready to use server Docker image:
+  **[build/package/Dockerfile](./build/package/Dockerfile)**
+- A server deployment example with Docker Compose and Caddy:
+  **[deployments](./deployments)**
+- An example server configuration to quickly get started:
+  **[examples/server/config.yaml](./examples/server/config.yaml)**
+
+> **Warning!**  
+> The public API of these libraries and programs
+> is not yet stable and might change in the future.
+> Wait for the first stable release, if a stable API is required.
+
+## Basic usage
 
 ### Run the server
 
@@ -91,34 +140,7 @@ assets/loon-small.png: http://localhost:8080/BnRWzVodwVmY11V7MXQ-Mw/f7AapwFxVSwl
 
 Open the URL in a browser and it should show the file's contents.
 
-## What is in this repository?
-
-- System and protocol specification: **[api](./api)**
-- A well-tested server library written in Go: **[pkg/server](./pkg/server)**
-- A simple reference client library written in Go: **[pkg/client](./pkg/client)**
-- A CLI program to run the server and client: **[cmd/loon](./cmd/loon)**
-  - It makes use of the above server and client library
-- A more feature-complete client library written in C++:
-  **[clients/cpp](./clients/cpp)**
-  - Well-tested and has more features than the reference client implementation
-  - Dependencies: libhv or Qt for websocket communication + OpenSSL + Protobuf
-  - Compatible with C++17 or newer
-  - Uses the CMake build system
-  - Less than 2.000 lines of code: 1.319 lines for commit `751c25`
-  - Documentation: *https://ungive.github.io/loon/clients/cpp*
-- A ready to use server Docker image:
-  **[build/package/Dockerfile](./build/package/Dockerfile)**
-- A server deployment example with Docker Compose and Caddy:
-  **[deployments](./deployments)**
-- An example server configuration to quickly get started:
-  **[examples/server/config.yaml](./examples/server/config.yaml)**
-
-> **Warning!**  
-> The public API of these libraries and programs
-> is not yet stable and might change in the future.
-> Wait for the first stable release, if a stable API is required.
-
-### Deployment
+## Server deployment
 
 For a docker compose deployment example, see [`deployments`](./deployments).
 Features:
