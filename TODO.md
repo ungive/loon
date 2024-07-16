@@ -35,8 +35,21 @@
     Could be done with `content_handle->populate_cache();`?
     What if the cache expires?
     Maybe add a "minimum cache duration" *per content*?
+    Note: Maybe add a protocol message to abstract away from the client
+    how exactly the cache is prepopulated.
+    The server should perhaps make a request to a URL
+    that was specified in the config, which prepopulates the cache.
+    Maybe cache-handler/Souin provides a mechanism for that with Caddy?
+    Maybe add a callback that would be called to prepopulate the cache,
+    which can be registered with the server library API?
+    That way, if prepopulation is required, users can write their own server
+    instead of running "loon server" directly.
 - [ ] Add versioning to the server and client libraries.
     Perhaps make releases on GitHub.
+- [ ] Currently the server synchronizes *all requests*
+    through the client manager.
+    There should be at least *some* concurrency (with goroutines)
+    to handle simultaneous requests concurrently.
 
 ## Normal
 
