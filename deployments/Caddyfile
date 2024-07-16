@@ -33,6 +33,9 @@
 :443 {
 	# use a certificate from a globally trusted CA here during production.
 	tls /cert.pem /privkey.pem
+	# ignore the Cache-Control request header,
+	# so HTTP clients cannot circumvent the cache.
+	request_header -Cache-Control
 	handle /ws {
 		respond 401
 	}

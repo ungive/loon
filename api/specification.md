@@ -228,6 +228,15 @@ ever has valid content again,
 if it never had content in the first place
 or if the content was removed by the client.
 
+If a cache is used, a "Cache-Control" HTTP request header
+with a value of "no-cache" should be ignored.
+This header value could be used to circumvent the cache
+and cause the client to upload data more often than desired.
+See [https://httpwg.org/specs/rfc7234.html#rfc.section.5.2.1.4](https://httpwg.org/specs/rfc7234.html#rfc.section.5.2.1.4).
+Other values for "Cache-Control" in the request may need to be ignored as well.
+It is recommended to completely ignore
+the "Cache-Control" request header altogether.
+
 ## Protocol
 
 This section describes the protocol over a websocket connection
