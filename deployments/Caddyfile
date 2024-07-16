@@ -36,6 +36,16 @@
 	# ignore the Cache-Control request header,
 	# so HTTP clients cannot circumvent the cache.
 	request_header -Cache-Control
+	## Alternative: remove individual Cache-Control values:
+	# request_header Cache-Control ,?\s*no-cache ""
+	# request_header Cache-Control ,?\s*no-store ""
+	# request_header Cache-Control ,?\s*no-transform ""
+	# request_header Cache-Control ,?\s*only-if-cached ""
+	# request_header Cache-Control ,?\s*max-age=[^,]*(,|$) "$1"
+	# request_header Cache-Control ,?\s*max-stale=[^,]*(,|$) "$1"
+	# request_header Cache-Control ,?\s*min-fresh=[^,]*(,|$) "$1"
+	## Always remove a possible leading comma:
+	#request_header Cache-Control ^,\s* ""
 	handle /ws {
 		respond 401
 	}
