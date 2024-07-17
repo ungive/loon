@@ -181,8 +181,8 @@ private:
     std::function<void(Hello&)> m_injected_hello_modifer{};
     std::function<void()> m_failed_callback{};
 
-    std::atomic<bool> m_started{ false };
-    std::atomic<bool> m_connected{ false };
+    bool m_started{ false };
+    bool m_connected{ false };
     // Use a recursive mutex, since many methods could trigger a reconnect,
     // which would call close and would trigger the close callback,
     // which locks this mutex again.

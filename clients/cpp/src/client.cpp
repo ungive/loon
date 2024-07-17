@@ -130,11 +130,11 @@ bool loon::ClientImpl::wait_until_connected(
     std::unique_lock<std::recursive_mutex>& lock,
     std::chrono::milliseconds timeout)
 {
-    if (!m_started.load()) {
+    if (!m_started) {
         throw ClientNotStartedException("the client must be started");
     }
     return m_cv_connection_ready.wait_for(lock, timeout, [this] {
-        return m_connected.load();
+        return m_connected;
     });
 }
 
@@ -412,9 +412,9 @@ void ClientImpl::wait_until_ready(std::unique_lock<std::recursive_mutex>& lock)
     // Use the connect timeout here, as it makes the perfect timeout value.
     // Receiving the Hello message should not take longer than connecting.
     m_cv_connection_ready.wait_for(lock, connect_timeout(), [this] {
-        return !m_connected.load() || m_hello.has_value();
+        return !m_connected || m_hello.has_value();
     });
-    if (!m_connected.load()) {
+    if (!m_connected) {
         throw ClientNotConnectedException("the client is not connected");
     }
     if (!m_hello.has_value()) {
@@ -482,7 +482,8 @@ void ClientImpl::handle_message(ServerMessage const& message)
 
 bool ClientImpl::update_connected(bool state)
 {
-    auto old_state = m_connected.exchange(state);
+    auto old_state = m_connected;
+    m_connected = state;
     // Notify any thread that might be waiting for connection state changes.
     // Just to be sure, always notify, even if the state might not have changed.
     m_cv_connection_ready.notify_all();
@@ -491,9 +492,10 @@ bool ClientImpl::update_connected(bool state)
 
 void ClientImpl::internal_start()
 {
-    if (m_started.exchange(true)) {
+    if (m_started) {
         return;
     }
+    m_started = true;
     m_conn->start();
 }
 
@@ -517,9 +519,10 @@ void ClientImpl::reset_connection_state()
 
 void ClientImpl::internal_stop()
 {
-    if (!m_started.exchange(false)) {
+    if (!m_started) {
         return;
     }
+    m_started = false;
     reset_connection_state();
     m_conn->stop();
     update_connected(false);
