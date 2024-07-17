@@ -409,13 +409,18 @@ void ClientImpl::on_close(Close const& close)
 
 void ClientImpl::wait_until_ready(std::unique_lock<std::recursive_mutex>& lock)
 {
-    m_cv_connection_ready.wait(lock, [this] {
+    // Use the connect timeout here, as it makes the perfect timeout value.
+    // Receiving the Hello message should not take longer than connecting.
+    m_cv_connection_ready.wait_for(lock, connect_timeout(), [this] {
         return !m_connected.load() || m_hello.has_value();
     });
     if (!m_connected.load()) {
         throw ClientNotConnectedException("the client is not connected");
     }
-    assert(m_hello.has_value());
+    if (!m_hello.has_value()) {
+        throw ClientFailedException(
+            "did not receive initial server message in time");
+    }
 }
 
 void ClientImpl::on_websocket_open()

@@ -149,9 +149,10 @@ public:
      * @returns A handle to the content.
      * For use with unregister_content() to unregister this content again.
      * @throws ClientNotConnectedException
-     * if the client is not started or connected.
-     * when the method is called or if the client disconnected
-     * while waiting for the connection to be ready.
+     * if the client is not started, connected or
+     * if the client disconnected while waiting for the connection to be ready.
+     * @throws ClientFailedException
+     * if the client failed while attempting to register the content.
      * @throws PathAlreadyRegisteredException
      * if content has already been registered under the path
      * that was specified in the info parameter.
@@ -168,6 +169,8 @@ public:
      *
      * @throws ClientNotConnectedException
      * if the client is not started or connected.
+     * @throws ClientFailedException
+     * if the client failed, while attempting to unregister the content.
      * @throws ContentNotRegisteredException
      * if the content is not registered with this client.
      */
@@ -379,6 +382,15 @@ public:
  * @brief The client is not connected to the server.
  */
 class ClientNotConnectedException : public std::runtime_error
+{
+public:
+    using runtime_error::runtime_error;
+};
+
+/**
+ * @brief The client is in a failed state and was stopped.
+ */
+class ClientFailedException : public std::runtime_error
 {
 public:
     using runtime_error::runtime_error;
