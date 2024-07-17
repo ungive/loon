@@ -44,6 +44,12 @@ public:
     {
         ClientImpl::chunk_sleep(duration);
     }
+
+    inline void start_and_wait_until_connected()
+    {
+        start();
+        wait_until_connected();
+    }
 };
 
 static std::shared_ptr<TestClient> create_client(
@@ -53,6 +59,7 @@ static std::shared_ptr<TestClient> create_client(
     auto client = std::make_shared<TestClient>(TEST_ADDRESS, options);
     if (started) {
         client->start();
+        client->wait_until_connected();
     }
     return client;
 }

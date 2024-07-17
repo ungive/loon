@@ -82,6 +82,35 @@ public:
     virtual void stop() = 0;
 
     /**
+     * @brief Waits until the client is connected.
+     *
+     * Times out after the connect timeout that was configured
+     * within the WebsocketOptions of the client
+     * or the default timeout if not explicitly configured.
+     *
+     * Must be called while the client is started.
+     *
+     * @param timeout
+     * @throws ClientNotStartedException if the client is not started.
+     */
+    virtual bool wait_until_connected() = 0;
+
+    /**
+     * @brief Waits until the client is connected.
+     *
+     * Times out after the given timeout duration,
+     * if the client has not successfully connected within that period.
+     * The timeout duration must be greater or equal to zero.
+     *
+     * Can be used to check whether the client is connected
+     * at a specific moment, by using a timeout duration of zero.
+     *
+     * @param timeout The timeout period.
+     * @throws ClientNotStartedException if the client is not started.
+     */
+    virtual bool wait_until_connected(std::chrono::milliseconds timeout) = 0;
+
+    /**
      * @brief Sets a callback for when the client has unrecoverably failed.
      *
      * This callback is only called when an abnormal event occurs,
@@ -89,8 +118,10 @@ public:
      * the client to continue operation.
      * The callback is not called when the client is stopped with stop()
      * or when the Client instance is destructed in the destructor.
+     * The client is stopped when this method is called.
      *
-     * It is recommended to call this method before start().
+     * It is recommended to call this method before start(),
+     * to reliably detect client failures.
      * Do not call any client methods within the callback.
      *
      * @param callback The function to call when the client failed.
@@ -117,7 +148,8 @@ public:
      *
      * @returns A handle to the content.
      * For use with unregister_content() to unregister this content again.
-     * @throws ClientNotConnectedException if the client is not connected
+     * @throws ClientNotConnectedException
+     * if the client is not started or connected.
      * when the method is called or if the client disconnected
      * while waiting for the connection to be ready.
      * @throws PathAlreadyRegisteredException
@@ -134,7 +166,8 @@ public:
      *
      * @param handle The handle for which the content should be unregistered.
      *
-     * @throws ClientNotConnectedException if the client is not connected.
+     * @throws ClientNotConnectedException
+     * if the client is not started or connected.
      * @throws ContentNotRegisteredException
      * if the content is not registered with this client.
      */
@@ -171,35 +204,35 @@ struct WebsocketOptions
      * No exception will be thrown if both an Authorization header
      * and this field are set.
      */
-    std::optional<std::string> basic_authorization;
+    std::optional<std::string> basic_authorization{};
 
     /**
      * @brief A path to a CA certificate to authenticate the server.
      *
      * If this value is set, ca_certificate must be empty.
      */
-    std::optional<std::string> ca_certificate_path;
+    std::optional<std::string> ca_certificate_path{};
 
     /**
      * @brief An in-memory CA certificate to authenticate the server.
      *
      * If this value is set, ca_certificate_path must be empty.
      */
-    std::optional<std::vector<uint8_t>> ca_certificate;
+    std::optional<std::vector<uint8_t>> ca_certificate{};
 
     /**
      * @brief The time after which a connection attempt times out.
      *
      * If not set, a sane default value is used.
      */
-    std::optional<std::chrono::milliseconds> connect_timeout;
+    std::optional<std::chrono::milliseconds> connect_timeout{};
 
     /**
      * @brief The interval in which ping messages are sent.
      *
      * If not set, a sane default value is used.
      */
-    std::optional<std::chrono::milliseconds> ping_interval;
+    std::optional<std::chrono::milliseconds> ping_interval{};
 
     /**
      * @brief The delay between reconnects.
@@ -210,7 +243,7 @@ struct WebsocketOptions
     std::optional<std::chrono::milliseconds> reconnect_delay{};
 
     /**
-     * @brief The maximum delay between reconnects
+     * @brief The maximum delay between reconnects.
      *
      * If set, the reconnect delay will be continuously increased
      * (exactly how is left to the implementation)
@@ -296,6 +329,16 @@ public:
 
     inline void stop() override { return m_impl->stop(); }
 
+    inline bool wait_until_connected() override
+    {
+        return m_impl->wait_until_connected();
+    }
+
+    inline bool wait_until_connected(std::chrono::milliseconds timeout) override
+    {
+        return m_impl->wait_until_connected(timeout);
+    }
+
     inline void failed(std::function<void()> callback) override
     {
         return m_impl->failed(callback);
@@ -321,6 +364,15 @@ public:
 
 private:
     std::unique_ptr<IClient> m_impl;
+};
+
+/**
+ * @brief The client is not started.
+ */
+class ClientNotStartedException : public std::runtime_error
+{
+public:
+    using runtime_error::runtime_error;
 };
 
 /**

@@ -13,6 +13,9 @@
 using WebsocketOptions = loon::WebsocketOptions;
 using namespace loon::websocket;
 
+std::chrono::milliseconds loon::websocket::default_connect_timeout =
+    std::chrono::milliseconds{ HIO_DEFAULT_CONNECT_TIMEOUT };
+
 class ClientImpl : public BaseClient
 {
 public:
@@ -49,6 +52,8 @@ ClientImpl::ClientImpl(
     m_conn.onclose = std::bind(&ClientImpl::on_websocket_close, this);
     if (m_options.connect_timeout.has_value()) {
         m_conn.setConnectTimeout(m_options.connect_timeout.value().count());
+    } else {
+        m_conn.setConnectTimeout(default_connect_timeout.count());
     }
     if (m_options.ping_interval.has_value()) {
         m_conn.setPingInterval(m_options.ping_interval.value().count());

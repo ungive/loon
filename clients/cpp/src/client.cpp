@@ -126,6 +126,18 @@ void ClientImpl::check_content_constraints(
     }
 }
 
+bool loon::ClientImpl::wait_until_connected(
+    std::unique_lock<std::recursive_mutex>& lock,
+    std::chrono::milliseconds timeout)
+{
+    if (!m_started.load()) {
+        throw ClientNotStartedException("the client must be started");
+    }
+    return m_cv_connection_ready.wait_for(lock, timeout, [this] {
+        return m_connected.load();
+    });
+}
+
 std::shared_ptr<ContentHandle> ClientImpl::register_content(
     std::shared_ptr<loon::ContentSource> source, loon::ContentInfo const& info)
 {
@@ -482,7 +494,7 @@ bool ClientImpl::update_connected(bool state)
 
 void ClientImpl::internal_start()
 {
-    if (update_connected(true)) {
+    if (m_started.exchange(true)) {
         return;
     }
     m_conn->start();
@@ -508,7 +520,7 @@ void ClientImpl::reset_connection_state()
 
 void ClientImpl::internal_stop()
 {
-    if (!update_connected(false)) {
+    if (!m_started.exchange(false)) {
         return;
     }
     reset_connection_state();

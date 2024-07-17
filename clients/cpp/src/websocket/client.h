@@ -10,6 +10,8 @@
 
 namespace loon::websocket
 {
+extern std::chrono::milliseconds default_connect_timeout;
+
 class IClient
 {
 public:

@@ -30,6 +30,17 @@ public:
 
     void stop() override;
 
+    inline bool wait_until_connected()
+    {
+        return wait_until_connected(connect_timeout());
+    }
+
+    inline bool wait_until_connected(std::chrono::milliseconds timeout) override
+    {
+        std::unique_lock<std::recursive_mutex> lock(m_mutex);
+        return wait_until_connected(lock, timeout);
+    }
+
     inline void failed(std::function<void()> callback) override
     {
         std::lock_guard<std::recursive_mutex> lock(m_mutex);
@@ -86,6 +97,7 @@ protected:
     inline Hello wait_for_hello()
     {
         std::unique_lock<std::recursive_mutex> lock(m_mutex);
+        wait_until_connected(lock, connect_timeout());
         wait_until_ready(lock);
         return m_hello.value();
     }
@@ -132,6 +144,8 @@ private:
     void on_request_closed(RequestClosed const& request_closed);
     void on_close(Close const& close);
     bool update_connected(bool state);
+    bool wait_until_connected(std::unique_lock<std::recursive_mutex>& lock,
+        std::chrono::milliseconds timeout);
     void wait_until_ready(std::unique_lock<std::recursive_mutex>& lock);
     void check_content_constraints(std::shared_ptr<loon::ContentSource> source,
         loon::ContentInfo const& info);
@@ -142,6 +156,12 @@ private:
     void internal_start();
     void internal_stop();
     void internal_restart();
+
+    inline std::chrono::milliseconds connect_timeout() const
+    {
+        return m_options.websocket_options.connect_timeout.value_or(
+            loon::websocket::default_connect_timeout);
+    }
 
     /**
      * @brief Puts the client in a failed state and closes any connection.
@@ -161,6 +181,7 @@ private:
     std::function<void(Hello&)> m_injected_hello_modifer{};
     std::function<void()> m_failed_callback{};
 
+    std::atomic<bool> m_started{ false };
     std::atomic<bool> m_connected{ false };
     // Use a recursive mutex, since many methods could trigger a reconnect,
     // which would call close and would trigger the close callback,
