@@ -517,6 +517,7 @@ void ClientImpl::internal_stop()
     }
     reset_connection_state();
     m_conn->stop();
+    update_connected(false);
 }
 
 inline void ClientImpl::internal_restart()
