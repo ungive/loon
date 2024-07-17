@@ -396,7 +396,7 @@ TEST(Client, FailsWhenMinCacheDurationIsSetAndServerDoesNotCacheResponses)
         hello.mutable_constraints()->set_max_cache_duration(0);
     });
     ExpectCalled callback;
-    client->failed(callback.get());
+    client->on_failed(callback.get());
     client->start();
     // Wait for the Hello message to have been handled.
     // It's expected that the client is not connected anymore,
@@ -421,7 +421,7 @@ TEST(Client, FailsWhenMinCacheDurationIsSetButResponseIsNotCached)
         hello.mutable_constraints()->set_max_cache_duration(30);
     });
     ExpectCalled failed;
-    client->failed(failed.get());
+    client->on_failed(failed.get());
     client->start();
     auto content = example_content(cache_duration);
     auto handle = client->register_content(content.source, content.info);
@@ -444,7 +444,7 @@ TEST(Client, FailsWhenMaxRequestsPerSecondIsSetAndRequestsAreTooFrequent)
         one_request_within.count();
     auto client = create_client(options, false);
     ExpectCalled failed(1);
-    client->failed(failed.get());
+    client->on_failed(failed.get());
     client->start();
     auto content = example_content();
     auto handle = client->register_content(content.source, content.info);
@@ -472,7 +472,7 @@ TEST(Client, RestartsWhenFailOnTooManyRequestsIsFalseAndRequestsAreTooFrequent)
         one_request_within.count();
     auto client = create_client(options, false);
     ExpectCalled failed(0);
-    client->failed(failed.get());
+    client->on_failed(failed.get());
     client->start();
     auto content = example_content();
     auto first_hello = client->wait_for_hello();
@@ -496,7 +496,7 @@ TEST(Client, DoesNotFailWhenMaxRequestsPerSecondIsSetAndRequestsAreSentSlowly)
         one_request_within.count();
     auto client = create_client(options, false);
     ExpectCalled failed(0);
-    client->failed(failed.get());
+    client->on_failed(failed.get());
     client->start();
     auto content = example_content();
     auto handle = client->register_content(content.source, content.info);

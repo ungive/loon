@@ -41,7 +41,7 @@ public:
         return wait_until_connected(lock, timeout);
     }
 
-    inline void failed(std::function<void()> callback) override
+    inline void on_failed(std::function<void()> callback) override
     {
         std::lock_guard<std::recursive_mutex> lock(m_mutex);
         m_failed_callback = callback;

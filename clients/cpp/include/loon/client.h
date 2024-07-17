@@ -126,7 +126,7 @@ public:
      *
      * @param callback The function to call when the client failed.
      */
-    virtual void failed(std::function<void()> callback) = 0;
+    virtual void on_failed(std::function<void()> callback) = 0;
 
     /**
      * @brief Registers content with this client and returns a handle for it.
@@ -342,9 +342,9 @@ public:
         return m_impl->wait_until_connected(timeout);
     }
 
-    inline void failed(std::function<void()> callback) override
+    inline void on_failed(std::function<void()> callback) override
     {
-        return m_impl->failed(callback);
+        return m_impl->on_failed(callback);
     }
 
     inline std::shared_ptr<ContentHandle> register_content(
