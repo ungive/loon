@@ -2,6 +2,8 @@
 
 ## High
 
+- [ ] Properly document and implement if and how
+    content remains registered across reconnects with the C++ client.
 - [ ] Fix max requests per second with the C++ client.
     Maximum requests per second should be *per content*,
     not *per connection*.
@@ -9,21 +11,27 @@
     and each one is requested immediately,
     then a request limit of 5 requests per minute makes the connection fail,
     which is not what should happen.
-- [ ] Properly document and implement if and how
-    content remains registered across reconnects with the C++ client.
-- [ ] Remove "with_callbacks" from "unregister_all_content" from C++ client
-    and instead add flags to the unregistered callback
-    indicating why it was unregistered (failure, disconnect, manually?).
 - [ ] Add method to iterate all content
     and allow unregistering it while iterating.
     That way a user can unregister e.g. all content except a selected few.
     Once implemented, remove the "unregister_all_content" method.
-- [ ] Add config option to limit how many chunks are buffered on the server.
-- [ ] Add config option to enable TCP keep-alive or not.
-    This should be a choice.
-    If there's a cache in front of it it's e.g. probably a good idea,
-    to keep a connection open between the server and the cache,
-    instead of opening a new connection every time.
+- [ ] Remove "with_callbacks" from "unregister_all_content" from C++ client
+    and instead add flags to the unregistered callback
+    indicating why it was unregistered (failure, disconnect, manually?).
+- [ ] Add proper logging to the C++ client
+    (protobuf, libhv and protocol errors).
+    The client ID should always be logged,
+    this helps a ton with debugging on the server-side.
+    Perhaps also log the Hello message?
+- [ ] Add support for QT websockets to the C++ client,
+    as an alternative to libhv.
+
+## Normal
+
+- [ ] Currently the server synchronizes *all requests*
+    through the client manager.
+    There should be at least *some* concurrency (with goroutines)
+    to handle simultaneous requests concurrently.
 - [ ] Add a feature to "prepopulate" the cache:
     The client makes a request to the URL, but maybe a special URL,
     which causes the server to request and cache the response,
@@ -46,35 +54,27 @@
     instead of running "loon server" directly.
 - [ ] Add versioning to the server and client libraries.
     Perhaps make releases on GitHub.
-- [ ] Currently the server synchronizes *all requests*
-    through the client manager.
-    There should be at least *some* concurrency (with goroutines)
-    to handle simultaneous requests concurrently.
 
-## Normal
-
+## Low
+- [ ] Add config option to limit how many chunks are buffered on the server.
+- [ ] Add config option to enable TCP keep-alive or not.
+    This should be a choice.
+    If there's a cache in front of it it's e.g. probably a good idea,
+    to keep a connection open between the server and the cache,
+    instead of opening a new connection every time.
 - [ ] Automatically update docs on commit or push.
 - [ ] Add test automation via GitHub Actions.
     Run Go tests, generate coverage, run client tests.
     Add badges to README for test coverage.
-- [ ] Add proper logging to the C++ client
-    (protobuf, libhv and protocol errors).
-    The client ID should always be logged,
-    this helps a ton with debugging on the server-side.
-    Perhaps also log the Hello message?
-
-## Low
 - [ ] Write tests for heavy load (multiple parallel requests, no caching)
 - [ ] Add a way to clear cached paths for connected clients,
     so that anything that might be cached on the server can be removed.
     Just a way to free resources whenever needed.
-    Maybe also add a server option "maximum cached paths per client",
+    Maybe also add a server constraint "maximum cached paths per client",
     if it's ever exceeded the connection is closed.
-- [ ] Add flag in client program to verify a server's certificate.
+- [ ] Add flag in the Go CLI program to verify a server's certificate.
 - [ ] Change "-server" option in Go client to use the WSS endpoint url.
 - [ ] Wildcard content types are not supported in the server's constraints yet.
-- [ ] Add support for QT websockets to the C++ client,
-    as an alternative to libhv.
 - [ ] Move image resizing into the client library?
     Might be a good idea, but might also mean additional maintenance
     that is not really a concern of the client library.
