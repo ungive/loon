@@ -258,13 +258,6 @@ void ClientImpl::on_hello(Hello const& hello)
         m_hello = hello;
     }
 
-    auto fail = [this](std::string const& message) {
-        // Make sure to notify all waiting threads on failure,
-        // such that they resume operation.
-        this->fail(message);
-        m_cv_connection_ready.notify_all();
-    };
-
     assert(m_hello->has_constraints());
     if (m_options.min_cache_duration.has_value()) {
         auto min = m_options.min_cache_duration.value().count();
