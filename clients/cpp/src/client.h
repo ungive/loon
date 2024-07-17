@@ -83,7 +83,7 @@ protected:
      *
      * @returns The Hello message from the server.
      */
-    inline Hello current_hello()
+    inline Hello wait_for_hello()
     {
         std::unique_lock<std::recursive_mutex> lock(m_mutex);
         wait_until_ready(lock);

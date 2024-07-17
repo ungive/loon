@@ -32,7 +32,7 @@ public:
 
     inline size_t active_requests() { return ClientImpl::active_requests(); }
 
-    inline Hello current_hello() { return ClientImpl::current_hello(); }
+    inline Hello wait_for_hello() { return ClientImpl::wait_for_hello(); }
 
     inline void inject_hello_modifier(std::function<void(Hello&)> modifier)
     {
@@ -363,7 +363,7 @@ TEST(Client, NoActiveRequestsWhenHandleUrlRequestIsCanceled)
     const auto total_sleep = chunk_sleep * chunk_count;
     const auto cancel_delta = chunk_sleep;
     auto client = create_client();
-    auto hello = client->current_hello();
+    auto hello = client->wait_for_hello();
     auto chunk_size = hello.constraints().chunk_size();
     auto content = example_content_large(3 * chunk_size);
     client->chunk_sleep(chunk_sleep);
@@ -394,7 +394,7 @@ TEST(Client, FailsWhenMinCacheDurationIsSetAndServerDoesNotCacheResponses)
     // Wait for the Hello message to have been handled.
     // It's expected that the client is not connected anymore,
     // since the client should be in a failed state.
-    EXPECT_THROW(client->current_hello(), ClientNotConnectedException);
+    EXPECT_THROW(client->wait_for_hello(), ClientNotConnectedException);
     EXPECT_TRUE(callback.was_called());
 }
 
@@ -468,12 +468,12 @@ TEST(Client, RestartsWhenFailOnTooManyRequestsIsFalseAndRequestsAreTooFrequent)
     client->failed(failed.get());
     client->start();
     auto content = example_content();
-    auto first_hello = client->current_hello();
+    auto first_hello = client->wait_for_hello();
     auto first_handle = client->register_content(content.source, content.info);
     http_get(first_handle->url());
     auto response = http_get(first_handle->url());
     EXPECT_NE(200, response.status);
-    auto second_hello = client->current_hello();
+    auto second_hello = client->wait_for_hello();
     // The client should have restarted, i.e. the client ID is now different.
     ASSERT_NE(first_hello.client_id(), second_hello.client_id());
 }
