@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['headers_19',['headers',['../structloon_1_1_websocket_options.html#a6a7cda44014ea6893816139541f91a51',1,'loon::WebsocketOptions']]]
+  ['iclient_21',['IClient',['../classloon_1_1_i_client.html',1,'loon']]]
 ];

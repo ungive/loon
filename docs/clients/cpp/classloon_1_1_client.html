@@ -72,13 +72,18 @@ $(function() {
 <div class="title">loon::Client Class Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
+
+<p>The loon client.  
+ <a href="classloon_1_1_client.html#details">More...</a></p>
+
+<p><code>#include &lt;<a class="el" href="client_8h_source.html">client.h</a>&gt;</code></p>
 <div class="dynheader">
 Inheritance diagram for loon::Client:</div>
 <div class="dyncontent">
  <div class="center">
   <img src="classloon_1_1_client.png" usemap="#loon::Client_map" alt=""/>
   <map id="loon::Client_map" name="loon::Client_map">
-<area href="classloon_1_1_i_client.html" alt="loon::IClient" shape="rect" coords="0,0,77,24"/>
+<area href="classloon_1_1_i_client.html" title="The interface for a loon client." alt="loon::IClient" shape="rect" coords="0,0,77,24"/>
   </map>
 </div></div>
 <table class="memberdecls">
@@ -92,24 +97,32 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a4da0243ffb3130d0e7a6f65c0a548906"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#a4da0243ffb3130d0e7a6f65c0a548906">stop</a> () override</td></tr>
 <tr class="memdesc:a4da0243ffb3130d0e7a6f65c0a548906"><td class="mdescLeft">&#160;</td><td class="mdescRight">Stops the client and disconnects from the server.  <a href="classloon_1_1_client.html#a4da0243ffb3130d0e7a6f65c0a548906">More...</a><br /></td></tr>
 <tr class="separator:a4da0243ffb3130d0e7a6f65c0a548906"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5391907516bf701481eb4c6da2ab3fc9"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#a5391907516bf701481eb4c6da2ab3fc9">failed</a> (std::function&lt; void()&gt; callback) override</td></tr>
-<tr class="memdesc:a5391907516bf701481eb4c6da2ab3fc9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sets a callback for when the client has unrecoverably failed.  <a href="classloon_1_1_client.html#a5391907516bf701481eb4c6da2ab3fc9">More...</a><br /></td></tr>
-<tr class="separator:a5391907516bf701481eb4c6da2ab3fc9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af12b83af81be38ecb80130b1e682039a"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#af12b83af81be38ecb80130b1e682039a">wait_until_connected</a> () override</td></tr>
+<tr class="memdesc:af12b83af81be38ecb80130b1e682039a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Waits until the client is connected.  <a href="classloon_1_1_client.html#af12b83af81be38ecb80130b1e682039a">More...</a><br /></td></tr>
+<tr class="separator:af12b83af81be38ecb80130b1e682039a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad7a0bc7142d450671f89158d44bef0d3"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#ad7a0bc7142d450671f89158d44bef0d3">wait_until_connected</a> (std::chrono::milliseconds timeout) override</td></tr>
+<tr class="memdesc:ad7a0bc7142d450671f89158d44bef0d3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Waits until the client is connected.  <a href="classloon_1_1_client.html#ad7a0bc7142d450671f89158d44bef0d3">More...</a><br /></td></tr>
+<tr class="separator:ad7a0bc7142d450671f89158d44bef0d3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2bd51caf0885655259f3084073dab8a1"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#a2bd51caf0885655259f3084073dab8a1">on_failed</a> (std::function&lt; void()&gt; callback) override</td></tr>
+<tr class="memdesc:a2bd51caf0885655259f3084073dab8a1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sets a callback for when the client has unrecoverably failed.  <a href="classloon_1_1_client.html#a2bd51caf0885655259f3084073dab8a1">More...</a><br /></td></tr>
+<tr class="separator:a2bd51caf0885655259f3084073dab8a1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a306388ae101447d7bf55b628ba8934a6"><td class="memItemLeft" align="right" valign="top"><a id="a306388ae101447d7bf55b628ba8934a6"></a>
 std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">ContentHandle</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>register_content</b> (std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_source.html">loon::ContentSource</a> &gt; source, <a class="el" href="structloon_1_1_content_info.html">loon::ContentInfo</a> const &amp;info) override</td></tr>
 <tr class="separator:a306388ae101447d7bf55b628ba8934a6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a119d5ea6cb48ee9faab2d61e24ee2c66"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#a119d5ea6cb48ee9faab2d61e24ee2c66">unregister_content</a> (std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">ContentHandle</a> &gt; handle) override</td></tr>
 <tr class="memdesc:a119d5ea6cb48ee9faab2d61e24ee2c66"><td class="mdescLeft">&#160;</td><td class="mdescRight">Unregisters registered content from this client.  <a href="classloon_1_1_client.html#a119d5ea6cb48ee9faab2d61e24ee2c66">More...</a><br /></td></tr>
 <tr class="separator:a119d5ea6cb48ee9faab2d61e24ee2c66"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4bb4a417964ed89e9b1dec35ab3d51f4"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#a4bb4a417964ed89e9b1dec35ab3d51f4">unregister_all_content</a> (bool with_callbacks=true) override</td></tr>
-<tr class="memdesc:a4bb4a417964ed89e9b1dec35ab3d51f4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Unregisters all registered content from this client.  <a href="classloon_1_1_client.html#a4bb4a417964ed89e9b1dec35ab3d51f4">More...</a><br /></td></tr>
-<tr class="separator:a4bb4a417964ed89e9b1dec35ab3d51f4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aab935b022865235c0e8e40a3939d218b"><td class="memItemLeft" align="right" valign="top">std::vector&lt; std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">ContentHandle</a> &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_client.html#aab935b022865235c0e8e40a3939d218b">content</a> () override</td></tr>
+<tr class="memdesc:aab935b022865235c0e8e40a3939d218b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns all handles of content that is currently registered.  <a href="classloon_1_1_client.html#aab935b022865235c0e8e40a3939d218b">More...</a><br /></td></tr>
+<tr class="separator:aab935b022865235c0e8e40a3939d218b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_classloon_1_1_i_client"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_classloon_1_1_i_client')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="classloon_1_1_i_client.html">loon::IClient</a></td></tr>
 <tr class="memitem:a5d67be90fb77328d4a653e5bb256353d inherit pub_methods_classloon_1_1_i_client"><td class="memItemLeft" align="right" valign="top">virtual std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">ContentHandle</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classloon_1_1_i_client.html#a5d67be90fb77328d4a653e5bb256353d">register_content</a> (std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_source.html">ContentSource</a> &gt; source, <a class="el" href="structloon_1_1_content_info.html">ContentInfo</a> const &amp;info)=0</td></tr>
 <tr class="memdesc:a5d67be90fb77328d4a653e5bb256353d inherit pub_methods_classloon_1_1_i_client"><td class="mdescLeft">&#160;</td><td class="mdescRight">Registers content with this client and returns a handle for it.  <a href="classloon_1_1_i_client.html#a5d67be90fb77328d4a653e5bb256353d">More...</a><br /></td></tr>
 <tr class="separator:a5d67be90fb77328d4a653e5bb256353d inherit pub_methods_classloon_1_1_i_client"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
-<h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>The loon client. </p>
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
 <a id="a1e5af3b12e0783bc57eb810ea74ffc7e"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a1e5af3b12e0783bc57eb810ea74ffc7e">&#9670;&nbsp;</a></span>Client()</h2>
 
@@ -139,7 +152,13 @@ std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">Conte
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">address</td><td>The websocket address to connect to. </td></tr>
-    <tr><td class="paramname">options</td><td><a class="el" href="classloon_1_1_client.html">Client</a> options. </td></tr>
+    <tr><td class="paramname">options</td><td><a class="el" href="classloon_1_1_client.html" title="The loon client.">Client</a> options. </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="exception"><dt>Exceptions</dt><dd>
+  <table class="exception">
+    <tr><td class="paramname">std::exception</td><td>if client creation failed. </td></tr>
   </table>
   </dd>
 </dl>
@@ -147,8 +166,8 @@ std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">Conte
 </div>
 </div>
 <h2 class="groupheader">Member Function Documentation</h2>
-<a id="a5391907516bf701481eb4c6da2ab3fc9"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a5391907516bf701481eb4c6da2ab3fc9">&#9670;&nbsp;</a></span>failed()</h2>
+<a id="aab935b022865235c0e8e40a3939d218b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aab935b022865235c0e8e40a3939d218b">&#9670;&nbsp;</a></span>content()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -157,7 +176,38 @@ std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">Conte
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">void loon::Client::failed </td>
+          <td class="memname">std::vector&lt;std::shared_ptr&lt;<a class="el" href="classloon_1_1_content_handle.html">ContentHandle</a>&gt; &gt; loon::Client::content </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Returns all handles of content that is currently registered. </p>
+<p>Represents a snapshot of registered content. Might get invalidated if any of the handle are unregistered or if the client disconnects, fails or is stopped in the meantime.</p>
+<dl class="section return"><dt>Returns</dt><dd>A list of content handles. </dd></dl>
+
+<p>Implements <a class="el" href="classloon_1_1_i_client.html#a59d1434f7f0b0dc2f8a14ad84a2522d5">loon::IClient</a>.</p>
+
+</div>
+</div>
+<a id="a2bd51caf0885655259f3084073dab8a1"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2bd51caf0885655259f3084073dab8a1">&#9670;&nbsp;</a></span>on_failed()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void loon::Client::on_failed </td>
           <td>(</td>
           <td class="paramtype">std::function&lt; void()&gt;&#160;</td>
           <td class="paramname"><em>callback</em></td><td>)</td>
@@ -172,8 +222,8 @@ std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">Conte
 </div><div class="memdoc">
 
 <p>Sets a callback for when the client has unrecoverably failed. </p>
-<p>This callback is only called when an abnormal event occurs, like an unacceptable server configuration that does not allow the client to continue operation. The callback is not called when the client is stopped with <a class="el" href="classloon_1_1_client.html#a4da0243ffb3130d0e7a6f65c0a548906" title="Stops the client and disconnects from the server.">stop()</a> or when the <a class="el" href="classloon_1_1_client.html">Client</a> instance is destructed in the destructor.</p>
-<p>If failure should be detected, this method must be called before <a class="el" href="classloon_1_1_client.html#ab956e5add223ba7a8ab6df2e4c465134" title="Connects to the server and maintains a connection.">start()</a>.</p>
+<p>This callback is only called when an abnormal event occurs, like an unacceptable server configuration that does not allow the client to continue operation. The callback is not called when the client is stopped with <a class="el" href="classloon_1_1_client.html#a4da0243ffb3130d0e7a6f65c0a548906" title="Stops the client and disconnects from the server.">stop()</a> or when the <a class="el" href="classloon_1_1_client.html" title="The loon client.">Client</a> instance is destructed in the destructor. The client is stopped when this method is called.</p>
+<p>It is recommended to call this method before <a class="el" href="classloon_1_1_client.html#ab956e5add223ba7a8ab6df2e4c465134" title="Connects to the server and maintains a connection.">start()</a>, to reliably detect client failures. Do not call any client methods within the callback.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">callback</td><td>The function to call when the client failed. </td></tr>
@@ -181,7 +231,7 @@ std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">Conte
   </dd>
 </dl>
 
-<p>Implements <a class="el" href="classloon_1_1_i_client.html#afb6518e3ee658e0baa8ba2795fe020a1">loon::IClient</a>.</p>
+<p>Implements <a class="el" href="classloon_1_1_i_client.html#afdfec7a4309eb3ca28e62bd868ebfa5f">loon::IClient</a>.</p>
 
 </div>
 </div>
@@ -245,43 +295,6 @@ std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">Conte
 
 </div>
 </div>
-<a id="a4bb4a417964ed89e9b1dec35ab3d51f4"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a4bb4a417964ed89e9b1dec35ab3d51f4">&#9670;&nbsp;</a></span>unregister_all_content()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void loon::Client::unregister_all_content </td>
-          <td>(</td>
-          <td class="paramtype">bool&#160;</td>
-          <td class="paramname"><em>with_callbacks</em> = <code>true</code></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Unregisters all registered content from this client. </p>
-<p>Does nothing if the client is not connected or no content is registered. Does not throw any exception.</p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">with_callbacks</td><td>If true, call all unregistered callbacks. Otherwise content's unregistered callbacks are not called. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p>Implements <a class="el" href="classloon_1_1_i_client.html#a06acee80c24d80bbe21b4ab0177b0165">loon::IClient</a>.</p>
-
-</div>
-</div>
 <a id="a119d5ea6cb48ee9faab2d61e24ee2c66"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a119d5ea6cb48ee9faab2d61e24ee2c66">&#9670;&nbsp;</a></span>unregister_content()</h2>
 
@@ -315,13 +328,101 @@ std::shared_ptr&lt; <a class="el" href="classloon_1_1_content_handle.html">Conte
 </dl>
 <dl class="exception"><dt>Exceptions</dt><dd>
   <table class="exception">
-    <tr><td class="paramname"><a class="el" href="classloon_1_1_client_not_connected_exception.html" title="The client is not connected to the server.">ClientNotConnectedException</a></td><td>if the client is not connected. </td></tr>
+    <tr><td class="paramname"><a class="el" href="classloon_1_1_client_not_connected_exception.html" title="The client is not connected to the server.">ClientNotConnectedException</a></td><td>if the client is not started or connected. </td></tr>
+    <tr><td class="paramname"><a class="el" href="classloon_1_1_client_failed_exception.html" title="The client is in a failed state and was stopped.">ClientFailedException</a></td><td>if the client failed, while attempting to unregister the content. </td></tr>
     <tr><td class="paramname"><a class="el" href="classloon_1_1_content_not_registered_exception.html" title="No content is registered under this handle with this client.">ContentNotRegisteredException</a></td><td>if the content is not registered with this client. </td></tr>
   </table>
   </dd>
 </dl>
 
 <p>Implements <a class="el" href="classloon_1_1_i_client.html#a10ddfe0d1c11db19153bd0e5ed36d94c">loon::IClient</a>.</p>
+
+</div>
+</div>
+<a id="af12b83af81be38ecb80130b1e682039a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af12b83af81be38ecb80130b1e682039a">&#9670;&nbsp;</a></span>wait_until_connected() <span class="overload">[1/2]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool loon::Client::wait_until_connected </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Waits until the client is connected. </p>
+<p>Times out after the connect timeout that was configured within the <a class="el" href="structloon_1_1_websocket_options.html" title="Websocket options for connecting to a loon server.">WebsocketOptions</a> of the client or the default timeout if not explicitly configured.</p>
+<p>Must be called while the client is started.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">timeout</td><td></td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="exception"><dt>Exceptions</dt><dd>
+  <table class="exception">
+    <tr><td class="paramname"><a class="el" href="classloon_1_1_client_not_started_exception.html" title="The client is not started.">ClientNotStartedException</a></td><td>if the client is not started. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+<p>Implements <a class="el" href="classloon_1_1_i_client.html#abce03784a8a365738080f8688ab4d5ed">loon::IClient</a>.</p>
+
+</div>
+</div>
+<a id="ad7a0bc7142d450671f89158d44bef0d3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad7a0bc7142d450671f89158d44bef0d3">&#9670;&nbsp;</a></span>wait_until_connected() <span class="overload">[2/2]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool loon::Client::wait_until_connected </td>
+          <td>(</td>
+          <td class="paramtype">std::chrono::milliseconds&#160;</td>
+          <td class="paramname"><em>timeout</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Waits until the client is connected. </p>
+<p>Times out after the given timeout duration, if the client has not successfully connected within that period. The timeout duration must be greater or equal to zero.</p>
+<p>Can be used to check whether the client is connected at a specific moment, by using a timeout duration of zero.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">timeout</td><td>The timeout period. </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="exception"><dt>Exceptions</dt><dd>
+  <table class="exception">
+    <tr><td class="paramname"><a class="el" href="classloon_1_1_client_not_started_exception.html" title="The client is not started.">ClientNotStartedException</a></td><td>if the client is not started. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+<p>Implements <a class="el" href="classloon_1_1_i_client.html#aebf2a20157b217edd58e8aa8f04bafd3">loon::IClient</a>.</p>
 
 </div>
 </div>

@@ -1,6 +1,4 @@
 var searchData=
 [
-  ['path_26',['path',['../structloon_1_1_content_info.html#a7c84898751b619c3a85fb28896745322',1,'loon::ContentInfo']]],
-  ['pathalreadyregisteredexception_27',['PathAlreadyRegisteredException',['../classloon_1_1_path_already_registered_exception.html',1,'loon']]],
-  ['ping_5finterval_28',['ping_interval',['../structloon_1_1_websocket_options.html#a7652c1b21f3e3d0240970949bc1e64b5',1,'loon::WebsocketOptions']]]
+  ['on_5ffailed_27',['on_failed',['../classloon_1_1_i_client.html#afdfec7a4309eb3ca28e62bd868ebfa5f',1,'loon::IClient::on_failed()'],['../classloon_1_1_client.html#a2bd51caf0885655259f3084073dab8a1',1,'loon::Client::on_failed()']]]
 ];

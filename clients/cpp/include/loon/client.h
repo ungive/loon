@@ -14,7 +14,8 @@
 namespace loon
 {
 /**
- * A handle for content registered with a Client.
+ * @brief A handle for content registered with a Client.
+ *
  */
 class ContentHandle
 {
@@ -60,6 +61,9 @@ public:
     virtual void unregistered(std::function<void()> callback) = 0;
 };
 
+/**
+ * @brief The interface for a loon client.
+ */
 class IClient
 {
 public:
@@ -189,6 +193,9 @@ public:
     virtual std::vector<std::shared_ptr<ContentHandle>> content() = 0;
 };
 
+/**
+ * @brief Websocket options for connecting to a loon server.
+ */
 struct WebsocketOptions
 {
     /**
@@ -260,6 +267,9 @@ struct WebsocketOptions
     std::optional<std::chrono::milliseconds> max_reconnect_delay{};
 };
 
+/**
+ * @brief Options for creating a loon client.
+ */
 struct ClientOptions
 {
     /**
@@ -309,8 +319,7 @@ struct ClientOptions
      *
      * Both pair values must be greater than zero.
      * It is recommended to set this value manually.
-     * A default value is used to enforce this limit, as in most use cases
-     * it is undesirable to allow unlimited requests like this.
+     * An explicit value must be set.
      *
      * If no limit is required, set this value to nullopt.
      */
@@ -330,6 +339,9 @@ struct ClientOptions
     std::optional<size_t> max_upload_speed{};
 };
 
+/**
+ * @brief The loon client.
+ */
 class Client : public IClient
 {
 public:
