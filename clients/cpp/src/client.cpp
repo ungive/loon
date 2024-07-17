@@ -207,17 +207,16 @@ void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
     m_content.erase(it);
 }
 
-void loon::ClientImpl::unregister_all_content(bool with_callbacks)
+std::vector<std::shared_ptr<ContentHandle>> loon::ClientImpl::content()
 {
-    std::unique_lock<std::recursive_mutex> lock(m_mutex);
-
-    for (auto& [_, content] : m_content) {
-        if (with_callbacks) {
-            content->unregistered();
-        }
-        content->request_handler()->exit_gracefully();
-    }
-    m_content.clear();
+    std::vector<std::shared_ptr<ContentHandle>> result;
+    result.reserve(m_content.size());
+    std::transform(m_content.begin(), m_content.end(),
+        std::back_inserter(result),
+        [](decltype(m_content)::value_type const& value) {
+            return value.second;
+        });
+    return result;
 }
 
 bool ClientImpl::send(ClientMessage const& message)

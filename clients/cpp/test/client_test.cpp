@@ -275,42 +275,12 @@ TEST(Client, UnregisteredCallbackIsCalledWhenUnregistering)
     client->unregister_content(handle);
 }
 
-TEST(Client, UnregisteredCallbackIsCalledWhenUnregisteringAll)
-{
-    auto client = create_client();
-    auto content = example_content();
-    auto handle = client->register_content(content.source, content.info);
-    ExpectCalled callback;
-    handle->unregistered(callback.get());
-    client->unregister_all_content();
-}
-
-TEST(Client, UnregisteredCallbackIsNotCalledWhenUnregisteringAllWithoutCalls)
-{
-    auto client = create_client();
-    auto content = example_content();
-    auto handle = client->register_content(content.source, content.info);
-    ExpectCalled callback(0);
-    handle->unregistered(callback.get());
-    client->unregister_all_content(false);
-}
-
 TEST(Client, UrlIsInvalidWhenContentIsUnregistered)
 {
     auto client = create_client();
     auto content = example_content();
     auto handle = client->register_content(content.source, content.info);
     client->unregister_content(handle);
-    auto response = http_get(handle->url());
-    EXPECT_NE(200, response.status);
-}
-
-TEST(Client, UrlIsInvalidWhenAllContentIsUnregistered)
-{
-    auto client = create_client();
-    auto content = example_content();
-    auto handle = client->register_content(content.source, content.info);
-    client->unregister_all_content();
     auto response = http_get(handle->url());
     EXPECT_NE(200, response.status);
 }
@@ -519,4 +489,16 @@ TEST(Client, CreationFailsWhenMaxUploadSpeedIsSet)
     ClientOptions options;
     options.max_upload_speed = 100;
     EXPECT_THROW(create_client(options, false), std::exception);
+}
+
+TEST(Client, ContentReturnsAllRegisteredContent)
+{
+    auto client = create_client();
+    auto c1 = example_content(std::nullopt, "1.txt");
+    auto c2 = example_content(std::nullopt, "2.txt");
+    auto h1 = client->register_content(c1.source, c1.info);
+    auto h2 = client->register_content(c2.source, c2.info);
+    auto h = client->content();
+    EXPECT_TRUE(std::find(h.begin(), h.end(), h1) != h.end());
+    EXPECT_TRUE(std::find(h.begin(), h.end(), h2) != h.end());
 }

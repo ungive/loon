@@ -177,15 +177,15 @@ public:
     virtual void unregister_content(std::shared_ptr<ContentHandle> handle) = 0;
 
     /**
-     * @brief Unregisters all registered content from this client.
+     * @brief Returns all handles of content that is currently registered.
      *
-     * Does nothing if the client is not connected or no content is registered.
-     * Does not throw any exception.
+     * Represents a snapshot of registered content.
+     * Might get invalidated if any of the handle are unregistered
+     * or if the client disconnects, fails or is stopped in the meantime.
      *
-     * @param with_callbacks If true, call all unregistered callbacks.
-     * Otherwise content's unregistered callbacks are not called.
+     * @returns A list of content handles.
      */
-    virtual void unregister_all_content(bool with_callbacks = true) = 0;
+    virtual std::vector<std::shared_ptr<ContentHandle>> content() = 0;
 };
 
 struct WebsocketOptions
@@ -360,9 +360,9 @@ public:
         return m_impl->unregister_content(handle);
     }
 
-    inline void unregister_all_content(bool with_callbacks = true) override
+    inline std::vector<std::shared_ptr<ContentHandle>> content() override
     {
-        return m_impl->unregister_all_content(with_callbacks);
+        return m_impl->content();
     }
 
 private:
