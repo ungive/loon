@@ -486,9 +486,8 @@ bool ClientImpl::update_connected(bool state)
 {
     auto old_state = m_connected.exchange(state);
     // Notify any thread that might be waiting for connection state changes.
-    if (old_state != state) {
-        m_cv_connection_ready.notify_all();
-    }
+    // Just to be sure, always notify, even if the state might not have changed.
+    m_cv_connection_ready.notify_all();
     return old_state;
 }
 
