@@ -2,22 +2,8 @@
 
 ## High
 
-- [ ] Properly document and implement if and how
-    content remains registered across reconnects with the C++ client.
-- [ ] Fix max requests per second with the C++ client.
-    Maximum requests per second should be *per content*,
-    not *per connection*.
-    If 10 pieces of content are registered per minute
-    and each one is requested immediately,
-    then a request limit of 5 requests per minute makes the connection fail,
-    which is not what should happen.
-- [ ] Add method to iterate all content
-    and allow unregistering it while iterating.
-    That way a user can unregister e.g. all content except a selected few.
-    Once implemented, remove the "unregister_all_content" method.
-- [ ] Remove "with_callbacks" from "unregister_all_content" from C++ client
-    and instead add flags to the unregistered callback
-    indicating why it was unregistered (failure, disconnect, manually?).
+- [ ] Auto-restart after...? for new client ID, to stay anonymous or idk
+    as an option for the client
 - [ ] Add proper logging to the C++ client
     (protobuf, libhv and protocol errors).
     The client ID should always be logged,
