@@ -491,8 +491,6 @@ void ClientImpl::internal_start()
 void ClientImpl::reset_connection_state()
 {
     for (auto& [_, content] : m_content) {
-        // Notify that content is not registered anymore.
-        content->unregistered();
         // Make sure all spawned request handler threads exit
         // and wait until they exited.
         // This method is used from the destructor,
@@ -500,6 +498,8 @@ void ClientImpl::reset_connection_state()
         // Request handlers use pointers to data in this object,
         // so this object must remain valid until each handler exited.
         content->request_handler()->exit_gracefully();
+        // Notify that content is not registered anymore.
+        content->unregistered();
     }
     m_content.clear();
     m_requests.clear();

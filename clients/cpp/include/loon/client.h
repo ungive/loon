@@ -51,7 +51,8 @@ public:
      * or if the content is not registered with the client anymore,
      * when this method was called to set the callback.
      *
-     * Any set callback is called at most once.
+     * The callback is called at most once.
+     * Do not call any client methods within the callback.
      *
      * @param callback The callback function to set.
      */
@@ -89,7 +90,8 @@ public:
      * The callback is not called when the client is stopped with stop()
      * or when the Client instance is destructed in the destructor.
      *
-     * If failure should be detected, this method must be called before start().
+     * It is recommended to call this method before start().
+     * Do not call any client methods within the callback.
      *
      * @param callback The function to call when the client failed.
      */
@@ -98,8 +100,10 @@ public:
     /**
      * @brief Registers content with this client and returns a handle for it.
      *
-     * The content remains registered across websocket reconnects,
-     * until it is unregistered with unregister_content().
+     * The content is registered for the lifetime of the websocket connection
+     * or until it is unregistered with unregister_content().
+     * If it is necessary to re-register the content again after a disconnect.
+     *
      * Calls to any of the methods of the source are synchronized.
      * The source's data() method is only called once per request
      * and while no other requests are being handled
