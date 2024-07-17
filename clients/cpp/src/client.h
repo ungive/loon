@@ -177,7 +177,8 @@ private:
     std::chrono::milliseconds m_chunk_sleep_duration{
         std::chrono::milliseconds::zero()
     };
-    std::deque<std::chrono::system_clock::time_point> request_history{};
+    std::deque<std::chrono::system_clock::time_point>
+        m_no_content_request_history{};
     std::function<void(Hello&)> m_injected_hello_modifer{};
     std::function<void()> m_failed_callback{};
 
@@ -212,6 +213,7 @@ private:
     std::unique_ptr<websocket::Client> m_conn;
 
     void call_served_callback(decltype(m_requests)::iterator it);
+    bool check_request_limit(decltype(m_content)::iterator it);
 };
 
 class InternalContentHandle : public ContentHandle
@@ -248,6 +250,8 @@ public:
         m_unregistered_callback = callback;
     }
 
+    // internal
+
     /**
      * @brief Call this method if the content has been fully served once.
      */
@@ -271,6 +275,13 @@ public:
         m_registered = false;
         m_unregistered_callback = nullptr;
     }
+
+    /**
+     * @brief The point in time when the last request has been received.
+     *
+     * Has no value if not request was received before.
+     */
+    std::optional<std::chrono::system_clock::time_point> last_request{};
 
 private:
     std::string m_url{};

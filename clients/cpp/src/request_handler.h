@@ -21,7 +21,6 @@ public:
         std::chrono::milliseconds chunk_sleep{
             std::chrono::milliseconds::zero()
         };
-        std::optional<std::chrono::seconds> min_cache_duration{};
     };
 
     /**
@@ -50,9 +49,6 @@ public:
      * @param request The request to serve.
      * @param callback The calback that is called,
      * once the response for the request has been fully sent.
-     *
-     * @throws ResponseNotCachedException if a request is made too quickly,
-     * while the server should have cached the response instead.
      */
     void serve_request(Request const& request, std::function<void()> callback);
 
@@ -123,7 +119,6 @@ private:
     };
 
     using request_id_t = uint64_t;
-    using time_point_t = std::chrono::time_point<std::chrono::system_clock>;
 
     Hello m_hello;
     loon::ContentInfo m_info;
@@ -140,7 +135,6 @@ private:
     std::mutex m_mutex_low{};  // Mutex for low-priority access threads.
 
     std::condition_variable m_cv_incoming_request{};
-    std::optional<time_point_t> m_last_request;
     std::deque<ServeRequest> m_pending_requests{};
     std::optional<request_id_t> m_handling_request_id{};
     bool m_cancel_handling_request{ false };
@@ -148,17 +142,5 @@ private:
     bool m_stop{ false };
     bool m_done{ false };
     std::condition_variable m_cv_done{};
-};
-
-/**
- * @brief The response has not been cached by the server.
- *
- * This happens when a request is made too quickly before the last request,
- * when instead it is expected to have been cached by the server.
- */
-class ResponseNotCachedException : public std::runtime_error
-{
-public:
-    using runtime_error::runtime_error;
 };
 } // namespace loon

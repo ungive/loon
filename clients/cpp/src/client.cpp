@@ -13,6 +13,8 @@
 
 using namespace loon;
 
+using namespace std::chrono_literals;
+
 Client::Client(std::string const& address, ClientOptions options)
     : m_impl{ std::make_unique<ClientImpl>(address, options) }
 {
@@ -27,25 +29,29 @@ ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
         m_options.min_cache_duration.value() <=
             std::chrono::milliseconds::zero()) {
         throw std::runtime_error(
-            "the minimum cache duration must be greater than zero");
+            "min_cache_duration must be greater than zero");
     }
-    if (m_options.max_requests_per_second.has_value() &&
-        m_options.max_requests_per_second.value() <= 0.001) {
-        throw std::runtime_error(
-            "maximum requests per second must be larger than zero");
+    if (m_options.no_content_request_limit.has_value()) {
+        auto limit = m_options.no_content_request_limit.value();
+        if (limit.first == -1 &&
+            limit.second == std::chrono::milliseconds::zero()) {
+            // TODO: perhaps make this a warning in the future. for now
+            // it's better to not give this field a default value though.
+            throw std::runtime_error(
+                "no_content_request_limit must be explicitly set to a value");
+        }
+        if (limit.first <= 0 ||
+            limit.second <= std::chrono::milliseconds::zero()) {
+            throw std::runtime_error("no_content_request_limit pair values "
+                                     "must be greater than zero");
+        }
     }
     if (m_options.max_upload_speed.has_value() &&
         m_options.max_upload_speed.value() == 0) {
-        throw std::runtime_error("maximum upload speed may not be zero");
-    }
-    if (m_options.fail_on_too_many_requests &&
-        !m_options.max_requests_per_second.has_value()) {
-        throw std::runtime_error(
-            "to fail with too many requests, "
-            "a maximum number of requests per second must be set");
+        throw std::runtime_error("max_upload_speed may not be zero");
     }
     if (m_options.max_upload_speed.has_value()) {
-        throw std::runtime_error("not yet implemented");
+        throw std::runtime_error("max_upload_speed is not yet implemented");
     }
     // Event handlers
     m_conn->on_open(std::bind(&ClientImpl::on_websocket_open, this));
@@ -169,7 +175,6 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
     auto send = std::bind(&ClientImpl::send, this, std::placeholders::_1);
     RequestHandler::Options options;
     options.chunk_sleep = m_chunk_sleep_duration;
-    options.min_cache_duration = m_options.min_cache_duration;
     auto request_handle = std::make_shared<RequestHandler>(
         info, source, m_hello.value(), options, send);
     request_handle->spawn_serve_thread();
@@ -273,6 +278,37 @@ void ClientImpl::on_hello(Hello const& hello)
     m_cv_connection_ready.notify_all();
 }
 
+bool ClientImpl::check_request_limit(decltype(m_content)::iterator it)
+{
+    auto has_content = it != m_content.end();
+    auto now = std::chrono::system_clock::now();
+    if (has_content && m_options.min_cache_duration.has_value()) {
+        auto& last_request = it->second->last_request;
+        if (last_request.has_value() &&
+            now - last_request.value() <=
+                m_options.min_cache_duration.value()) {
+            return true;
+        }
+        last_request = now;
+    } else if (!has_content && m_options.no_content_request_limit.has_value()) {
+        auto& history = m_no_content_request_history;
+        auto const& limit = m_options.no_content_request_limit.value();
+        for (auto it = history.begin(); it != history.end();) {
+            auto then = *it;
+            assert(then <= now);
+            if (now - then <= limit.second) {
+                break;
+            }
+            it = history.erase(it);
+        }
+        history.push_back(now);
+        if (history.size() > limit.first) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void ClientImpl::on_request(Request const& request)
 {
     // TODO
@@ -285,33 +321,12 @@ void ClientImpl::on_request(Request const& request)
         return internal_restart();
     }
 
-    if (m_options.max_requests_per_second.has_value()) {
-        auto requests_per_second = m_options.max_requests_per_second.value();
-        auto milliseconds_per_request = std::chrono::milliseconds{
-            static_cast<long long>(1000.0 / requests_per_second)
-        };
-        auto now = std::chrono::system_clock::now();
-        for (auto it = request_history.begin(); it != request_history.end();) {
-            auto then = *it;
-            assert(then <= now);
-            if (now - then <= milliseconds_per_request) {
-                break;
-            }
-            it = request_history.erase(it);
-        }
-        request_history.push_back(now);
-        if (request_history.size() > 1) {
-            if (m_options.fail_on_too_many_requests) {
-                std::cerr << "FAIL\n";
-                return fail("maximum number of requests per second exceeded");
-            } else {
-                std::cerr << "RESTART\n";
-                return internal_restart();
-            }
-        }
+    auto it = m_content.find(request.path());
+    if (check_request_limit(it)) {
+        std::cerr << "restart: request limit reached\n";
+        return internal_restart();
     }
 
-    auto it = m_content.find(request.path());
     if (it == m_content.end()) {
         ClientMessage message;
         auto empty_response = message.mutable_empty_response();
@@ -322,13 +337,8 @@ void ClientImpl::on_request(Request const& request)
 
     auto content = it->second;
     m_requests.emplace(request.id(), std::make_pair(content, false));
-    try {
-        content->request_handler()->serve_request(
-            request, std::bind(&ClientImpl::response_sent, this, request.id()));
-    }
-    catch (ResponseNotCachedException const& e) {
-        return fail(e.what());
-    }
+    content->request_handler()->serve_request(
+        request, std::bind(&ClientImpl::response_sent, this, request.id()));
 }
 
 inline void ClientImpl::call_served_callback(decltype(m_requests)::iterator it)

@@ -7,6 +7,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #include "loon/content.h"
 
@@ -267,43 +268,55 @@ struct ClientOptions
     WebsocketOptions websocket_options{};
 
     /**
-     * @brief The minimum duration for which
-     * responses must be cached by the server, in seconds.
+     * @brief The duration for which responses must be cached by the server.
      *
-     * This means that when another request comes in for the same content,
-     * within the time period of this duration,
-     * the client will fail and stop with an error.
+     * Within this time period, at most one request may be received
+     * for an individual piece of registered content,
+     * otherwise the connection is closed and the client reconnects.
      *
-     * The client also fails if the server does not support caching.
+     * The value must be greater than zero, if set.
+     * The client fails and stops if the server does not support caching.
      */
     std::optional<std::chrono::seconds> min_cache_duration{};
 
     /**
-     * @brief The maximum number of requests to handle per second.
+     * @brief Maximum number of requests per time frame for missing content.
      *
-     * If this number is exceeded, the client restarts.
-     * Any registered content will be unregistered and must be registered again.
-     * Unregistered callbacks will be called on each piece of content.
+     * Designates how many requests (first pair value)
+     * are allowed within a given time frame (second pair value)
+     * for request paths that lead to content that is not registered anymore.
+     * If this limit is exceeded, the client simply disconnects and reconnects,
+     * leading to a new client ID and thereby
+     * invalidating all previously generated URLs.
      *
-     * If fail_on_too_many_requests is set, the client fails instead.
+     * The purpose of this option is to make sure the client
+     * is not flooded with requests that lead to no content.
+     * To simplify the implementation, requests that lead to no content
+     * are not tracked individually, but grouped together.
+     * Therefore a general limit like this is employed
+     * as a means to limit incoming requests for no content.
      *
-     * This option exists in the case that a malicious third party
-     * attempts to spam this client with requests,
-     * which might cause an extraneous
+     * It is recommended to set this limit as high as possible,
+     * to not disrupt the normal flow of your application.
+     * The exact value should be chosen depending on:
+     * - how much content is registered,
+     * - how many invalid generated URLs might exist during program execution,
+     * - which third parties receive generated URLs,
+     * - when third parties might discard these generated URLs,
+     *   i.e. how many URLs might be in circulation at a time,
+     * - how often these URLs are being requested,
+     * - and how long the server caches responses.
+     *
+     * Both pair values must be greater than zero.
+     * It is recommended to set this value manually.
+     * A default value is used to enforce this limit, as in most use cases
+     * it is undesirable to allow unlimited requests like this.
+     *
+     * If no limit is required, set this value to nullopt.
      */
-    std::optional<double> max_requests_per_second{};
-
-    /**
-     * @brief If set to true, this client fails on too many requests.
-     *
-     * How many requests exactly consitute as "too many requests"
-     * is determined by the value for max_requests_per_second,
-     * which must be set if this flag is true.
-     *
-     * On failure, the client stops with an error
-     * and must be started again manually to continue.
-     */
-    bool fail_on_too_many_requests{ false };
+    std::optional<std::pair<size_t, std::chrono::milliseconds>>
+        no_content_request_limit{ std::make_pair(
+            -1, std::chrono::seconds{ 0 }) };
 
     // TODO: not yet implemented
     /**
@@ -325,6 +338,7 @@ public:
      *
      * @param address The websocket address to connect to.
      * @param options Client options.
+     * @throws std::exception if client creation failed.
      */
     Client(std::string const& address, ClientOptions options = {});
 

@@ -168,22 +168,6 @@ void RequestHandler::serve_request(
     // Neither high, nor low priority.
     const std::lock_guard<std::mutex> lock(m_mutex);
 
-    // Check if the previous response should have been cached by the server.
-    auto now = std::chrono::system_clock::now();
-    if (m_options.min_cache_duration.has_value() &&
-        m_last_request.has_value()) {
-        auto then = m_last_request.value();
-        auto elapsed = now - then;
-        assert(now - then >= 0ms);
-        auto duration = m_options.min_cache_duration.value();
-        if (elapsed <= duration) {
-            throw ResponseNotCachedException(
-                "the server does not seem to cache previous responses for a "
-                "sufficient amount of time");
-        }
-    }
-    m_last_request = now;
-
     m_pending_requests.push_back(ServeRequest(request, callback));
     m_cv_incoming_request.notify_one();
 }

@@ -55,7 +55,14 @@ public:
 static std::shared_ptr<TestClient> create_client(
     ClientOptions options = {}, bool started = true)
 {
-    options.websocket_options.basic_authorization = TEST_AUTH;
+    if (options.no_content_request_limit.has_value() &&
+        options.no_content_request_limit->first == -1 &&
+        options.no_content_request_limit->second == 0ms) {
+        options.no_content_request_limit = std::make_pair(8, 1s);
+    }
+    if (!options.websocket_options.basic_authorization.has_value()) {
+        options.websocket_options.basic_authorization = TEST_AUTH;
+    }
     auto client = std::make_shared<TestClient>(TEST_ADDRESS, options);
     if (started) {
         client->start();
@@ -99,6 +106,12 @@ static Content create_content(std::string const& path,
 static Content example_content(
     std::optional<uint32_t> max_cache_duration = std::nullopt,
     std::string const& path = "example.txt")
+{
+    return create_content(path, "text/plain", "test", max_cache_duration);
+}
+
+static Content example_content(std::string const& path,
+    std::optional<uint32_t> max_cache_duration = std::nullopt)
 {
     return create_content(path, "text/plain", "test", max_cache_duration);
 }
@@ -367,7 +380,7 @@ TEST(Client, FailsWhenMinCacheDurationIsSetAndServerDoesNotCacheResponses)
     });
     ExpectCalled callback;
     client->on_failed(callback.get());
-    client->start();
+    client->start_and_wait_until_connected();
     // Wait for the Hello message to have been handled.
     // It's expected that the client is not connected anymore,
     // since the client should be in a failed state.
@@ -390,9 +403,7 @@ TEST(Client, FailsWhenMinCacheDurationIsSetButResponseIsNotCached)
         // This would resemble a server that claims to cache, but doesn't.
         hello.mutable_constraints()->set_max_cache_duration(30);
     });
-    ExpectCalled failed;
-    client->on_failed(failed.get());
-    client->start();
+    client->start_and_wait_until_connected();
     auto content = example_content(cache_duration);
     auto handle = client->register_content(content.source, content.info);
     // The served callback should only be called once,
@@ -403,85 +414,73 @@ TEST(Client, FailsWhenMinCacheDurationIsSetButResponseIsNotCached)
     http_get(handle->url());
 }
 
-TEST(Client, FailsWhenMaxRequestsPerSecondIsSetAndRequestsAreTooFrequent)
+TEST(Client, RestartsWhenReceivingTooManyNoContentRequests)
 {
-    using namespace std::chrono;
-    const auto one_request_within = 25ms;
     ClientOptions options;
-    options.fail_on_too_many_requests = true;
-    options.max_requests_per_second =
-        static_cast<double>(duration_cast<milliseconds>(1s).count()) /
-        one_request_within.count();
+    options.no_content_request_limit = std::make_pair(1, 1s);
     auto client = create_client(options, false);
-    ExpectCalled failed(1);
-    client->on_failed(failed.get());
-    client->start();
-    auto content = example_content();
-    auto handle = client->register_content(content.source, content.info);
-    auto start = time_now();
-    http_get(handle->url());
-    auto diff = duration_cast<milliseconds>(time_now() - start);
-    auto sleep = one_request_within / 2 - diff;
-    if (sleep > 0ms) {
-        std::this_thread::sleep_for(sleep);
-    } else {
-        FAIL() << "the first request took too long";
-    }
-    auto response = http_get(handle->url());
-    EXPECT_NE(200, response.status);
+    client->start_and_wait_until_connected();
+    auto c1 = example_content("1.txt");
+    auto c2 = example_content("2.txt");
+    auto handle = client->register_content(c1.source, c1.info);
+    client->register_content(c2.source, c2.info);
+    client->unregister_content(handle);
+    auto response1 = http_get(handle->url());
+    EXPECT_EQ(404, response1.status);
+    auto response2 = http_get(handle->url());
+    EXPECT_NE(200, response2.status);
+    client->wait_until_connected();
+    // Check that the client restarted, i.e. it has no content.
+    EXPECT_EQ(0, client->content().size());
 }
 
-TEST(Client, RestartsWhenFailOnTooManyRequestsIsFalseAndRequestsAreTooFrequent)
+TEST(Client, DoesNotRestartWhenReceivingNoContentRequestsWithinLimit)
 {
-    using namespace std::chrono;
-    const auto one_request_within = 25ms;
     ClientOptions options;
-    options.fail_on_too_many_requests = false;
-    options.max_requests_per_second =
-        static_cast<double>(duration_cast<milliseconds>(1s).count()) /
-        one_request_within.count();
+    options.no_content_request_limit = std::make_pair(2, 1s);
     auto client = create_client(options, false);
-    ExpectCalled failed(0);
-    client->on_failed(failed.get());
-    client->start();
-    auto content = example_content();
-    auto first_hello = client->wait_for_hello();
-    auto first_handle = client->register_content(content.source, content.info);
-    http_get(first_handle->url());
-    auto response = http_get(first_handle->url());
-    EXPECT_NE(200, response.status);
-    auto second_hello = client->wait_for_hello();
-    // The client should have restarted, i.e. the client ID is now different.
-    ASSERT_NE(first_hello.client_id(), second_hello.client_id());
+    client->start_and_wait_until_connected();
+    auto c1 = example_content("1.txt");
+    auto c2 = example_content("2.txt");
+    auto handle = client->register_content(c1.source, c1.info);
+    client->register_content(c2.source, c2.info);
+    client->unregister_content(handle);
+    auto response1 = http_get(handle->url());
+    EXPECT_EQ(404, response1.status);
+    auto response2 = http_get(handle->url());
+    EXPECT_EQ(404, response2.status);
+    client->wait_until_connected();
+    // Check that the client did not restart.
+    EXPECT_EQ(1, client->content().size());
 }
 
-TEST(Client, DoesNotFailWhenMaxRequestsPerSecondIsSetAndRequestsAreSentSlowly)
+TEST(Client, DoesNotRestartWhenNoContentRequestLimitIsEmpty)
 {
-    using namespace std::chrono;
-    const auto one_request_within = 25ms;
     ClientOptions options;
-    options.fail_on_too_many_requests = true;
-    options.max_requests_per_second =
-        static_cast<double>(duration_cast<milliseconds>(1s).count()) /
-        one_request_within.count();
+    options.no_content_request_limit = std::nullopt;
     auto client = create_client(options, false);
-    ExpectCalled failed(0);
-    client->on_failed(failed.get());
-    client->start();
-    auto content = example_content();
-    auto handle = client->register_content(content.source, content.info);
-    auto start = time_now();
-    http_get(handle->url());
-    auto diff = duration_cast<milliseconds>(time_now() - start);
-    auto sleep = one_request_within * 3 / 2 - diff;
-    if (sleep > 0ms) {
-        std::this_thread::sleep_for(sleep);
-    } else {
-        FAIL() << "the first request took too long";
-    }
-    auto response = http_get(handle->url());
-    EXPECT_EQ(200, response.status);
-    EXPECT_EQ(content.data, response.body);
+    client->start_and_wait_until_connected();
+    auto c1 = example_content("1.txt");
+    auto c2 = example_content("2.txt");
+    auto handle = client->register_content(c1.source, c1.info);
+    client->register_content(c2.source, c2.info);
+    client->unregister_content(handle);
+    auto response1 = http_get(handle->url());
+    EXPECT_EQ(404, response1.status);
+    auto response2 = http_get(handle->url());
+    EXPECT_EQ(404, response2.status);
+    auto response3 = http_get(handle->url());
+    EXPECT_EQ(404, response3.status);
+    // Check that the client did not restart.
+    EXPECT_EQ(1, client->content().size());
+}
+
+TEST(Client, ClientCreationThrowsExceptionWhenNoContentRequestLimitIsUnset)
+{
+    ClientOptions options;
+    // Not setting no_content_request_limit to anything explicitly.
+    // options.no_content_request_limit = std::nullopt;
+    EXPECT_THROW(TestClient(TEST_ADDRESS, options), std::exception);
 }
 
 TEST(Client, CreationFailsWhenMaxUploadSpeedIsSet)
@@ -494,8 +493,8 @@ TEST(Client, CreationFailsWhenMaxUploadSpeedIsSet)
 TEST(Client, ContentReturnsAllRegisteredContent)
 {
     auto client = create_client();
-    auto c1 = example_content(std::nullopt, "1.txt");
-    auto c2 = example_content(std::nullopt, "2.txt");
+    auto c1 = example_content("1.txt");
+    auto c2 = example_content("2.txt");
     auto h1 = client->register_content(c1.source, c1.info);
     auto h2 = client->register_content(c2.source, c2.info);
     auto h = client->content();
