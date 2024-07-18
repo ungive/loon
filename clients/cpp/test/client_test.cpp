@@ -87,8 +87,7 @@ struct Content
 };
 
 static Content create_content(std::string const& path,
-    std::string const& content_type,
-    std::string const& content,
+    std::string const& content_type, std::string const& content,
     std::optional<uint32_t> max_cache_duration = std::nullopt)
 {
     Content result;

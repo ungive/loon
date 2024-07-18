@@ -26,9 +26,7 @@ using namespace loon;
     m_mutex_next.unlock();
 
 RequestHandler::RequestHandler(ContentInfo const& info,
-    std::shared_ptr<ContentSource> source,
-    Hello const& hello,
-    Options options,
+    std::shared_ptr<ContentSource> source, Hello const& hello, Options options,
     std::function<bool(ClientMessage const&)> send_func)
     : m_hello{ hello }, m_info{ info }, m_source{ source },
       m_options{ options }, m_send_message{ send_func }

@@ -32,7 +32,7 @@ AllowShortLambdasOnASingleLine: Empty
 AlwaysBreakTemplateDeclarations: true
 AlignOperands: DontAlign
 AlignEscapedNewlines: Left
-BinPackParameters: false
+BinPackParameters: true
 ---
 # Notes:
 # Designated initializer list formatting: Write a ',' after the last item.

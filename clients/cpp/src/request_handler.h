@@ -34,10 +34,8 @@ public:
      * to send response client messages to the websocket peer.
      */
     RequestHandler(loon::ContentInfo const& info,
-        std::shared_ptr<loon::ContentSource> source,
-        Hello const& hello,
-        Options options,
-        std::function<bool(ClientMessage const&)> send_func);
+        std::shared_ptr<loon::ContentSource> source, Hello const& hello,
+        Options options, std::function<bool(ClientMessage const&)> send_func);
 
     /**
      * @brief Forwards the given request to the serve thread.

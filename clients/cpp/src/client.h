@@ -219,8 +219,7 @@ private:
 class InternalContentHandle : public ContentHandle
 {
 public:
-    InternalContentHandle(std::string const& url,
-        std::string const& path,
+    InternalContentHandle(std::string const& url, std::string const& path,
         std::shared_ptr<RequestHandler> request_handle)
         : m_url{ url }, m_path{ path }, m_request_handler{ request_handle }
     {
