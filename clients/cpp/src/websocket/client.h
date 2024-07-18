@@ -19,6 +19,13 @@ public:
     virtual ~IClient() {};
 
     /**
+     * @brief The websocket server address the client connects to.
+     *
+     * @returns The websocket address.
+     */
+    virtual std::string const& address() = 0;
+
+    /**
      * @brief Sets the callback for when the connection is opened.
      *
      * May not be called after start().
@@ -81,8 +88,11 @@ public:
      * if a reconnect delay is configured in the options.
      *
      * Does nothing, if the client is already started.
+     *
+     * @returns Whether the client has
+     * successfully connected the first time or not.
      */
-    virtual void start() = 0;
+    virtual bool start() = 0;
 
     /**
      * @brief Stops the websocket client.
@@ -96,6 +106,8 @@ class Client : public IClient
 {
 public:
     Client(std::string const& address, WebsocketOptions const& options);
+
+    inline std::string const& address() override { return m_impl->address(); }
 
     inline void on_open(std::function<void()> callback) override
     {
@@ -123,9 +135,9 @@ public:
         return m_impl->send_text(data, length);
     }
 
-    inline void start() override { m_impl->start(); }
+    inline bool start() override { return m_impl->start(); }
 
-    inline void stop() override { m_impl->stop(); }
+    inline void stop() override { return m_impl->stop(); }
 
 private:
     std::unique_ptr<IClient> m_impl;
@@ -135,6 +147,8 @@ class BaseClient : public IClient
 {
 public:
     BaseClient(std::string const& address, WebsocketOptions const& options);
+
+    inline std::string const& address() override { return m_address; }
 
     void on_open(std::function<void()> callback) override;
 
@@ -147,12 +161,12 @@ public:
 
     virtual int64_t send_text(const char* data, size_t length) = 0;
 
-    void start() override;
+    bool start() override;
 
     void stop() override;
 
 protected:
-    virtual void internal_start() = 0;
+    virtual bool internal_start() = 0;
     virtual void internal_stop() = 0;
 
     /**
@@ -185,7 +199,7 @@ protected:
         }
     }
 
-    std::string m_address{};
+    const std::string m_address{};
     WebsocketOptions m_options{};
 
     std::mutex m_mutex{};

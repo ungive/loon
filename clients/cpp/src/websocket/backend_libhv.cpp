@@ -30,7 +30,7 @@ public:
     int64_t send_text(const char* data, size_t length) override;
 
 protected:
-    void internal_start() override;
+    bool internal_start() override;
     void internal_stop() override;
 
 private:
@@ -81,7 +81,7 @@ ClientImpl::ClientImpl(
     }
 }
 
-void ClientImpl::internal_start()
+bool ClientImpl::internal_start()
 {
     // Reconnect
     if (m_options.reconnect_delay.has_value()) {
@@ -114,6 +114,7 @@ void ClientImpl::internal_start()
     }
     // Open the connection
     m_conn.open(m_address.c_str(), headers);
+    return m_conn.isConnected();
 }
 
 void ClientImpl::internal_stop()

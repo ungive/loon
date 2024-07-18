@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ios>
 #include <sstream>
 #include <utility>
 
@@ -27,9 +28,9 @@ inline std::pair<K&, V> log_var(K& name, V&& value)
 class LogBuffer
 {
 public:
-    LogBuffer() = default;
+    LogBuffer() { m_buffer << std::boolalpha; }
 
-    LogBuffer(LogBuffer&& other)
+    LogBuffer(LogBuffer&& other) : LogBuffer()
     {
         m_has_content = other.m_has_content;
         m_was_pair = other.m_was_pair;
@@ -56,6 +57,25 @@ public:
         m_buffer << pair.first << '=' << '"' << pair.second << '"';
         m_has_content = true;
         m_was_pair = true;
+        return *this;
+    }
+
+    template <typename K, typename R, typename P>
+    LogBuffer& operator<<(std::pair<K, std::chrono::duration<R, P>> const& pair)
+    {
+        *this << std::make_pair(pair.first, pair.second.count());
+        return *this;
+    }
+
+    template <typename K, typename V>
+    LogBuffer& operator<<(std::pair<K, const std::optional<V>&> const& pair)
+    {
+        if (pair.second.has_value()) {
+            *this << std::make_pair(pair.first, pair.second.value());
+        } else {
+            // Conveniently doesn't call the std::string specialization.
+            *this << std::make_pair(pair.first, "<nullopt>");
+        }
         return *this;
     }
 
