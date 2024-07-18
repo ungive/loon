@@ -2,18 +2,27 @@
 
 ## High
 
-- [ ] Auto-restart after...? for new client ID, to stay anonymous or idk
-    as an option for the client
-- [ ] Add proper logging to the C++ client
-    (protobuf, libhv and protocol errors).
-    The client ID should always be logged,
-    this helps a ton with debugging on the server-side.
-    Perhaps also log the Hello message?
 - [ ] Add support for QT websockets to the C++ client,
     as an alternative to libhv.
+- [ ] Option to auto-restart after a given timeout to rotate client IDs?
+    probably not a bad idea instead of e.g. staying connected for 24h
+    and still using the same client ID and client secret
+    and accumulating possibly a lot of authenticated generated URLs,
+    which, if accumulated/collected, could be used to spam the client
+    with requests, despite response caching.
+- [ ] Add config option to limit how many chunks are buffered on the server.
+- [ ] Add config option to enable TCP keep-alive or not.
+    This should be a choice.
+    If there's a cache in front of it it's e.g. probably a good idea,
+    to keep a connection open between the server and the cache,
+    instead of opening a new connection every time.
 
 ## Normal
 
+- [ ] Call served/unregistered/failed callbacks on a separate thread?
+    that way they can do more work without blocking client operation
+    and client methods can be called without deadlocking.
+- [ ] URL-encode path in generated URLs.
 - [ ] Currently the server synchronizes *all requests*
     through the client manager.
     There should be at least *some* concurrency (with goroutines)
@@ -42,12 +51,6 @@
     Perhaps make releases on GitHub.
 
 ## Low
-- [ ] Add config option to limit how many chunks are buffered on the server.
-- [ ] Add config option to enable TCP keep-alive or not.
-    This should be a choice.
-    If there's a cache in front of it it's e.g. probably a good idea,
-    to keep a connection open between the server and the cache,
-    instead of opening a new connection every time.
 - [ ] Automatically update docs on commit or push.
 - [ ] Add test automation via GitHub Actions.
     Run Go tests, generate coverage, run client tests.
