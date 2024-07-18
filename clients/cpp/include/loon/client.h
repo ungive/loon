@@ -402,12 +402,12 @@ private:
  */
 enum class LogLevel
 {
-    Debug,   // Messages to aid with debugging.
-    Info,    // Informational messages, like served requests.
-    Warning, // Events and errors that can be handled gracefully.
-    Error,   // Errors which cause the client to restart the connection.
-    Fatal,   // Errors which cause the client to fail and stop.
-    Silent,  // Log nothing.
+    Debug,   /// Messages to aid with debugging.
+    Info,    /// Informational messages, like served requests.
+    Warning, /// Events and errors that can be handled gracefully.
+    Error,   /// Errors which cause the client to restart the connection.
+    Fatal,   /// Errors which cause the client to fail and stop.
+    Silent,  /// Log nothing.
 };
 
 using log_handler_t =
