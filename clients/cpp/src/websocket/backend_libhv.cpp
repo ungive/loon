@@ -63,7 +63,6 @@ ClientImpl::ClientImpl(
     if (m_options.ping_interval.has_value()) {
         m_conn.setPingInterval(m_options.ping_interval.value().count());
     }
-    hlog_set_level(LOG_LEVEL_WARN); // default log level
     // It should be okay to set the global log handler,
     // as the libhv library is being statically linked.
     hlog_set_format("%s");
