@@ -9,7 +9,7 @@ protocol:
     accepted_content_types:
       - text/plain
       - text/html
-    max_cache_duration: 0s
+    cache_duration: 0s
   intervals:
     write_wait: 10s
     pong_wait: 20s

@@ -313,15 +313,21 @@ The server must define the following constraints:
   but not the "parameters" (anything after the first semicolon)
   of a content type
   (see https://www.w3.org/Protocols/rfc1341/4_Content-Type.html)
-- `max_cache_duration` -
-  Whether the server caches responses,
-  both content responses and empty responses,
-  and for how long at most.
+- `cache_duration` -
+  How long the server is configured to cache responses,
+  both responses that have content, as well as responses without content.
+  This is the default duration for which responses are cached,
+  which can be prohibited or limited
+  in an individual `ContentHeader` response message
+  with the `max_cache_duration` field.
+  A server implementing a cache should cache responses
+  for exactly this duration on a best effort basis,
+  as clients expect that content will be cached for this long.
   A value of zero indicates that content is not cached by this server.
   Clients should fail if caching is required but this field is set to zero
   or if the server caches responses for an insufficient amount of time.
-  Any maximum cache duration that is given in a content response
-  will be capped by this maximum cache duration.
+  Any `max_cache_duration` that is given in a `ContentHeader` message
+  will be capped by this value.
 
 ### Creating URLs
 
@@ -403,9 +409,10 @@ but greater than or equal to zero.
 
 The `max_cache_duration` indicates the maximum duration in seconds
 for which the response data may be cached on the server.
-A value of 0 indicates that the data should not be stored in any cache.
-This value is limited by the `max_cache_duration` in the `Constraints`.
-If the `max_cache_duration` in a `ContentHeader` exceeds the constraints,
+A value of 0 indicates that the data should not be stored in any cache,
+but this is not guaranteed, as external systems might still cache the response.
+This value is limited by the `cache_duration` in the `Constraints`.
+If the `max_cache_duration` value exceeds the constraints,
 the value is simply capped, without any errors.
 
 The `filename` may contain an optional filename,

@@ -49,7 +49,7 @@ var defaultConstraints = &pb.Constraints{
 	AcceptedContentTypes: []string{
 		testContentType,
 	},
-	MaxCacheDuration: 0,
+	CacheDuration: 0,
 }
 
 func Test_server_sends_Hello_when_client_connects(t *testing.T) {
@@ -62,7 +62,7 @@ func Test_server_sends_Hello_when_client_connects(t *testing.T) {
 	assert.Equal(t, defaultConstraints.MaxContentSize, m.Constraints.MaxContentSize)
 	assert.Equal(t, defaultConstraints.ChunkSize, m.Constraints.ChunkSize)
 	assert.Equal(t, defaultConstraints.AcceptedContentTypes, m.Constraints.AcceptedContentTypes)
-	assert.Equal(t, defaultConstraints.MaxCacheDuration, m.Constraints.MaxCacheDuration)
+	assert.Equal(t, defaultConstraints.CacheDuration, m.Constraints.CacheDuration)
 }
 
 func Test_base_URL_of_Hello_message_does_not_end_in_trailing_slash_when_client_connects(t *testing.T) {
@@ -1912,12 +1912,12 @@ func newConstraints() *pb.Constraints {
 func constraintsFromProto(
 	c *pb.Constraints,
 ) *ProtocolConstraints {
-	duration := time.Duration(c.MaxCacheDuration) * time.Second
+	duration := time.Duration(c.CacheDuration) * time.Second
 	return &ProtocolConstraints{
 		ChunkSize:            c.ChunkSize,
 		MaxContentSize:       c.MaxContentSize,
 		AcceptedContentTypes: c.AcceptedContentTypes,
-		MaxCacheDuration:     &duration,
+		CacheDuration:        &duration,
 	}
 }
 

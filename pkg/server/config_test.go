@@ -39,7 +39,7 @@ func newConfigConstraints() *server.ProtocolConstraints {
 		AcceptedContentTypes: []string{
 			"text/html",
 		},
-		MaxCacheDuration: durationPtr(time.Duration(0)),
+		CacheDuration: durationPtr(time.Duration(0)),
 	}
 }
 

@@ -11,8 +11,8 @@ option go_package = "/pb";
 message Constraints {
   uint64 chunk_size = 1;
   uint64 max_content_size = 2;
-  uint32 max_cache_duration = 3;
-  repeated string accepted_content_types = 4;
+  repeated string accepted_content_types = 3;
+  uint32 cache_duration = 4;
 }
 
 // <-

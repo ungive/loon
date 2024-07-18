@@ -376,7 +376,7 @@ TEST(Client, FailsWhenMinCacheDurationIsSetAndServerDoesNotCacheResponses)
     options.min_cache_duration = std::chrono::seconds{ 10 };
     auto client = create_client(options, false);
     client->inject_hello_modifier([](Hello& hello) {
-        hello.mutable_constraints()->set_max_cache_duration(0);
+        hello.mutable_constraints()->set_cache_duration(0);
     });
     ExpectCalled callback;
     client->on_failed(callback.get());
@@ -395,13 +395,13 @@ TEST(Client, FailsWhenMinCacheDurationIsSetButResponseIsNotCached)
     options.min_cache_duration = std::chrono::seconds{ cache_duration / 2 };
     auto client = create_client(options, false);
     client->inject_hello_modifier([](Hello& hello) {
-        if (hello.constraints().max_cache_duration() > 0) {
+        if (hello.constraints().cache_duration() > 0) {
             FAIL() << "the test server is expected to not cache responses";
         }
         // The real test server does not cache responses,
         // but for the sake of the test, we pretend it does.
         // This would resemble a server that claims to cache, but doesn't.
-        hello.mutable_constraints()->set_max_cache_duration(30);
+        hello.mutable_constraints()->set_cache_duration(30);
     });
     client->start_and_wait_until_connected();
     auto content = example_content(cache_duration);

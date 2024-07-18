@@ -265,11 +265,11 @@ void ClientImpl::on_hello(Hello const& hello)
     assert(m_hello->has_constraints());
     if (m_options.min_cache_duration.has_value()) {
         auto min = m_options.min_cache_duration.value().count();
-        auto max = m_hello->constraints().max_cache_duration();
-        if (max == 0) {
+        auto value = m_hello->constraints().cache_duration();
+        if (value == 0) {
             return fail("the server does not support response caching");
         }
-        if (min > max) {
+        if (min > value) {
             return fail(
                 "the server does not cache responses for the desired duration");
         }

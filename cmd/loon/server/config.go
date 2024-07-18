@@ -15,7 +15,7 @@ var defaultConfig = &server.Options{
 			MaxContentSize:       64 * 1024 * 1024, // 64 MiB
 			ChunkSize:            64 * 1024,        // 64 KiB
 			AcceptedContentTypes: defaultContentTypes,
-			MaxCacheDuration:     durationPtr(time.Duration(0)), // no caching by default
+			CacheDuration:        durationPtr(time.Duration(0)), // no caching by default
 		},
 		Intervals: &server.ProtocolIntervals{
 			WriteTimeout:          10 * time.Second,
