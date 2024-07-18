@@ -125,6 +125,15 @@ static loon::log_handler_t _handler{ nullptr };
 
 static void libhv_log_handler(int level, const char* buf, int len)
 {
+    // Logger
+    decltype(_handler) handler;
+    {
+        const std::lock_guard<std::mutex> lock(_mutex);
+        if (!_handler) {
+            return;
+        }
+        handler = _handler;
+    }
     // Level
     loon::LogLevel converted_level = loon::LogLevel::Warning;
     switch (level) {
@@ -155,12 +164,7 @@ static void libhv_log_handler(int level, const char* buf, int len)
     }
     oss.write(buf, len);
     auto converted_message = oss.str();
-    // Logging
-    decltype(_handler) handler;
-    {
-        const std::lock_guard<std::mutex> lock(_mutex);
-        handler = _handler;
-    }
+    // Log
     handler(converted_level, converted_message);
 }
 
