@@ -63,14 +63,22 @@ ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
     m_conn->on_close(std::bind(&ClientImpl::on_websocket_close, this));
     m_conn->on_message(std::bind(
         &ClientImpl::on_websocket_message, this, std::placeholders::_1));
-    // Make sure logging is initialized.
+    // Logging
     loon::init_logging();
+    // Start the send pump
+    m_send_pump_thread = std::thread(&ClientImpl::send_pump, this);
 }
 
 ClientImpl::~ClientImpl()
 {
-    //
     stop();
+    // Stop the send pump
+    {
+        const std::lock_guard<std::mutex> lock(m_send_pump_comm_mutex);
+        m_stop_send_pump = true;
+        m_cv_send_pump.notify_all();
+    }
+    m_send_pump_thread.join();
 }
 
 void ClientImpl::start()
@@ -232,25 +240,6 @@ std::vector<std::shared_ptr<ContentHandle>> loon::ClientImpl::content()
     return result;
 }
 
-bool ClientImpl::send(ClientMessage const& message)
-{
-    std::lock_guard<std::mutex> lock(m_write_mutex);
-    auto result = message.SerializeAsString();
-    if (result.empty()) {
-        log(Error) << "failed to serialize client message"
-                   << var("data_case", message.data_case());
-        internal_restart();
-        return false;
-    }
-    int64_t n = m_conn->send_binary(result.data(), result.size());
-    if (n <= 0) {
-        log(Error) << "failed to send message" << var("retval", n);
-        internal_restart();
-        return false;
-    }
-    return true;
-}
-
 void ClientImpl::on_hello(Hello const& hello)
 {
     if (m_injected_hello_modifer) {
@@ -312,7 +301,7 @@ bool ClientImpl::check_request_limit(decltype(m_content)::iterator it)
 
 void ClientImpl::on_request(Request const& request)
 {
-    std::lock_guard<std::mutex> lock(m_request_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
     if (m_requests.find(request.id()) != m_requests.end()) {
         log(Error) << "protocol: request id already in use"
@@ -358,7 +347,7 @@ inline void ClientImpl::call_served_callback(decltype(m_requests)::iterator it)
 
 void ClientImpl::response_sent(uint64_t request_id)
 {
-    const std::lock_guard<std::mutex> lock(m_request_mutex);
+    const std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
     auto it = m_requests.find(request_id);
     if (it == m_requests.end()) {
@@ -371,7 +360,7 @@ void ClientImpl::response_sent(uint64_t request_id)
 
 void ClientImpl::on_success(Success const& success)
 {
-    const std::lock_guard<std::mutex> lock(m_request_mutex);
+    const std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
     auto request_id = success.request_id();
     auto it = m_requests.find(request_id);
@@ -385,7 +374,7 @@ void ClientImpl::on_success(Success const& success)
 
 void ClientImpl::on_request_closed(RequestClosed const& request_closed)
 {
-    const std::lock_guard<std::mutex> lock(m_request_mutex);
+    const std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
     auto request_id = request_closed.request_id();
     auto it = m_requests.find(request_id);
@@ -487,6 +476,70 @@ void ClientImpl::handle_message(ServerMessage const& message)
         log(Error) << "protocol: unrecognized server message";
         return internal_restart();
     }
+}
+
+bool ClientImpl::send(ClientMessage const& message)
+{
+    const std::lock_guard<std::mutex> send_lock(m_send_pump_send_mutex);
+    std::unique_lock<std::mutex> comm_lock(m_send_pump_comm_mutex);
+    m_send_pump_message = &message;
+    m_cv_send_pump.notify_one();            // notify message
+    m_cv_send_pump.wait(comm_lock, [this] { // wait until sent
+        return m_stop_send_pump || m_send_pump_message == nullptr;
+    });
+    if (m_stop_send_pump) {
+        return false;
+    }
+    return m_send_pump_result;
+}
+
+void ClientImpl::send_pump()
+{
+    std::unique_lock<std::mutex> lock(m_send_pump_comm_mutex);
+    while (true) {
+        m_cv_send_pump.wait(
+            lock, [this] { // wait for a message or until stopped
+                return m_stop_send_pump || m_send_pump_message != nullptr;
+            });
+        if (m_stop_send_pump) {
+            return;
+        }
+        bool is_sent = internal_send(*m_send_pump_message);
+        m_send_pump_result = is_sent;
+        m_send_pump_message = nullptr;
+        m_cv_send_pump.notify_one(); // notify done
+        {
+            // While restarting, the mutex has to be unlocked,
+            // so that it can be locked by the send method again,
+            // once it receives the above condition variable signal.
+            lock.unlock();
+            if (!is_sent) {
+                // If the send operation failed, restart the connection.
+                // Do this after (!) the send operation has finished,
+                // such that the request handler can unlock its mutex
+                // and the restart operation can close the request handler.
+                // Otherwise a deadlock would occur.
+                internal_restart();
+            }
+            lock.lock();
+        }
+    }
+}
+
+bool ClientImpl::internal_send(ClientMessage const& message)
+{
+    auto result = message.SerializeAsString();
+    if (result.empty()) {
+        log(Error) << "failed to serialize client message"
+                   << var("data_case", message.data_case());
+        return false;
+    }
+    int64_t n = m_conn->send_binary(result.data(), result.size());
+    if (n <= 0) {
+        log(Error) << "failed to send message" << var("retval", n);
+        return false;
+    }
+    return true;
 }
 
 bool ClientImpl::update_connected(bool state)

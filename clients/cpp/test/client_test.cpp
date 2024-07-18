@@ -500,3 +500,5 @@ TEST(Client, ContentReturnsAllRegisteredContent)
     EXPECT_TRUE(std::find(h.begin(), h.end(), h1) != h.end());
     EXPECT_TRUE(std::find(h.begin(), h.end(), h2) != h.end());
 }
+
+// TODO: send error (send returns <= 0) should not cause deadlock
