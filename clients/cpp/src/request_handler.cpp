@@ -236,7 +236,11 @@ void loon::RequestHandler::exit_gracefully()
         // Exiting gracefully is high priority.
         mutex_lock_high_priority();
 
-        if (m_stop || m_done) {
+        if (m_done) {
+            // Already done, nothing to do.
+            return;
+        }
+        if (m_stop) {
             throw std::runtime_error("request handle is already destroyed");
         }
         if (m_handling_request_id.has_value()) {
