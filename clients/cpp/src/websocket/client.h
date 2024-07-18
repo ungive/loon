@@ -193,4 +193,7 @@ protected:
     std::function<void()> m_close_callback{};
     std::function<void(std::string const& message)> m_message_callback{};
 };
+
+void log_level(LogLevel level);
+void log_handler(log_handler_t handler);
 } // namespace loon::websocket

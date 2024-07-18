@@ -1,3 +1,5 @@
+#include <sstream>
+
 #include <hv/WebSocketClient.h>
 
 #include "client.h"
@@ -10,8 +12,9 @@
 #define DEFAULT_RECONNECT_INCREASING_DELAY_POLICY \
     RECONNECT_DELAY_POLICY_EXPONENTIAL
 
-using WebsocketOptions = loon::WebsocketOptions;
 using namespace loon::websocket;
+
+using WebsocketOptions = loon::WebsocketOptions;
 
 std::chrono::milliseconds loon::websocket::default_connect_timeout =
     std::chrono::milliseconds{ HIO_DEFAULT_CONNECT_TIMEOUT };
@@ -42,6 +45,8 @@ Client::Client(std::string const& address, WebsocketOptions const& options)
     }
 }
 
+void libhv_log_handler(int level, const char* buf, int len);
+
 ClientImpl::ClientImpl(
     std::string const& address, WebsocketOptions const& options)
     : BaseClient(address, options)
@@ -58,10 +63,11 @@ ClientImpl::ClientImpl(
     if (m_options.ping_interval.has_value()) {
         m_conn.setPingInterval(m_options.ping_interval.value().count());
     }
-    // Logging
-    // TODO Allow the caller to configure this.
-    hlog_set_level(LOG_LEVEL_DEBUG);
-    hlog_set_handler(stderr_logger);
+    hlog_set_level(LOG_LEVEL_WARN); // default log level
+    // It should be okay to set the global log handler,
+    // as the libhv library is being statically linked.
+    hlog_set_format("%s");
+    hlog_set_handler(libhv_log_handler);
 }
 
 void ClientImpl::internal_start()
@@ -113,4 +119,77 @@ int64_t ClientImpl::send_binary(const char* data, size_t length)
 int64_t ClientImpl::send_text(const char* data, size_t length)
 {
     return m_conn.send(data, length, WS_OPCODE_TEXT);
+}
+
+static std::mutex _mutex{};
+static loon::log_handler_t _handler{ nullptr };
+
+static void libhv_log_handler(int level, const char* buf, int len)
+{
+    // Level
+    loon::LogLevel converted_level = loon::LogLevel::Warning;
+    switch (level) {
+    case LOG_LEVEL_DEBUG:
+        converted_level = loon::LogLevel::Debug;
+        break;
+    case LOG_LEVEL_INFO:
+        converted_level = loon::LogLevel::Info;
+        break;
+    case LOG_LEVEL_WARN:
+        converted_level = loon::LogLevel::Warning;
+        break;
+    case LOG_LEVEL_ERROR:
+        converted_level = loon::LogLevel::Error;
+        break;
+    case LOG_LEVEL_FATAL:
+        // If there is a fatal websocket error, it's also a fatal loon error,
+        // since the client cannot possibly be connected to the server.
+        converted_level = loon::LogLevel::Fatal;
+        break;
+    }
+    // Message
+    std::ostringstream oss;
+    oss << "libhv: ";
+    if (len > 0 && buf[len - 1] == '\n') {
+        // Strip a possible linefeed at the end.
+        len -= 1;
+    }
+    oss.write(buf, len);
+    auto converted_message = oss.str();
+    // Logging
+    decltype(_handler) handler;
+    {
+        const std::lock_guard<std::mutex> lock(_mutex);
+        handler = _handler;
+    }
+    handler(converted_level, converted_message);
+}
+
+void loon::websocket::log_level(LogLevel level)
+{
+    auto converted_level = LOG_LEVEL_WARN;
+    switch (level) {
+    case LogLevel::Debug:
+        converted_level = LOG_LEVEL_DEBUG;
+        break;
+    case LogLevel::Info:
+        converted_level = LOG_LEVEL_INFO;
+        break;
+    case LogLevel::Warning:
+        converted_level = LOG_LEVEL_WARN;
+        break;
+    case LogLevel::Error:
+        converted_level = LOG_LEVEL_ERROR;
+        break;
+    case LogLevel::Fatal:
+        converted_level = LOG_LEVEL_FATAL;
+        break;
+    }
+    hlog_set_level(converted_level);
+}
+
+void loon::websocket::log_handler(log_handler_t handler)
+{
+    const std::lock_guard<std::mutex> lock(_mutex);
+    _handler = handler;
 }

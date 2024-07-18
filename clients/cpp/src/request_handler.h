@@ -38,6 +38,21 @@ public:
         Options options, std::function<bool(ClientMessage const&)> send_func);
 
     /**
+     * @brief Returns information about thsi request handler's content.
+     * @returns The content information.
+     */
+    inline loon::ContentInfo const& info() const { return m_info; }
+
+    /**
+     * @brief Returns the content source associated with this request handler.
+     * @returns The content source.
+     */
+    inline std::shared_ptr<const loon::ContentSource> source() const
+    {
+        return m_source;
+    }
+
+    /**
      * @brief Forwards the given request to the serve thread.
      *
      * Sends a response to the websocket peer in the background,

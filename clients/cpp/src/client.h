@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "logging.h"
 #include "loon/client.h"
 #include "loon/messages.pb.h"
 #include "request_handler.h"
@@ -133,6 +134,8 @@ private:
     using request_id_t = uint64_t;
     using request_path_t = std::string;
 
+    Logger make_logger(LogLevel level);
+
     void on_websocket_open();
     void on_websocket_close();
     void on_websocket_message(std::string const& message);
@@ -155,6 +158,13 @@ private:
     void reset_connection_state();
     void internal_start();
     void internal_stop();
+
+    /**
+     * @brief Restarts the connection.
+     *
+     * Must be preceded by a log message describing what happened,
+     * with log level "Error".
+     */
     void internal_restart();
 
     inline std::chrono::milliseconds connect_timeout() const
@@ -219,15 +229,18 @@ private:
 class InternalContentHandle : public ContentHandle
 {
 public:
-    InternalContentHandle(std::string const& url, std::string const& path,
-        std::shared_ptr<RequestHandler> request_handle)
-        : m_url{ url }, m_path{ path }, m_request_handler{ request_handle }
+    InternalContentHandle(
+        std::string const& url, std::shared_ptr<RequestHandler> request_handle)
+        : m_url{ url }, m_request_handler{ request_handle }
     {
     }
 
     inline std::string const& url() const override { return m_url; }
 
-    inline std::string const& path() const { return m_path; }
+    inline std::string const& path() const
+    {
+        return m_request_handler->info().path;
+    }
 
     inline std::shared_ptr<RequestHandler> request_handler()
     {
@@ -284,7 +297,6 @@ public:
 
 private:
     std::string m_url{};
-    std::string m_path{};
     std::shared_ptr<RequestHandler> m_request_handler;
 
     std::mutex m_mutex{};

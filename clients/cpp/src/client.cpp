@@ -1,19 +1,25 @@
 #include "client.h"
 
 #include <cassert>
-#include <iostream>
 #include <memory>
 #include <sstream>
 #include <thread>
 
 #include <google/protobuf/text_format.h>
 
+#include "logging.h"
 #include "loon/client.h"
 #include "util.h"
 
 using namespace loon;
-
 using namespace std::chrono_literals;
+
+#define var loon::log_var
+#define log(level)                           \
+    if (LogLevel::level < loon::log_level()) \
+        ;                                    \
+    else                                     \
+        make_logger(LogLevel::level)
 
 Client::Client(std::string const& address, ClientOptions options)
     : m_impl{ std::make_unique<ClientImpl>(address, options) }
@@ -57,6 +63,8 @@ ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
     m_conn->on_close(std::bind(&ClientImpl::on_websocket_close, this));
     m_conn->on_message(std::bind(
         &ClientImpl::on_websocket_message, this, std::placeholders::_1));
+    // Make sure logging is initialized.
+    loon::init_logging();
 }
 
 ClientImpl::~ClientImpl()
@@ -88,6 +96,15 @@ std::string ClientImpl::make_url(std::string const& path)
     oss << m_hello->base_url() << "/" << m_hello->client_id() << "/"
         << mac_encoded << "/" << path;
     return oss.str();
+}
+
+loon::Logger loon::ClientImpl::make_logger(LogLevel level)
+{
+    Logger logger(level);
+    if (m_hello.has_value()) {
+        logger.after() << var("cid", m_hello->client_id());
+    }
+    return logger;
 }
 
 void ClientImpl::check_content_constraints(
@@ -148,14 +165,6 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
 {
     std::unique_lock<std::recursive_mutex> lock(m_mutex);
 
-    // TODO the content must be registered permanently, across restarts.
-    //   actually, no: notify caller of restart, then invalidate.
-    //   caller needs to register again or not at all.
-    // TODO configurable timeout until Hello should be received.
-    // TODO configurable "failed too much" count,
-    //   after which the client stops reconnecting
-    // TODO upload speed limit (will help with testing too!)
-
     // Check if the path is already in use.
     auto const& path = info.path;
     auto it = m_content.find(path);
@@ -178,7 +187,7 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
         info, source, m_hello.value(), options, send);
     request_handle->spawn_serve_thread();
     auto handle = std::make_shared<InternalContentHandle>(
-        make_url(info.path), path, request_handle);
+        make_url(info.path), request_handle);
     m_content.emplace(path, handle);
     return handle;
 }
@@ -228,31 +237,22 @@ bool ClientImpl::send(ClientMessage const& message)
     std::lock_guard<std::mutex> lock(m_write_mutex);
     auto result = message.SerializeAsString();
     if (result.empty()) {
-        std::cerr << "loon/send: failed to serialize message";
+        log(Error) << "failed to serialize client message"
+                   << var("data_case", message.data_case());
         internal_restart();
         return false;
     }
     int64_t n = m_conn->send_binary(result.data(), result.size());
     if (n <= 0) {
-        std::cerr << "loon/send: failed to send message";
+        log(Error) << "failed to send message" << var("retval", n);
         internal_restart();
         return false;
     }
-    // TODO remove
-    std::string output;
-    google::protobuf::TextFormat::PrintToString(message, &output);
-    std::cerr << "send (" << n << "/" << result.size()
-              << "): " << output.substr(0, output.find_first_of('{')) << "\n";
     return true;
 }
 
 void ClientImpl::on_hello(Hello const& hello)
 {
-    if (m_hello.has_value()) {
-        // Already received a Hello message for this connection.
-        // TODO log invalid second hello message
-        return internal_restart();
-    }
     if (m_injected_hello_modifer) {
         Hello modified = hello;
         m_injected_hello_modifer(modified);
@@ -261,7 +261,9 @@ void ClientImpl::on_hello(Hello const& hello)
         m_hello = hello;
     }
 
-    assert(m_hello->has_constraints());
+    if (!m_hello->has_constraints()) {
+        return fail("the server did not send any constraints");
+    }
     if (m_options.min_cache_duration.has_value()) {
         auto min = m_options.min_cache_duration.value().count();
         auto value = m_hello->constraints().cache_duration();
@@ -269,12 +271,12 @@ void ClientImpl::on_hello(Hello const& hello)
             return fail("the server does not support response caching");
         }
         if (min > value) {
-            return fail(
-                "the server does not cache responses for the desired duration");
+            return fail("the server does not cache responses long enough");
         }
     }
 
     m_cv_connection_ready.notify_all();
+    log(Info) << "ready" << var("base_url", m_hello->base_url());
 }
 
 bool ClientImpl::check_request_limit(decltype(m_content)::iterator it)
@@ -310,19 +312,18 @@ bool ClientImpl::check_request_limit(decltype(m_content)::iterator it)
 
 void ClientImpl::on_request(Request const& request)
 {
-    // TODO
-    std::cerr << "request (" << request.id() << "): " << request.path() << "\n";
-
     std::lock_guard<std::mutex> lock(m_request_mutex);
 
     if (m_requests.find(request.id()) != m_requests.end()) {
-        // TODO log protocol error: request ID already in use
+        log(Error) << "protocol: request id already in use"
+                   << var("rid", request.id());
         return internal_restart();
     }
 
     auto it = m_content.find(request.path());
     if (check_request_limit(it)) {
-        std::cerr << "restart: request limit reached\n";
+        log(Error) << "too many requests" << var("rid", request.id())
+                   << var("path", request.path());
         return internal_restart();
     }
 
@@ -346,22 +347,23 @@ inline void ClientImpl::call_served_callback(decltype(m_requests)::iterator it)
         it->second.second = true;
         return;
     }
-    auto content_handle = it->second.first;
-    // assert(m_content.find(content_handle->path()) != m_content.end());
+    auto request_id = it->first;
+    auto content = it->second.first;
+    content->served();
+    log(Info) << "served request" << var("rid", request_id)
+              << var("size", content->request_handler()->source()->size())
+              << var("path", content->path());
     m_requests.erase(it);
-    content_handle->served();
 }
 
 void ClientImpl::response_sent(uint64_t request_id)
 {
     const std::lock_guard<std::mutex> lock(m_request_mutex);
 
-    std::cerr << "response sent!\n";
-
     auto it = m_requests.find(request_id);
     if (it == m_requests.end()) {
-        // TODO log error
-        assert(false && "served a request that is not registered anymore");
+        log(Warning) << "served a request that is not registered anymore";
+        assert(false);
         return;
     }
     call_served_callback(it);
@@ -369,16 +371,13 @@ void ClientImpl::response_sent(uint64_t request_id)
 
 void ClientImpl::on_success(Success const& success)
 {
-    // TODO
-    std::cerr << "success (" << success.request_id() << ")\n";
-
     const std::lock_guard<std::mutex> lock(m_request_mutex);
 
     auto request_id = success.request_id();
     auto it = m_requests.find(request_id);
     if (it == m_requests.end()) {
-        // TODO log error
-        assert(false && "received success for an unknown request id");
+        log(Warning) << "received success for an unknown request id";
+        assert(false);
         return;
     }
     call_served_callback(it);
@@ -386,32 +385,29 @@ void ClientImpl::on_success(Success const& success)
 
 void ClientImpl::on_request_closed(RequestClosed const& request_closed)
 {
-    // TODO
-    std::cerr << "request closed (" << request_closed.request_id()
-              << "): " << request_closed.message() << "\n";
-
     const std::lock_guard<std::mutex> lock(m_request_mutex);
 
     auto request_id = request_closed.request_id();
     auto it = m_requests.find(request_id);
     if (it == m_requests.end()) {
-        // protocol error
-        // TODO log
-        assert(false && "received request closed for an unknown request id");
+        log(Warning)
+            << "protocol: received request closed for an unknown request id";
+        assert(false);
         return;
     }
 
-    auto content_handle = it->second.first;
-    content_handle->request_handler()->cancel_request(request_id);
+    auto content = it->second.first;
+    content->request_handler()->cancel_request(request_id);
+    log(Warning) << "request failed" << var("rid", request_closed.request_id())
+                 << var("message", request_closed.message());
     m_requests.erase(it);
 }
 
 void ClientImpl::on_close(Close const& close)
 {
-    // TODO log close reason
-    std::cerr << "close message: " << close.message() << "\n";
-
-    // Restart the connection, if the server closed the connection.
+    // The server closed the connection.
+    log(Error) << "connection closed by server"
+               << var("message", close.message());
     internal_restart();
 }
 
@@ -433,21 +429,15 @@ void ClientImpl::wait_until_ready(std::unique_lock<std::recursive_mutex>& lock)
 
 void ClientImpl::on_websocket_open()
 {
+    log(Debug) << "connected";
     const std::lock_guard<std::recursive_mutex> lock(m_mutex);
-
-    // TODO better logging
-    std::cerr << "connection opened\n";
-
     update_connected(true);
 }
 
 void ClientImpl::on_websocket_close()
 {
+    log(Info) << "disconnected";
     const std::lock_guard<std::recursive_mutex> lock(m_mutex);
-
-    // TODO better logging
-    std::cerr << "connection closed\n";
-
     update_connected(false);
     reset_connection_state();
 }
@@ -458,13 +448,25 @@ void ClientImpl::on_websocket_message(std::string const& message)
 
     ServerMessage server_message;
     if (!server_message.ParseFromString(message)) {
-        // TODO better logging
-        std::cerr << "failed to parse message\n";
-
-        // Failed to parse message, restart the connection.
-        // TODO implicitly log error with global protobuf error handler.
+        log(Error) << "failed to parse server message";
         return internal_restart();
     }
+
+    switch (server_message.data_case()) {
+    case ServerMessage::kHello:
+        if (m_hello.has_value()) {
+            log(Error) << "protocol: received more than one Hello message";
+            return internal_restart();
+        }
+        break;
+    default:
+        if (!m_hello.has_value()) {
+            log(Error) << "protocol: first message is not a Hello message";
+            return internal_restart();
+        }
+        break;
+    }
+
     handle_message(server_message);
 }
 
@@ -482,8 +484,7 @@ void ClientImpl::handle_message(ServerMessage const& message)
     case ServerMessage::kClose:
         return on_close(message.close());
     default:
-        // Unexpected server message, restart the connection.
-        // TODO log invalid server message (including message type)
+        log(Error) << "protocol: unrecognized server message";
         return internal_restart();
     }
 }
@@ -534,19 +535,19 @@ void ClientImpl::internal_stop()
     reset_connection_state();
     m_conn->stop();
     update_connected(false);
+    log(Debug) << "stopped";
 }
 
 inline void ClientImpl::internal_restart()
 {
+    log(Warning) << "restarting";
     internal_stop();
     internal_start();
 }
 
 void loon::ClientImpl::fail(std::string const& message)
 {
-    // TODO log message
-    std::cerr << "failed: " << message << "\n";
-
+    log(Fatal) << message;
     internal_stop();
     if (m_failed_callback) {
         m_failed_callback();

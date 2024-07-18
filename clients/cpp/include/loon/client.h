@@ -396,6 +396,42 @@ private:
 };
 
 /**
+ * @brief Severity levels for log messages.
+ *
+ * Severity increases with the integer value of the log level.
+ */
+enum class LogLevel
+{
+    Debug,   // Messages to aid with debugging.
+    Info,    // Informational messages, like served requests.
+    Warning, // Events and errors that can be handled gracefully.
+    Error,   // Errors which cause the client to restart the connection.
+    Fatal,   // Errors which cause the client to fail and stop.
+    Silent,  // Log nothing.
+};
+
+using log_handler_t =
+    std::function<void(LogLevel level, std::string const& message)>;
+
+/**
+ * @brief Set the minimum level to write logs for.
+ *
+ * Log messages with a level less than this level will not be logged.
+ *
+ * @param level The log level.
+ */
+void log_level(LogLevel level);
+
+/**
+ * @brief A custom handler function for handling log messages.
+ *
+ * If not set, log messages will be written to stderr by default.
+ *
+ * @param handler The log handler.
+ */
+void log_handler(log_handler_t handler);
+
+/**
  * @brief The client is not started.
  */
 class ClientNotStartedException : public std::runtime_error
