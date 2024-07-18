@@ -6,6 +6,7 @@
 #include <mutex>
 #include <string>
 
+#include "logging.h"
 #include "loon/client.h"
 
 namespace loon::websocket
@@ -194,6 +195,9 @@ protected:
     std::function<void(std::string const& message)> m_message_callback{};
 };
 
+constexpr loon::LogLevel default_log_level = LogLevel::Error;
+
 void log_level(LogLevel level);
 void log_handler(log_handler_t handler);
+
 } // namespace loon::websocket

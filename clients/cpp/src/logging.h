@@ -10,6 +10,7 @@ namespace loon
 LogLevel log_level();
 void init_logging();
 void log(LogLevel level, std::string const& message);
+void default_log_handler(LogLevel level, const std::string& message);
 
 template <typename K, typename V>
 inline std::pair<K&, V&> log_var(K& name, V& value)

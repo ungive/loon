@@ -414,13 +414,22 @@ using log_handler_t =
     std::function<void(LogLevel level, std::string const& message)>;
 
 /**
- * @brief Set the minimum level to write logs for.
+ * @brief Set the minimum level for loon client log messages.
  *
  * Log messages with a level less than this level will not be logged.
  *
  * @param level The log level.
  */
-void log_level(LogLevel level);
+void client_log_level(LogLevel level);
+
+/**
+ * @brief Set the minimum level for websocket log messages.
+ *
+ * Websocket log messages with a level less than this level will not be logged.
+ *
+ * @param level The log level.
+ */
+void websocket_log_level(LogLevel level);
 
 /**
  * @brief A custom handler function for handling log messages.

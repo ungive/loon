@@ -16,8 +16,6 @@
 
 using namespace loon;
 
-void default_log_handler(LogLevel level, std::string const& message);
-
 static std::mutex _mutex{};
 static std::atomic<LogLevel> _level{ LogLevel::Warning };
 static log_handler_t _handler{ default_log_handler };
@@ -109,7 +107,7 @@ static std::string time_str()
     return oss.str();
 }
 
-static void default_log_handler(LogLevel level, const std::string& message)
+void loon::default_log_handler(LogLevel level, const std::string& message)
 {
     std::cerr << time_str() << " " << level_str(level) << ' ';
     std::cerr << "loon: " << message << std::endl;
@@ -130,10 +128,15 @@ void loon::log(LogLevel level, std::string const& message)
     }
 }
 
-void loon::log_level(LogLevel level)
+void loon::client_log_level(LogLevel level)
 {
     const std::lock_guard<std::mutex> lock(_mutex);
     _level = level;
+}
+
+void loon::websocket_log_level(LogLevel level)
+{
+    loon::websocket::log_level(level);
 }
 
 void loon::log_handler(log_handler_t handler)
