@@ -268,7 +268,10 @@ void RequestHandler::destroy()
     // Destroying the request handle has high priority.
     mutex_lock_high_priority();
 
-    if (m_stop || m_done) {
+    if (m_done || !m_running) {
+        return;
+    }
+    if (m_stop) {
         throw std::runtime_error("request handle is already destroyed");
     }
     m_stop = true;
