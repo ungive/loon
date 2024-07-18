@@ -59,7 +59,10 @@ to prevent clients from being flooded with requests:
   When using a reverse proxy, this header should be deleted from all requests.
   If not done properly, the cache is effectively rendered obsolete
   from an attackers point of view.
-  
+- Query parameters are not forwarded to a connected client,
+  so they **MUST** not be part of the cache key.
+  Setting a meaningless query parameter should not bypass the cache.
+
 A deployment example can be found in [**deployments**](./deployments).
 
 ## What is in this repository?
