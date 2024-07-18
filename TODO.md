@@ -72,3 +72,42 @@
     (e.g. in a browser implementation)
     or to generally simplify client implementation.
 - [ ] Add support for rotation between multiple loon servers?
+
+---
+
+## Done
+
+- [x] Request handler thread should be joined
+- [x] Fix deadlock with request handler when restarting in send().
+- [x] Websocket client: on_websocket_open does not use mutex?
+- [x] Detect and log connection failure.
+- [x] Separate logging for client and websocket.
+- [x] Add proper logging to the C++ client
+    (protobuf, libhv and protocol errors).
+    The client ID should always be logged,
+    this helps a ton with debugging on the server-side.
+- [x] Fix max requests per second with the C++ client.
+    Maximum requests per second should be *per content*,
+    not *per connection*.
+    If 10 pieces of content are registered per minute
+    and each one is requested immediately,
+    then a request limit of 5 requests per minute makes the connection fail,
+    which is not what should happen.
+- [x] Remove "with_callbacks" from "unregister_all_content" from C++ client
+    and instead add flags to the unregistered callback
+    indicating why it was unregistered (failure, disconnect, manually?).
+- [x] Add method to iterate all content
+    and allow unregistering it while iterating.
+    That way a user can unregister e.g. all content except a selected few.
+    Once implemented, remove the "unregister_all_content" method.
+- [x] m_connected does not need to be atomic.
+- [x] Rename failed to on_failed.
+- [x] Add a timeout to "register_content".
+    As it stands, it will just block forever if the client never connects.
+- [x] If the connection fails, any thread that is waiting must be notified!
+    Same todo as below: throw exception on failure.
+- [x] Timeout for receiving Hello message
+    \+ exception if it times out during registration or unregistration.
+    Just reuse the connect timeout for this.
+- [x] Properly document and implement if and how
+    content remains registered across reconnects with the C++ client.
