@@ -473,7 +473,8 @@ void ClientImpl::handle_message(ServerMessage const& message)
     case ServerMessage::kClose:
         return on_close(message.close());
     default:
-        log(Error) << "protocol: unrecognized server message";
+        log(Error) << "protocol: unrecognized server message"
+                   << var("data_case", message.data_case());
         return internal_restart();
     }
 }
