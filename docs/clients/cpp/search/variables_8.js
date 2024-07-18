@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['websocket_5foptions_88',['websocket_options',['../structloon_1_1_client_options.html#a7fc19c3d0e60978a94c10a69185a0d02',1,'loon::ClientOptions']]]
+  ['websocket_88',['websocket',['../structloon_1_1_client_options.html#a8f532dac0821ab23f76912db5cfb4d61',1,'loon::ClientOptions']]]
 ];
