@@ -236,8 +236,8 @@ void loon::RequestHandler::exit_gracefully()
         // Exiting gracefully is high priority.
         mutex_lock_high_priority();
 
-        if (m_done) {
-            // Already done, nothing to do.
+        if (m_done || !m_running) {
+            // Not running or already done, nothing to do.
             return;
         }
         if (m_stop) {
