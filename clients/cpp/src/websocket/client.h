@@ -60,7 +60,7 @@ public:
      * @param length The length of the data.
      * @returns The number of bytes actually sent.
      */
-    virtual size_t send_binary(const char* data, size_t length) = 0;
+    virtual int64_t send_binary(const char* data, size_t length) = 0;
 
     /**
      * @brief Sends text data to the websocket peer.
@@ -71,7 +71,7 @@ public:
      * @param length The length of the data.
      * @returns The number of bytes actually sent.
      */
-    virtual size_t send_text(const char* data, size_t length) = 0;
+    virtual int64_t send_text(const char* data, size_t length) = 0;
 
     /**
      * @brief Starts the websocket client.
@@ -96,35 +96,35 @@ class Client : public IClient
 public:
     Client(std::string const& address, WebsocketOptions const& options);
 
-    inline void on_open(std::function<void()> callback)
+    inline void on_open(std::function<void()> callback) override
     {
         m_impl->on_open(callback);
     }
 
-    inline void on_close(std::function<void()> callback)
+    inline void on_close(std::function<void()> callback) override
     {
         m_impl->on_close(callback);
     }
 
     inline void on_message(
-        std::function<void(std::string const& message)> callback)
+        std::function<void(std::string const& message)> callback) override
     {
         m_impl->on_message(callback);
     }
 
-    inline size_t send_binary(const char* data, size_t length)
+    inline int64_t send_binary(const char* data, size_t length) override
     {
         return m_impl->send_binary(data, length);
     }
 
-    inline size_t send_text(const char* data, size_t length)
+    inline int64_t send_text(const char* data, size_t length) override
     {
         return m_impl->send_text(data, length);
     }
 
-    inline void start() { m_impl->start(); }
+    inline void start() override { m_impl->start(); }
 
-    inline void stop() { m_impl->stop(); }
+    inline void stop() override { m_impl->stop(); }
 
 private:
     std::unique_ptr<IClient> m_impl;
@@ -142,9 +142,9 @@ public:
     void on_message(
         std::function<void(std::string const& message)> callback) override;
 
-    virtual size_t send_binary(const char* data, size_t length) = 0;
+    virtual int64_t send_binary(const char* data, size_t length) = 0;
 
-    virtual size_t send_text(const char* data, size_t length) = 0;
+    virtual int64_t send_text(const char* data, size_t length) = 0;
 
     void start() override;
 

@@ -232,7 +232,7 @@ bool ClientImpl::send(ClientMessage const& message)
         internal_restart();
         return false;
     }
-    size_t n = m_conn->send_binary(result.data(), result.size());
+    int64_t n = m_conn->send_binary(result.data(), result.size());
     if (n <= 0) {
         std::cerr << "loon/send: failed to send message";
         internal_restart();

@@ -21,8 +21,8 @@ class ClientImpl : public BaseClient
 public:
     ClientImpl(std::string const& address, WebsocketOptions const& options);
 
-    size_t send_binary(const char* data, size_t length) override;
-    size_t send_text(const char* data, size_t length) override;
+    int64_t send_binary(const char* data, size_t length) override;
+    int64_t send_text(const char* data, size_t length) override;
 
 protected:
     void internal_start() override;
@@ -105,12 +105,12 @@ void ClientImpl::internal_stop()
     m_conn.close();
 }
 
-size_t ClientImpl::send_binary(const char* data, size_t length)
+int64_t ClientImpl::send_binary(const char* data, size_t length)
 {
     return m_conn.send(data, length, WS_OPCODE_BINARY);
 }
 
-size_t ClientImpl::send_text(const char* data, size_t length)
+int64_t ClientImpl::send_text(const char* data, size_t length)
 {
     return m_conn.send(data, length, WS_OPCODE_TEXT);
 }
