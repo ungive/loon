@@ -220,14 +220,14 @@ void RequestHandler::cancel_request(uint64_t request_id)
 void RequestHandler::spawn_serve_thread()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_dirty) {
+    if (m_running) {
         throw std::runtime_error("serve thread has already been spawned");
     }
     if (m_stop) {
         throw std::runtime_error("request handle is stopped");
     }
-    std::thread(&RequestHandler::serve, this).detach();
-    m_dirty = true;
+    m_serve_thread = std::thread(&RequestHandler::serve, this);
+    m_running = true;
 }
 
 void loon::RequestHandler::exit_gracefully()
@@ -257,6 +257,9 @@ void loon::RequestHandler::exit_gracefully()
         m_cv_done.wait(lock, [this] {
             return m_done;
         });
+        if (m_running) {
+            m_serve_thread.join();
+        }
     }
 }
 

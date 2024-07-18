@@ -151,9 +151,10 @@ private:
     std::deque<ServeRequest> m_pending_requests{};
     std::optional<request_id_t> m_handling_request_id{};
     bool m_cancel_handling_request{ false };
-    bool m_dirty{ false };
+    bool m_running{ false }; // whether the thread member is a running thread.
     bool m_stop{ false };
     bool m_done{ false };
+    std::thread m_serve_thread{};
     std::condition_variable m_cv_done{};
 };
 } // namespace loon
