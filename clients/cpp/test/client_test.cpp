@@ -60,8 +60,8 @@ static std::shared_ptr<TestClient> create_client(
         options.no_content_request_limit->second == 0ms) {
         options.no_content_request_limit = std::make_pair(8, 1s);
     }
-    if (!options.websocket_options.basic_authorization.has_value()) {
-        options.websocket_options.basic_authorization = TEST_AUTH;
+    if (!options.websocket.basic_authorization.has_value()) {
+        options.websocket.basic_authorization = TEST_AUTH;
     }
     auto client = std::make_shared<TestClient>(TEST_ADDRESS, options);
     if (started) {

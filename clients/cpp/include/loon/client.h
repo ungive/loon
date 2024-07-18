@@ -275,7 +275,7 @@ struct ClientOptions
     /**
      * @brief The underlying websocket options to use.
      */
-    WebsocketOptions websocket_options{};
+    WebsocketOptions websocket{};
 
     /**
      * @brief The duration for which responses must be cached by the server.

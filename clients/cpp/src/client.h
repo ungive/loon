@@ -159,7 +159,7 @@ private:
 
     inline std::chrono::milliseconds connect_timeout() const
     {
-        return m_options.websocket_options.connect_timeout.value_or(
+        return m_options.websocket.connect_timeout.value_or(
             loon::websocket::default_connect_timeout);
     }
 

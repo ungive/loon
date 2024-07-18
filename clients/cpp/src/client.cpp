@@ -21,8 +21,7 @@ Client::Client(std::string const& address, ClientOptions options)
 }
 
 ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
-    : m_conn{ std::make_unique<websocket::Client>(
-          address, options.websocket_options) },
+    : m_conn{ std::make_unique<websocket::Client>(address, options.websocket) },
       m_options{ options }
 {
     if (m_options.min_cache_duration.has_value() &&

@@ -15,14 +15,14 @@ int main()
 
     std::string address = "wss://localhost/ws";
     loon::ClientOptions options;
-    options.websocket_options.basic_authorization =
+    options.websocket.basic_authorization =
         "loon-client:qadjB4GeRyUSEjbj6ZFWwOiDtjLq";
-    options.websocket_options.ca_certificate_path =
+    options.websocket.ca_certificate_path =
         "W:\\dev\\projects\\loon\\deployments\\cert.pem";
-    options.websocket_options.connect_timeout = 5000ms;
-    options.websocket_options.ping_interval = 20000ms;
-    options.websocket_options.reconnect_delay = 1000ms;
-    options.websocket_options.max_reconnect_delay = 30000ms;
+    options.websocket.connect_timeout = 5000ms;
+    options.websocket.ping_interval = 20000ms;
+    options.websocket.reconnect_delay = 1000ms;
+    options.websocket.max_reconnect_delay = 30000ms;
     loon::Client client(address, options);
     client.start();
 
