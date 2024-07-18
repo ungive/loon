@@ -166,6 +166,11 @@ void RequestHandler::serve_request(
     // Neither high, nor low priority.
     const std::lock_guard<std::mutex> lock(m_mutex);
 
+    // Nothing to serve if the serve loop exited.
+    if (m_done) {
+        return;
+    }
+
     m_pending_requests.push_back(ServeRequest(request, callback));
     m_cv_incoming_request.notify_one();
 }
@@ -174,6 +179,11 @@ void RequestHandler::cancel_request(uint64_t request_id)
 {
     // Response cancellation has high priority.
     mutex_lock_high_priority();
+
+    // Nothing to cancel if the serve loop exited.
+    if (m_done) {
+        return;
+    }
 
     // This request ID is currently being handled.
     // It's the responsibility of the serve function
