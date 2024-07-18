@@ -16,6 +16,7 @@
     If there's a cache in front of it it's e.g. probably a good idea,
     to keep a connection open between the server and the cache,
     instead of opening a new connection every time.
+- [ ] Implement upload speed limitation across all handled requests.
 
 ## Normal
 
