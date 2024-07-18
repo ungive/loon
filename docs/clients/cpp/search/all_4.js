@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['headers_20',['headers',['../structloon_1_1_websocket_options.html#a6a7cda44014ea6893816139541f91a51',1,'loon::WebsocketOptions']]]
+  ['error_24',['Error',['../namespaceloon.html#acba26d17c857f98b8e42e2182925f52ea902b0d55fddef6f8d651fe1035b7d4bd',1,'loon']]]
 ];

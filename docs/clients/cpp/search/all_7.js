@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['no_5fcontent_5frequest_5flimit_26',['no_content_request_limit',['../structloon_1_1_client_options.html#a9efc317e5c8fc64f985fda040af4962c',1,'loon::ClientOptions']]]
+  ['iclient_27',['IClient',['../classloon_1_1_i_client.html',1,'loon']]],
+  ['info_28',['Info',['../namespaceloon.html#acba26d17c857f98b8e42e2182925f52ea4059b0251f66a18cb56f544728796875',1,'loon']]]
 ];

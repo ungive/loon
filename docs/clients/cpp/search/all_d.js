@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['wait_5funtil_5fconnected_41',['wait_until_connected',['../classloon_1_1_i_client.html#abce03784a8a365738080f8688ab4d5ed',1,'loon::IClient::wait_until_connected()=0'],['../classloon_1_1_i_client.html#aebf2a20157b217edd58e8aa8f04bafd3',1,'loon::IClient::wait_until_connected(std::chrono::milliseconds timeout)=0'],['../classloon_1_1_client.html#af12b83af81be38ecb80130b1e682039a',1,'loon::Client::wait_until_connected() override'],['../classloon_1_1_client.html#ad7a0bc7142d450671f89158d44bef0d3',1,'loon::Client::wait_until_connected(std::chrono::milliseconds timeout) override']]],
-  ['websocket_42',['websocket',['../structloon_1_1_client_options.html#a8f532dac0821ab23f76912db5cfb4d61',1,'loon::ClientOptions']]],
-  ['websocketoptions_43',['WebsocketOptions',['../structloon_1_1_websocket_options.html',1,'loon']]]
+  ['readme_2emd_42',['README.md',['../_r_e_a_d_m_e_8md.html',1,'']]],
+  ['reconnect_5fdelay_43',['reconnect_delay',['../structloon_1_1_websocket_options.html#a34310c4c11fd3ebe78ff2822dc119e56',1,'loon::WebsocketOptions']]],
+  ['register_5fcontent_44',['register_content',['../classloon_1_1_i_client.html#a5d67be90fb77328d4a653e5bb256353d',1,'loon::IClient::register_content()'],['../classloon_1_1_client.html#a306388ae101447d7bf55b628ba8934a6',1,'loon::Client::register_content()']]]
 ];

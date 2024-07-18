@@ -1,4 +1,6 @@
 var searchData=
 [
-  ['wait_5funtil_5fconnected_73',['wait_until_connected',['../classloon_1_1_i_client.html#abce03784a8a365738080f8688ab4d5ed',1,'loon::IClient::wait_until_connected()=0'],['../classloon_1_1_i_client.html#aebf2a20157b217edd58e8aa8f04bafd3',1,'loon::IClient::wait_until_connected(std::chrono::milliseconds timeout)=0'],['../classloon_1_1_client.html#af12b83af81be38ecb80130b1e682039a',1,'loon::Client::wait_until_connected() override'],['../classloon_1_1_client.html#ad7a0bc7142d450671f89158d44bef0d3',1,'loon::Client::wait_until_connected(std::chrono::milliseconds timeout) override']]]
+  ['unregister_5fcontent_92',['unregister_content',['../classloon_1_1_i_client.html#a10ddfe0d1c11db19153bd0e5ed36d94c',1,'loon::IClient::unregister_content()'],['../classloon_1_1_client.html#a119d5ea6cb48ee9faab2d61e24ee2c66',1,'loon::Client::unregister_content()']]],
+  ['unregistered_93',['unregistered',['../classloon_1_1_content_handle.html#ad0e0c0e716a1289d702f3c0d4370b4f7',1,'loon::ContentHandle']]],
+  ['url_94',['url',['../classloon_1_1_content_handle.html#a194f7a2bcbb41b4e77a77709224fe301',1,'loon::ContentHandle']]]
 ];

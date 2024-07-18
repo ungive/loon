@@ -1,5 +1,4 @@
 var searchData=
 [
-  ['reconnect_5fdelay_31',['reconnect_delay',['../structloon_1_1_websocket_options.html#a34310c4c11fd3ebe78ff2822dc119e56',1,'loon::WebsocketOptions']]],
-  ['register_5fcontent_32',['register_content',['../classloon_1_1_i_client.html#a5d67be90fb77328d4a653e5bb256353d',1,'loon::IClient']]]
+  ['no_5fcontent_5frequest_5flimit_37',['no_content_request_limit',['../structloon_1_1_client_options.html#a9efc317e5c8fc64f985fda040af4962c',1,'loon::ClientOptions']]]
 ];
