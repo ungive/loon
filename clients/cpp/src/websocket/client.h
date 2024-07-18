@@ -174,6 +174,9 @@ protected:
      */
     inline void on_websocket_open()
     {
+        // Note: No mutex used for performance reasons
+        // and since it is prohibited in the client code
+        // that the mutex can be overwritten while the client is started.
         if (m_open_callback) {
             m_open_callback();
         }
@@ -184,6 +187,7 @@ protected:
      */
     inline void on_websocket_close()
     {
+        // Note: No mutex, for the same reason as in on_websocket_open.
         if (m_close_callback) {
             m_close_callback();
         }
@@ -194,6 +198,7 @@ protected:
      */
     inline void on_websocket_message(std::string const& message)
     {
+        // Note: No mutex, for the same reason as in on_websocket_open.
         if (m_message_callback) {
             m_message_callback(message);
         }
