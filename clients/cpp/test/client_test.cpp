@@ -1,6 +1,7 @@
 #include <atomic>
 #include <chrono>
 #include <ctime>
+#include <iostream>
 #include <map>
 #include <memory>
 #include <stdexcept>
@@ -55,6 +56,8 @@ public:
         start();
         wait_until_connected();
     }
+
+    inline void restart_and_wait() { ClientImpl::restart_and_wait(); }
 };
 
 static std::shared_ptr<TestClient> create_client(
@@ -237,18 +240,18 @@ public:
         };
     }
 
-    inline bool was_called() const { return m_called.load(); }
+    inline uint64_t count() const { return m_called.load(); }
 
 private:
     void wrap_callback()
     {
-        m_called.exchange(true);
+        m_called += 1;
         callback();
     }
 
     MOCK_METHOD(void, callback, ());
 
-    std::atomic<bool> m_called{ false };
+    std::atomic<uint64_t> m_called{ 0 };
 };
 
 static inline std::chrono::system_clock::time_point time_now()
@@ -327,7 +330,7 @@ TEST(Client, UnregisteredCallbackIsCalledWhenServerClosesConnection)
     empty_response->set_request_id(1000);
     client->send(message);
     std::this_thread::sleep_for(250ms);
-    EXPECT_TRUE(callback.was_called());
+    EXPECT_EQ(1, callback.count());
 }
 
 TEST(Client, UnregisteredCallbackIsCalledWhenClientClosesConnection)
@@ -338,7 +341,7 @@ TEST(Client, UnregisteredCallbackIsCalledWhenClientClosesConnection)
     ExpectCalled callback;
     handle->unregistered(callback.get());
     client->stop();
-    EXPECT_TRUE(callback.was_called());
+    EXPECT_EQ(1, callback.count());
 }
 
 TEST(Client, ServedCallbackIsCalledWhenContentHandleUrlIsRequested)
@@ -349,7 +352,7 @@ TEST(Client, ServedCallbackIsCalledWhenContentHandleUrlIsRequested)
     ExpectCalled callback;
     handle->served(callback.get());
     http_get(handle->url());
-    EXPECT_TRUE(callback.was_called());
+    EXPECT_EQ(1, callback.count());
 }
 
 TEST(Client, NoActiveRequestsWhenHandleUrlRequestIsCanceled)
@@ -391,7 +394,8 @@ TEST(Client, FailsWhenMinCacheDurationIsSetAndServerDoesNotCacheResponses)
     // It's expected that the client is not connected anymore,
     // since the client should be in a failed state.
     EXPECT_THROW(client->wait_for_hello(), ClientNotConnectedException);
-    EXPECT_TRUE(callback.was_called());
+    std::this_thread::sleep_for(25ms);
+    EXPECT_EQ(1, callback.count());
 }
 
 TEST(Client, FailsWhenMinCacheDurationIsSetButResponseIsNotCached)
@@ -508,4 +512,35 @@ TEST(Client, ContentReturnsAllRegisteredContent)
     EXPECT_TRUE(std::find(h.begin(), h.end(), h2) != h.end());
 }
 
-// TODO: send error (send returns <= 0) should not cause deadlock
+TEST(Client, ClientRestartsWhenSendErrorOccurs)
+{
+    auto client = create_client();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    ExpectCalled served(0);
+    handle->served(served.get());
+    client->inject_send_error(true);
+    auto response = http_get(handle->url());
+    EXPECT_NE(200, response.status);
+    EXPECT_NO_THROW(client->wait_until_connected());
+    EXPECT_EQ(0, client->content().size()); // should be restarted
+}
+
+TEST(Client, ServesReregisteredContentAfterRestart)
+{
+    auto client = create_client();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    client->inject_send_error(true);
+    auto failed_response = http_get(handle->url());
+    client->inject_send_error(false);
+    EXPECT_NE(200, failed_response.status);
+    EXPECT_NO_THROW(client->wait_until_connected());
+    EXPECT_EQ(0, client->content().size()); // should be restarted
+    handle = client->register_content(content.source, content.info);
+    ExpectCalled served(1);
+    handle->served(served.get());
+    auto response = http_get(handle->url());
+    EXPECT_EQ(200, response.status);
+    EXPECT_EQ(content.data, response.body);
+}

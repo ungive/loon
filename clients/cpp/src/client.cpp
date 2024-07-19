@@ -65,32 +65,42 @@ ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
         &ClientImpl::on_websocket_message, this, std::placeholders::_1));
     // Logging
     loon::init_logging();
-    // Start the send pump
+    // Start the send pump thread
     m_send_pump_thread = std::thread(&ClientImpl::send_pump, this);
+    // Start the manager loop thread
+    m_manager_loop_thread = std::thread(&ClientImpl::manager_loop, this);
 }
 
 ClientImpl::~ClientImpl()
 {
     stop();
-    // Stop the send pump
+    // Stop the send pump thread
     {
         const std::lock_guard<std::mutex> lock(m_send_pump_comm_mutex);
         m_stop_send_pump = true;
         m_cv_send_pump.notify_all();
     }
+    // Stop the manager loop thread
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        m_stop_manager_loop = true;
+        m_cv_manager.notify_all();
+    }
+    // Join all running threads
     m_send_pump_thread.join();
+    m_manager_loop_thread.join();
 }
 
 void ClientImpl::start()
 {
-    const std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    const std::lock_guard<std::mutex> lock(m_mutex);
     internal_start();
 }
 
 void ClientImpl::stop()
 {
-    const std::lock_guard<std::recursive_mutex> lock(m_mutex);
-    internal_stop();
+    std::unique_lock<std::mutex> lock(m_mutex);
+    internal_stop(lock);
 }
 
 std::string ClientImpl::make_url(std::string const& path)
@@ -157,8 +167,7 @@ void ClientImpl::check_content_constraints(
 }
 
 bool loon::ClientImpl::wait_until_connected(
-    std::unique_lock<std::recursive_mutex>& lock,
-    std::chrono::milliseconds timeout)
+    std::unique_lock<std::mutex>& lock, std::chrono::milliseconds timeout)
 {
     if (!m_started) {
         throw ClientNotStartedException("the client must be started");
@@ -171,7 +180,7 @@ bool loon::ClientImpl::wait_until_connected(
 std::shared_ptr<ContentHandle> ClientImpl::register_content(
     std::shared_ptr<loon::ContentSource> source, loon::ContentInfo const& info)
 {
-    std::unique_lock<std::recursive_mutex> lock(m_mutex);
+    std::unique_lock<std::mutex> lock(m_mutex);
 
     // Check if the path is already in use.
     auto const& path = info.path;
@@ -204,7 +213,7 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
 
 void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
 {
-    std::unique_lock<std::recursive_mutex> lock(m_mutex);
+    std::unique_lock<std::mutex> lock(m_mutex);
 
     // Verify that the content is valid and that it is registered.
     auto ptr = std::dynamic_pointer_cast<InternalContentHandle>(handle);
@@ -257,16 +266,19 @@ void ClientImpl::on_hello(Hello const& hello)
 #endif
 
     if (!m_hello->has_constraints()) {
-        return fail("the server did not send any constraints");
+        log(Fatal) << "the server did not send any constraints";
+        return fail();
     }
     if (m_options.min_cache_duration.has_value()) {
         auto min = m_options.min_cache_duration.value().count();
         auto value = m_hello->constraints().cache_duration();
         if (value == 0) {
-            return fail("the server does not support response caching");
+            log(Fatal) << "the server does not support response caching";
+            return fail();
         }
         if (min > value) {
-            return fail("the server does not cache responses long enough");
+            log(Fatal) << "the server does not cache responses long enough";
+            return fail();
         }
     }
 
@@ -312,14 +324,14 @@ void ClientImpl::on_request(Request const& request)
     if (m_requests.find(request.id()) != m_requests.end()) {
         log(Error) << "protocol: request id already in use"
                    << var("rid", request.id());
-        return internal_restart();
+        return restart();
     }
 
     auto it = m_content.find(request.path());
     if (check_request_limit(it)) {
         log(Error) << "too many requests" << var("rid", request.id())
                    << var("path", request.path());
-        return internal_restart();
+        return restart();
     }
 
     if (it == m_content.end()) {
@@ -403,10 +415,10 @@ void ClientImpl::on_close(Close const& close)
     // The server closed the connection.
     log(Error) << "connection closed by server"
                << var("message", close.message());
-    internal_restart();
+    restart();
 }
 
-void ClientImpl::wait_until_ready(std::unique_lock<std::recursive_mutex>& lock)
+void ClientImpl::wait_until_ready(std::unique_lock<std::mutex>& lock)
 {
     // Use the connect timeout here, as it makes the perfect timeout value.
     // Receiving the Hello message should not take longer than connecting.
@@ -424,40 +436,40 @@ void ClientImpl::wait_until_ready(std::unique_lock<std::recursive_mutex>& lock)
 
 void ClientImpl::on_websocket_open()
 {
-    log(Debug) << "connected";
-    const std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    const std::lock_guard<std::mutex> lock(m_mutex);
     update_connected(true);
+    log(Debug) << "connected";
 }
 
 void ClientImpl::on_websocket_close()
 {
-    log(Info) << "disconnected";
-    const std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    const std::lock_guard<std::mutex> lock(m_mutex);
     update_connected(false);
     reset_connection_state();
+    log(Info) << "disconnected";
 }
 
 void ClientImpl::on_websocket_message(std::string const& message)
 {
-    const std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    const std::lock_guard<std::mutex> lock(m_mutex);
 
     ServerMessage server_message;
     if (!server_message.ParseFromString(message)) {
         log(Error) << "failed to parse server message";
-        return internal_restart();
+        return restart();
     }
 
     switch (server_message.data_case()) {
     case ServerMessage::kHello:
         if (m_hello.has_value()) {
             log(Error) << "protocol: received more than one Hello message";
-            return internal_restart();
+            return restart();
         }
         break;
     default:
         if (!m_hello.has_value()) {
             log(Error) << "protocol: first message is not a Hello message";
-            return internal_restart();
+            return restart();
         }
         break;
     }
@@ -481,7 +493,7 @@ void ClientImpl::handle_message(ServerMessage const& message)
     default:
         log(Error) << "protocol: unrecognized server message"
                    << var("data_case", message.data_case());
-        return internal_restart();
+        return restart();
     }
 }
 
@@ -526,7 +538,9 @@ void ClientImpl::send_pump()
                 // such that the request handler can unlock its mutex
                 // and the restart operation can close the request handler.
                 // Otherwise a deadlock would occur.
-                internal_restart();
+
+                // FIXME: no locking
+                restart();
             }
             lock.lock();
         }
@@ -607,30 +621,91 @@ void ClientImpl::reset_connection_state()
     m_no_content_request_history.clear();
 }
 
-void ClientImpl::internal_stop()
+void ClientImpl::internal_stop(std::unique_lock<std::mutex>& lock)
 {
     if (!m_started) {
         return;
     }
-    m_started = false;
+    // Note: the order of the following operations is critical.
+    {
+        // Unlock the lock while stopping the websocket connection,
+        // since this might trigger a call to on_websocket_close(),
+        // which would lock the mutex again, causing a deadlock.
+        // It is safe to read m_conn without holding the lock
+        // because m_conn is never changed after object construction.
+        lock.unlock();
+        m_conn->stop();
+        lock.lock();
+    }
+    // Unregister all content and stop all request handlers.
     reset_connection_state();
-    m_conn->stop();
+    // Notify any client methods that are waiting for state changes.
     update_connected(false);
-    log(Debug) << "stopped";
+    // Reset started state.
+    m_started = false;
+    // Reset any manager state by removing pending actions.
+    // We do not want to carry those into a fresh connection.
+    m_manager_action = ManagerAction::Nothing{};
 }
 
-inline void ClientImpl::internal_restart()
+void ClientImpl::internal_restart(std::unique_lock<std::mutex>& lock)
 {
-    log(Warning) << "restarting";
-    internal_stop();
+    internal_stop(lock);
     internal_start();
+    log(Warning) << "restarted";
 }
 
-void loon::ClientImpl::fail(std::string const& message)
+void ClientImpl::restart()
 {
-    log(Fatal) << message;
-    internal_stop();
-    if (m_failed_callback) {
-        m_failed_callback();
+    if (std::holds_alternative<ManagerAction::Restart>(m_manager_action)) {
+        log(Warning) << "manager: already restarting, skipping restart";
+        return;
+    }
+    if (std::holds_alternative<ManagerAction::Fail>(m_manager_action)) {
+        log(Warning) << "manager: already failing, skipping restart";
+        return;
+    }
+    ManagerAction::Restart restart{};
+    m_manager_action = restart;
+    m_cv_manager.notify_one();
+}
+
+void loon::ClientImpl::fail()
+{
+    if (std::holds_alternative<ManagerAction::Restart>(m_manager_action)) {
+        log(Warning) << "manager: failing, overwriting pending restart";
+    }
+    if (std::holds_alternative<ManagerAction::Fail>(m_manager_action)) {
+        log(Warning) << "manager: already failing, skipping";
+        return;
+    }
+    ManagerAction::Fail fail{};
+    m_manager_action = fail;
+    m_cv_manager.notify_one();
+}
+
+void ClientImpl::manager_loop()
+{
+    using Action = ManagerAction;
+    std::unique_lock<std::mutex> lock(m_mutex);
+    while (true) {
+        m_cv_manager.wait(lock, [this] {
+            return m_stop_manager_loop ||
+                !std::holds_alternative<Action::Nothing>(m_manager_action);
+        });
+        if (m_stop_manager_loop) {
+            return;
+        }
+        if (auto* restart = std::get_if<Action::Restart>(&m_manager_action)) {
+            internal_restart(lock);
+        } else if (auto* fail = std::get_if<Action::Fail>(&m_manager_action)) {
+            internal_stop(lock);
+            if (m_failed_callback) {
+                m_failed_callback();
+            }
+        } else {
+            assert(false);
+        }
+        m_manager_action = Action::Nothing{};
     }
 }

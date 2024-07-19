@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <variant>
 
 #include "logging.h"
 #include "loon/client.h"
@@ -39,13 +40,13 @@ public:
 
     inline bool wait_until_connected(std::chrono::milliseconds timeout) override
     {
-        std::unique_lock<std::recursive_mutex> lock(m_mutex);
+        std::unique_lock<std::mutex> lock(m_mutex);
         return wait_until_connected(lock, timeout);
     }
 
     inline void on_failed(std::function<void()> callback) override
     {
-        std::lock_guard<std::recursive_mutex> lock(m_mutex);
+        std::lock_guard<std::mutex> lock(m_mutex);
         m_failed_callback = callback;
     }
 
@@ -61,7 +62,8 @@ protected:
     // Methods that should be accessible from tests.
 
     /**
-     * Serializes a client message and sends it to the websocket peer.
+     * @brief Serializes a client message and sends it to the websocket peer.
+     *
      * Returns true if the message was successfully sent.
      * Returns false if an error occured and the connection is restarted.
      * If false is returned, any handling function should terminate immediately,
@@ -93,7 +95,7 @@ protected:
      */
     inline size_t active_requests()
     {
-        std::lock_guard<std::recursive_mutex> lock(m_mutex);
+        std::lock_guard<std::mutex> lock(m_mutex);
         return m_requests.size();
     }
 
@@ -107,7 +109,7 @@ protected:
      */
     inline Hello wait_for_hello()
     {
-        std::unique_lock<std::recursive_mutex> lock(m_mutex);
+        std::unique_lock<std::mutex> lock(m_mutex);
         wait_until_connected(lock, connect_timeout());
         wait_until_ready(lock);
         return m_hello.value();
@@ -123,7 +125,7 @@ protected:
      */
     inline void inject_hello_modifier(std::function<void(Hello&)> modifier)
     {
-        std::unique_lock<std::recursive_mutex> lock(m_mutex);
+        std::unique_lock<std::mutex> lock(m_mutex);
         m_injected_hello_modifer = modifier;
     }
 
@@ -136,7 +138,7 @@ protected:
      */
     inline void inject_send_error(bool trigger_error)
     {
-        std::unique_lock<std::recursive_mutex> lock(m_mutex);
+        std::unique_lock<std::mutex> lock(m_mutex);
         m_inject_send_error = trigger_error;
     }
 
@@ -149,8 +151,17 @@ protected:
     inline void chunk_sleep(
         std::chrono::milliseconds duration = std::chrono::milliseconds::zero())
     {
-        std::lock_guard<std::recursive_mutex> lock(m_mutex);
+        std::lock_guard<std::mutex> lock(m_mutex);
         m_chunk_sleep_duration = duration;
+    }
+
+    /**
+     * @brief Triggers a restart and returns once the client is restarted.
+     */
+    inline void restart_and_wait()
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        internal_restart(lock);
     }
 
 private:
@@ -165,6 +176,34 @@ private:
     using request_id_t = uint64_t;
     using request_path_t = std::string;
 
+    /**
+     * @brief Restarts the connection.
+     *
+     * Triggers the restarting process on another thread,
+     * so that the calling function can return immediately.
+     *
+     * Should be preceded by a log message describing what happened,
+     * using the "Error" log level, since that level is used
+     * to communicate that the connection is restarted.
+     *
+     * A lock for the data mutex must be held when calling this method.
+     */
+    void restart();
+
+    /**
+     * @brief Puts the client in a failed state and closes the connection.
+     *
+     * Triggers the restarting process on another thread,
+     * so that the calling function can return immediately.
+     *
+     * Should be preceded by a log message describing what happened,
+     * using the "Fatal" log level, since that level is used
+     * to communicate that the connection has failed.
+     *
+     * A lock for the data mutex must be held when calling this method.
+     */
+    void fail();
+
     Logger make_logger(LogLevel level);
 
     void on_websocket_open();
@@ -178,9 +217,9 @@ private:
     void on_request_closed(RequestClosed const& request_closed);
     void on_close(Close const& close);
     bool update_connected(bool state);
-    bool wait_until_connected(std::unique_lock<std::recursive_mutex>& lock,
-        std::chrono::milliseconds timeout);
-    void wait_until_ready(std::unique_lock<std::recursive_mutex>& lock);
+    bool wait_until_connected(
+        std::unique_lock<std::mutex>& lock, std::chrono::milliseconds timeout);
+    void wait_until_ready(std::unique_lock<std::mutex>& lock);
     void check_content_constraints(std::shared_ptr<loon::ContentSource> source,
         loon::ContentInfo const& info);
 
@@ -197,33 +236,36 @@ private:
     ClientMessage const* m_send_pump_message{ nullptr };
     bool m_send_pump_result{ false };
 
+    // clang-format off
+    struct ManagerAction
+    {
+        struct Nothing {};
+        struct Restart {};
+        struct Fail {};
+
+        using variant = std::variant<
+            ManagerAction::Nothing,
+            ManagerAction::Restart,
+            ManagerAction::Fail>;
+    }; // clang-format on
+
+    void manager_loop();
+
+    std::thread m_manager_loop_thread{};
+    std::condition_variable m_cv_manager{};
+    ManagerAction::variant m_manager_action{};
+    bool m_stop_manager_loop{ false };
+
     void reset_connection_state();
     void internal_start();
-    void internal_stop();
-
-    /**
-     * @brief Restarts the connection.
-     *
-     * Must be preceded by a log message describing what happened,
-     * with log level "Error".
-     */
-    void internal_restart();
+    void internal_stop(std::unique_lock<std::mutex>& lock);
+    void internal_restart(std::unique_lock<std::mutex>& lock);
 
     inline std::chrono::milliseconds connect_timeout() const
     {
         return m_options.websocket.connect_timeout.value_or(
             loon::websocket::default_connect_timeout);
     }
-
-    /**
-     * @brief Puts the client in a failed state and closes any connection.
-     *
-     * After calling this method, the client is guaranteed to not be connected
-     * and not attempt any reconnects.
-     *
-     * @param message A message describing what happened.
-     */
-    void fail(std::string const& message);
 
     const ClientOptions m_options{};
     std::deque<std::chrono::system_clock::time_point>
@@ -235,13 +277,12 @@ private:
     // Use a recursive mutex, since many methods could trigger a reconnect,
     // which would call close and would trigger the close callback,
     // which locks this mutex again.
+    std::mutex m_mutex{};
     // Requests mutex. For reads/writes from/to m_requests.
     std::mutex m_request_mutex{};
     // Use an "any" condition variable, so it works with a recursive mutex.
     // It must only be used if it is known that the mutex is only locked once.
-    std::condition_variable_any m_cv_connection_ready{};
-
-    // Per-connection state fields
+    std::condition_variable m_cv_connection_ready{};
 
     std::optional<Hello> m_hello{};
     std::unordered_map<request_path_t, std::shared_ptr<InternalContentHandle>>

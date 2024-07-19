@@ -86,8 +86,13 @@ public:
      *
      * Attempts to reconnect until stop() is called,
      * if a reconnect delay is configured in the options.
-     *
      * Does nothing, if the client is already started.
+     *
+     * This method is guaranteed to return immediately,
+     * it will not block until any of the event handlers
+     * have been called and returned.
+     * If a mutex is held while start() is called,
+     * it can safely be locked from any of the event handlers.
      *
      * @returns Whether the client has
      * successfully connected the first time or not.
@@ -98,6 +103,11 @@ public:
      * @brief Stops the websocket client.
      *
      * Does nothing, if the client is not started or already stopped.
+     *
+     * Blocks until the client is fully stopped
+     * and until all resources have been deallocated.
+     * If a mutex is locked in any of the event handlers,
+     * no lock should be held for it when calling this method.
      */
     virtual void stop() = 0;
 };
