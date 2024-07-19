@@ -543,4 +543,6 @@ TEST(Client, ServesReregisteredContentAfterRestart)
     auto response = http_get(handle->url());
     EXPECT_EQ(200, response.status);
     EXPECT_EQ(content.data, response.body);
+    std::this_thread::sleep_for(10ms);
+    EXPECT_EQ(1, served.count());
 }
