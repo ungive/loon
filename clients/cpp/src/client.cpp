@@ -541,7 +541,14 @@ bool ClientImpl::internal_send(ClientMessage const& message)
                    << var("data_case", message.data_case());
         return false;
     }
+#ifdef LOON_TEST
+    int64_t n = 0;
+    if (!m_inject_send_error) {
+        n = m_conn->send_binary(result.data(), result.size());
+    }
+#else
     int64_t n = m_conn->send_binary(result.data(), result.size());
+#endif
     if (n <= 0) {
         log(Error) << "failed to send message" << var("retval", n);
         return false;

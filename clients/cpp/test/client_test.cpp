@@ -39,6 +39,11 @@ public:
         ClientImpl::inject_hello_modifier(modifier);
     }
 
+    inline void inject_send_error(bool trigger_error)
+    {
+        ClientImpl::inject_send_error(trigger_error);
+    }
+
     inline void chunk_sleep(
         std::chrono::milliseconds duration = std::chrono::milliseconds::zero())
     {

@@ -128,6 +128,19 @@ protected:
     }
 
     /**
+     * @brief Injects a send error, to simulate send failure.
+     *
+     * The send function will return 0
+     *
+     * @param trigger_error
+     */
+    inline void inject_send_error(bool trigger_error)
+    {
+        std::unique_lock<std::recursive_mutex> lock(m_mutex);
+        m_inject_send_error = trigger_error;
+    }
+
+    /**
      * @brief How long to sleep inbetween chunks.
      *
      * A zero value indicates no sleeping inbetween chunks, the default.
@@ -142,6 +155,7 @@ protected:
 
 private:
     std::function<void(Hello&)> m_injected_hello_modifer{};
+    bool m_inject_send_error{ false };
     std::chrono::milliseconds m_chunk_sleep_duration{
         std::chrono::milliseconds::zero()
     };
