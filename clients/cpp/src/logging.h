@@ -80,7 +80,7 @@ public:
             *this << std::make_pair(pair.first, pair.second.value());
         } else {
             // Conveniently doesn't call the std::string specialization.
-            *this << std::make_pair(pair.first, "<nullopt>");
+            *this << std::make_pair(pair.first, "<null>");
         }
         return *this;
     }
