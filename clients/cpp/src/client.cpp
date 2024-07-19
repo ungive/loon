@@ -601,6 +601,7 @@ void ClientImpl::reset_connection_state()
     m_content.clear();
     m_requests.clear();
     m_hello = std::nullopt;
+    m_no_content_request_history.clear();
 }
 
 void ClientImpl::internal_stop()
