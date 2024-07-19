@@ -599,7 +599,10 @@ void ClientImpl::reset_connection_state()
         content->unregistered();
     }
     m_content.clear();
-    m_requests.clear();
+    {
+        const std::lock_guard<std::mutex> lock(m_request_mutex);
+        m_requests.clear();
+    }
     m_hello = std::nullopt;
     m_no_content_request_history.clear();
 }
