@@ -54,7 +54,13 @@ public:
     {
         if (m_has_content)
             m_buffer << ' ';
-        m_buffer << pair.first << '=' << '"' << pair.second << '"';
+        m_buffer << pair.first << '=';
+        bool has_space = pair.second.find_first_of(' ') != std::string::npos;
+        if (has_space)
+            m_buffer << '"';
+        m_buffer << pair.second;
+        if (has_space)
+            m_buffer << '"';
         m_has_content = true;
         m_was_pair = true;
         return *this;
