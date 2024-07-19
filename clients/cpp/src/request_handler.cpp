@@ -35,6 +35,20 @@ RequestHandler::RequestHandler(ContentInfo const& info,
     // since the values are already validated by the client implementation.
 }
 
+loon::RequestHandler::~RequestHandler()
+{
+    bool has_thread = false;
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_stop = true;
+        m_cv_incoming_request.notify_all();
+        has_thread = m_running;
+    }
+    if (has_thread) {
+        m_serve_thread.join();
+    }
+}
+
 void RequestHandler::serve()
 {
     std::unique_lock<std::mutex> lock(m_mutex);
@@ -259,9 +273,6 @@ void loon::RequestHandler::exit_gracefully()
         m_cv_done.wait(lock, [this] {
             return m_done;
         });
-        if (m_running) {
-            m_serve_thread.join();
-        }
     }
 }
 

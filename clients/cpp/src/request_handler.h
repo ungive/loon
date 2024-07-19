@@ -39,6 +39,8 @@ public:
         std::shared_ptr<loon::ContentSource> source, Hello const& hello,
         Options options, std::function<bool(ClientMessage const&)> send_func);
 
+    ~RequestHandler();
+
     /**
      * @brief Returns information about thsi request handler's content.
      * @returns The content information.
