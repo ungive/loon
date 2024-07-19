@@ -225,17 +225,6 @@ private:
 
     std::string make_url(std::string const& path);
 
-    void send_pump();
-    bool internal_send(ClientMessage const& message);
-
-    std::thread m_send_pump_thread{};
-    std::mutex m_send_pump_send_mutex{};
-    std::mutex m_send_pump_comm_mutex{};
-    bool m_stop_send_pump{ false };
-    std::condition_variable m_cv_send_pump{};
-    ClientMessage const* m_send_pump_message{ nullptr };
-    bool m_send_pump_result{ false };
-
     // clang-format off
     struct ManagerAction
     {
@@ -278,6 +267,8 @@ private:
     // which would call close and would trigger the close callback,
     // which locks this mutex again.
     std::mutex m_mutex{};
+    // Mutex for writing to the connection.
+    std::mutex m_write_mutex{};
     // Requests mutex. For reads/writes from/to m_requests.
     std::mutex m_request_mutex{};
     // Use an "any" condition variable, so it works with a recursive mutex.
