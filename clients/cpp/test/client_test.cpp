@@ -60,6 +60,8 @@ public:
 static std::shared_ptr<TestClient> create_client(
     ClientOptions options = {}, bool started = true)
 {
+    loon::client_log_level(loon::LogLevel::Debug);
+    loon::websocket_log_level(loon::LogLevel::Debug);
     if (options.no_content_request_limit.has_value() &&
         options.no_content_request_limit->first == -1 &&
         options.no_content_request_limit->second == 0ms) {
