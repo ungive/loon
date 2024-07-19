@@ -71,7 +71,11 @@ ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
 
 ClientImpl::~ClientImpl()
 {
-    stop();
+    // Stop the client
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        internal_stop(lock);
+    }
     // Stop the manager loop thread
     {
         const std::lock_guard<std::mutex> lock(m_mutex);
@@ -84,12 +88,14 @@ ClientImpl::~ClientImpl()
 void ClientImpl::start()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
+    m_was_explicitly_started = true;
     internal_start();
 }
 
 void ClientImpl::stop()
 {
     std::unique_lock<std::mutex> lock(m_mutex);
+    m_was_explicitly_stopped = true;
     internal_stop(lock);
 }
 
@@ -428,7 +434,7 @@ void ClientImpl::on_websocket_open()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     update_connected(true);
-    log(Debug) << "connected";
+    m_was_explicitly_started = false;
 }
 
 void ClientImpl::on_websocket_close()
@@ -436,7 +442,22 @@ void ClientImpl::on_websocket_close()
     const std::lock_guard<std::mutex> lock(m_mutex);
     update_connected(false);
     reset_connection_state();
-    log(Info) << "disconnected";
+    if (m_was_explicitly_started) {
+        m_was_explicitly_started = false;
+        auto retrying = m_options.websocket.reconnect_delay.has_value();
+        log(Error) << (retrying ? "initial connection attempt failed"
+                                : "connection failed")
+                   << var("retrying", retrying)
+                   << var("address", m_conn->address())
+                   << var("conn_timeout", m_options.websocket.connect_timeout)
+                   << var("reconn_delay", m_options.websocket.reconnect_delay)
+                   << var("max_reconn_delay",
+                          m_options.websocket.max_reconnect_delay);
+    }
+    if (m_was_explicitly_stopped) {
+        m_was_explicitly_stopped = false;
+        log(Info) << "client stopped";
+    }
 }
 
 void ClientImpl::on_websocket_message(std::string const& message)
@@ -529,17 +550,7 @@ void ClientImpl::internal_start()
         return;
     }
     m_started = true;
-    if (!m_conn->start()) {
-        auto retrying = m_options.websocket.reconnect_delay.has_value();
-        log(Error) << (retrying ? "initial connection attempt failed"
-                                : "connection failed")
-                   << var("retrying", retrying)
-                   << var("address", m_conn->address())
-                   << var("conn_timeout", m_options.websocket.connect_timeout)
-                   << var("reconn_delay", m_options.websocket.reconnect_delay)
-                   << var("max_reconn_delay",
-                          m_options.websocket.max_reconnect_delay);
-    }
+    m_conn->start();
 }
 
 void ClientImpl::reset_connection_state()

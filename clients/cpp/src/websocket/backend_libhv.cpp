@@ -30,7 +30,7 @@ public:
     int64_t send_text(const char* data, size_t length) override;
 
 protected:
-    bool internal_start() override;
+    void internal_start() override;
     void internal_stop() override;
 
     std::unique_ptr<hv::WebSocketClient> create_conn();
@@ -90,7 +90,7 @@ std::unique_ptr<hv::WebSocketClient> ClientImpl::create_conn()
     return conn;
 }
 
-bool ClientImpl::internal_start()
+void ClientImpl::internal_start()
 {
     // Reconnect
     if (m_options.reconnect_delay.has_value()) {
@@ -123,8 +123,6 @@ bool ClientImpl::internal_start()
     }
     // Open the connection
     m_conn->open(m_address.c_str(), headers);
-    perror("internal_start() after");
-    return m_conn->isConnected();
 }
 
 void ClientImpl::internal_stop()

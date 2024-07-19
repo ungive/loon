@@ -93,11 +93,8 @@ public:
      * have been called and returned.
      * If a mutex is held while start() is called,
      * it can safely be locked from any of the event handlers.
-     *
-     * @returns Whether the client has
-     * successfully connected the first time or not.
      */
-    virtual bool start() = 0;
+    virtual void start() = 0;
 
     /**
      * @brief Stops the websocket client.
@@ -145,7 +142,7 @@ public:
         return m_impl->send_text(data, length);
     }
 
-    inline bool start() override { return m_impl->start(); }
+    inline void start() override { return m_impl->start(); }
 
     inline void stop() override { return m_impl->stop(); }
 
@@ -171,12 +168,12 @@ public:
 
     virtual int64_t send_text(const char* data, size_t length) = 0;
 
-    bool start() override;
+    void start() override;
 
     void stop() override;
 
 protected:
-    virtual bool internal_start() = 0;
+    virtual void internal_start() = 0;
     virtual void internal_stop() = 0;
 
     /**

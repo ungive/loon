@@ -61,14 +61,14 @@ void BaseClient::on_message(
     m_message_callback = callback;
 }
 
-bool BaseClient::start()
+void BaseClient::start()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     if (m_started) {
-        return true;
+        return;
     }
     m_started = true;
-    return internal_start();
+    internal_start();
 }
 
 void BaseClient::stop()
