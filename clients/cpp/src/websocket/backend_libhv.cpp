@@ -33,8 +33,10 @@ protected:
     bool internal_start() override;
     void internal_stop() override;
 
+    std::unique_ptr<hv::WebSocketClient> create_conn();
+
 private:
-    hv::WebSocketClient m_conn{};
+    std::unique_ptr<hv::WebSocketClient> m_conn{};
 };
 
 static constexpr int loon_to_libhv_level(loon::LogLevel level);
@@ -57,20 +59,9 @@ Client::Client(std::string const& address, WebsocketOptions const& options)
 
 ClientImpl::ClientImpl(
     std::string const& address, WebsocketOptions const& options)
-    : BaseClient(address, options)
+    : BaseClient(address, options), m_conn{ create_conn() }
 {
-    m_conn.onopen = std::bind(&ClientImpl::on_websocket_open, this);
-    m_conn.onmessage = std::bind(
-        &ClientImpl::on_websocket_message, this, std::placeholders::_1);
-    m_conn.onclose = std::bind(&ClientImpl::on_websocket_close, this);
-    if (m_options.connect_timeout.has_value()) {
-        m_conn.setConnectTimeout(m_options.connect_timeout.value().count());
-    } else {
-        m_conn.setConnectTimeout(default_connect_timeout.count());
-    }
-    if (m_options.ping_interval.has_value()) {
-        m_conn.setPingInterval(m_options.ping_interval.value().count());
-    }
+
     // It should be okay to set a global log handler,
     // as the libhv library is being statically linked.
     hlog_set_format("%s");
@@ -79,6 +70,24 @@ ClientImpl::ClientImpl(
         const std::lock_guard<std::mutex> lock(_mutex);
         hlog_set_level(_level);
     }
+}
+
+std::unique_ptr<hv::WebSocketClient> ClientImpl::create_conn()
+{
+    auto conn = std::make_unique<hv::WebSocketClient>();
+    conn->onopen = std::bind(&ClientImpl::on_websocket_open, this);
+    conn->onmessage = std::bind(
+        &ClientImpl::on_websocket_message, this, std::placeholders::_1);
+    conn->onclose = std::bind(&ClientImpl::on_websocket_close, this);
+    if (m_options.connect_timeout.has_value()) {
+        conn->setConnectTimeout(m_options.connect_timeout.value().count());
+    } else {
+        conn->setConnectTimeout(default_connect_timeout.count());
+    }
+    if (m_options.ping_interval.has_value()) {
+        conn->setPingInterval(m_options.ping_interval.value().count());
+    }
+    return conn;
 }
 
 bool ClientImpl::internal_start()
@@ -92,7 +101,7 @@ bool ClientImpl::internal_start()
             reconnect.max_delay = m_options.max_reconnect_delay.value().count();
             reconnect.delay_policy = DEFAULT_RECONNECT_INCREASING_DELAY_POLICY;
         }
-        m_conn.setReconnect(&reconnect);
+        m_conn->setReconnect(&reconnect);
     }
     // Headers
     http_headers headers;
@@ -110,27 +119,29 @@ bool ClientImpl::internal_start()
         param.endpoint = HSSL_CLIENT;
         param.verify_peer = 1;
         param.ca_file = m_options.ca_certificate_path.value().c_str();
-        m_conn.withTLS(&param);
+        m_conn->withTLS(&param);
     }
     // Open the connection
-    m_conn.open(m_address.c_str(), headers);
-    return m_conn.isConnected();
+    m_conn->open(m_address.c_str(), headers);
+    perror("internal_start() after");
+    return m_conn->isConnected();
 }
 
 void ClientImpl::internal_stop()
 {
-    m_conn.setReconnect(nullptr);
-    m_conn.close();
+    m_conn->stop();
+    m_conn.reset();
+    m_conn = create_conn();
 }
 
 int64_t ClientImpl::send_binary(const char* data, size_t length)
 {
-    return m_conn.send(data, length, WS_OPCODE_BINARY);
+    return m_conn->send(data, length, WS_OPCODE_BINARY);
 }
 
 int64_t ClientImpl::send_text(const char* data, size_t length)
 {
-    return m_conn.send(data, length, WS_OPCODE_TEXT);
+    return m_conn->send(data, length, WS_OPCODE_TEXT);
 }
 
 static void libhv_log_handler(int level, const char* buf, int len)
