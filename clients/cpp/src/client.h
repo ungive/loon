@@ -78,6 +78,10 @@ protected:
      */
     bool send(ClientMessage const& message);
 
+#ifdef LOON_TEST
+    // Methods and fields that are only needed for testing
+    // and which shouldn't be part of release builds.
+
     /**
      * @brief Counts the number of active requests that are being handled.
      *
@@ -135,6 +139,13 @@ protected:
         std::lock_guard<std::recursive_mutex> lock(m_mutex);
         m_chunk_sleep_duration = duration;
     }
+
+private:
+    std::function<void(Hello&)> m_injected_hello_modifer{};
+    std::chrono::milliseconds m_chunk_sleep_duration{
+        std::chrono::milliseconds::zero()
+    };
+#endif
 
 private:
     using request_id_t = uint64_t;
@@ -201,12 +212,8 @@ private:
     void fail(std::string const& message);
 
     const ClientOptions m_options{};
-    std::chrono::milliseconds m_chunk_sleep_duration{
-        std::chrono::milliseconds::zero()
-    };
     std::deque<std::chrono::system_clock::time_point>
         m_no_content_request_history{};
-    std::function<void(Hello&)> m_injected_hello_modifer{};
     std::function<void()> m_failed_callback{};
 
     bool m_started{ false };

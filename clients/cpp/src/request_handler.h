@@ -18,9 +18,11 @@ class RequestHandler
 public:
     struct Options
     {
+#ifdef LOON_TEST
         std::chrono::milliseconds chunk_sleep{
             std::chrono::milliseconds::zero()
         };
+#endif
     };
 
     /**

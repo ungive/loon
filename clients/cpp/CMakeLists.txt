@@ -69,6 +69,12 @@ target_link_libraries(loon loon_proto)
 set_property(TARGET loon PROPERTY CXX_STANDARD 17)
 set_property(TARGET loon PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    # Compile test methods and functions with debug builds.
+    # That way they are not greyed out during development.
+    target_compile_definitions(loon PRIVATE LOON_TEST)
+endif()
+
 if(LOON_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
@@ -96,6 +102,7 @@ if(LOON_BUILD_TESTS)
     target_link_libraries(loon_test CURL::libcurl)
     set_property(TARGET loon_test PROPERTY CXX_STANDARD 17)
     set_property(TARGET loon_test PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
+    target_compile_definitions(loon_test PRIVATE LOON_TEST)
 
     add_custom_command(
         TARGET loon_test

@@ -117,9 +117,11 @@ void RequestHandler::serve()
         std::vector<char> buffer(chunk_size);
         std::size_t total = 0;
         while (stream.good()) {
+#ifdef LOON_TEST
             if (m_options.chunk_sleep > std::chrono::milliseconds::zero()) {
                 std::this_thread::sleep_for(m_options.chunk_sleep);
             }
+#endif
             stream.read(buffer.data(), buffer.size());
             std::streamsize n = stream.gcount();
             if (n <= 0) {

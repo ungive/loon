@@ -190,7 +190,9 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
     // Serve requests for this content, register it and return a handle.
     auto send = std::bind(&ClientImpl::send, this, std::placeholders::_1);
     RequestHandler::Options options;
+#ifdef LOON_TEST
     options.chunk_sleep = m_chunk_sleep_duration;
+#endif
     auto request_handle = std::make_shared<RequestHandler>(
         info, source, m_hello.value(), options, send);
     request_handle->spawn_serve_thread();
@@ -242,6 +244,7 @@ std::vector<std::shared_ptr<ContentHandle>> loon::ClientImpl::content()
 
 void ClientImpl::on_hello(Hello const& hello)
 {
+#ifdef LOON_TEST
     if (m_injected_hello_modifer) {
         Hello modified = hello;
         m_injected_hello_modifer(modified);
@@ -249,6 +252,9 @@ void ClientImpl::on_hello(Hello const& hello)
     } else {
         m_hello = hello;
     }
+#else
+    m_hello = hello;
+#endif
 
     if (!m_hello->has_constraints()) {
         return fail("the server did not send any constraints");
