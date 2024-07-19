@@ -14,8 +14,8 @@ int main()
     // options.min_cache_duration = (cache_duration * 4) / 5;
     // options.max_requests_per_second = 1.0f;
 
-    loon::client_log_level(loon::LogLevel::Warning);
-    loon::websocket_log_level(loon::LogLevel::Error);
+    loon::client_log_level(loon::LogLevel::Debug);
+    loon::websocket_log_level(loon::LogLevel::Warning);
 
     std::string address = "ws://localhost:8071/ws";
     loon::ClientOptions options;
@@ -26,11 +26,14 @@ int main()
     options.websocket.connect_timeout = 5000ms;
     options.websocket.ping_interval = 20000ms;
     options.websocket.reconnect_delay = 1000ms;
-    options.websocket.max_reconnect_delay = 30000ms;
+    // options.websocket.max_reconnect_delay = 30000ms;
     options.no_content_request_limit = std::make_pair(16, 1s);
     loon::Client client(address, options);
     client.start();
-    client.wait_until_connected();
+    if (!client.wait_until_connected(20s)) {
+        std::cerr << "Failed to connect, exiting\n";
+        return -1;
+    }
 
     std::ostringstream oss;
     oss << "<h1>It works!</h1><br>";
@@ -55,10 +58,10 @@ int main()
 
     std::cout << "URL: " << handle->url() << std::endl;
 
-    std::this_thread::sleep_for(3s);
+    std::this_thread::sleep_for(30s);
 
     std::cout << "Unregistering content" << std::endl;
-    // client.unregister_content(handle);
+    client.unregister_content(handle);
     std::this_thread::sleep_for(1s);
 
     std::cout << "Stopping client" << std::endl;
