@@ -567,9 +567,10 @@ void ClientImpl::internal_start()
     m_started = true;
     if (!m_conn->start()) {
         auto retrying = m_options.websocket.reconnect_delay.has_value();
-        log(Error) << "initial connection attempt failed"
-                   << var("address", m_conn->address())
+        log(Error) << (retrying ? "initial connection attempt failed"
+                                : "connection failed")
                    << var("retrying", retrying)
+                   << var("address", m_conn->address())
                    << var("conn_timeout", m_options.websocket.connect_timeout)
                    << var("reconn_delay", m_options.websocket.reconnect_delay)
                    << var("max_reconn_delay",
