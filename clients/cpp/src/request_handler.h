@@ -122,7 +122,7 @@ private:
      * @returns The return value of the send function.
      * If this value is false, the serve function should terminate.
      */
-    bool send_response_message(ClientMessage const& message);
+    bool send_message_low_priority(ClientMessage const& message);
 
     struct ServeRequest
     {

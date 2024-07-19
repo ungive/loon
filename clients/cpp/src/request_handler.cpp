@@ -68,12 +68,13 @@ void RequestHandler::serve()
     // so that cancellation while the message is being sent can go through,
     // locks the lock and returns whether the message was successfully sent.
     // If false is returned, the serve function should immediately terminate.
-    auto send = [this](decltype(lock)& lock, ClientMessage const& message) {
-        lock.unlock();
-        auto result = send_response_message(message);
-        lock.lock();
-        return result;
-    };
+    auto unlock_send_low_priority = //
+        [this](decltype(lock)& lock, ClientMessage const& message) {
+            lock.unlock();
+            auto result = send_message_low_priority(message);
+            lock.lock();
+            return result;
+        };
 
     // The loop condition needs to be true,
     // since the request cancellation is always done after an iteration.
@@ -119,7 +120,7 @@ void RequestHandler::serve()
         if (m_info.attachment_filename.has_value()) {
             header->set_filename(m_info.attachment_filename.value());
         }
-        if (!send(lock, header_message))
+        if (!unlock_send_low_priority(lock, header_message))
             return;
         if (m_cancel_handling_request)
             continue;
@@ -148,7 +149,7 @@ void RequestHandler::serve()
             chunk->set_request_id(serve_request.request.id());
             chunk->set_sequence(sequence++);
             chunk->set_data(buffer.data(), n);
-            if (!send(lock, chunk_message))
+            if (!unlock_send_low_priority(lock, chunk_message))
                 return;
             total += n;
             if (m_cancel_handling_request)
@@ -170,7 +171,8 @@ void RequestHandler::serve()
     }
 }
 
-inline bool RequestHandler::send_response_message(ClientMessage const& message)
+inline bool RequestHandler::send_message_low_priority(
+    ClientMessage const& message)
 {
     mutex_lock_low_priority();
     return m_send_message(message);
