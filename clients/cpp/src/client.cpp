@@ -307,7 +307,7 @@ bool ClientImpl::check_request_limit(decltype(m_content)::iterator it)
 
 void ClientImpl::on_request(Request const& request)
 {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    std::lock_guard<std::mutex> lock(m_request_mutex);
 
     if (m_requests.find(request.id()) != m_requests.end()) {
         log(Error) << "protocol: request id already in use"
@@ -353,7 +353,7 @@ inline void ClientImpl::call_served_callback(decltype(m_requests)::iterator it)
 
 void ClientImpl::response_sent(uint64_t request_id)
 {
-    const std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    const std::lock_guard<std::mutex> lock(m_request_mutex);
 
     auto it = m_requests.find(request_id);
     if (it == m_requests.end()) {
@@ -366,7 +366,7 @@ void ClientImpl::response_sent(uint64_t request_id)
 
 void ClientImpl::on_success(Success const& success)
 {
-    const std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    const std::lock_guard<std::mutex> lock(m_request_mutex);
 
     auto request_id = success.request_id();
     auto it = m_requests.find(request_id);
@@ -380,7 +380,7 @@ void ClientImpl::on_success(Success const& success)
 
 void ClientImpl::on_request_closed(RequestClosed const& request_closed)
 {
-    const std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    const std::lock_guard<std::mutex> lock(m_request_mutex);
 
     auto request_id = request_closed.request_id();
     auto it = m_requests.find(request_id);

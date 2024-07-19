@@ -235,7 +235,8 @@ private:
     // Use a recursive mutex, since many methods could trigger a reconnect,
     // which would call close and would trigger the close callback,
     // which locks this mutex again.
-    std::recursive_mutex m_mutex{};
+    // Requests mutex. For reads/writes from/to m_requests.
+    std::mutex m_request_mutex{};
     // Use an "any" condition variable, so it works with a recursive mutex.
     // It must only be used if it is known that the mutex is only locked once.
     std::condition_variable_any m_cv_connection_ready{};
