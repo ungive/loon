@@ -54,6 +54,8 @@ void RequestHandler::serve()
     std::unique_lock<std::mutex> lock(m_mutex);
 
     std::shared_ptr<void> defer(nullptr, std::bind([this] {
+        // Reset currentl handled request ID.
+        m_handling_request_id = std::nullopt;
         // Notify that the serve loop has exited once the function returns.
         // Note that "defer" needs to be constructed after the lock,
         // so that it is destructed before the lock
