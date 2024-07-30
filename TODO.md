@@ -2,8 +2,7 @@
 
 ## High
 
-- [ ] Add support for QT websockets to the C++ client,
-    as an alternative to libhv.
+- [ ] Implement reconnecting for the QT websocket backend.
 - [ ] Option to auto-restart after a given timeout to rotate client IDs?
     probably not a bad idea instead of e.g. staying connected for 24h
     and still using the same client ID and client secret
@@ -16,14 +15,21 @@
     If there's a cache in front of it it's e.g. probably a good idea,
     to keep a connection open between the server and the cache,
     instead of opening a new connection every time.
-- [ ] Implement upload speed limitation across all handled requests.
 
 ## Normal
 
+- [ ] Implement upload speed limitation across all handled requests.
+- [ ] Switch to std::string_view with websocket message in C++ client?
 - [ ] Call served/unregistered/failed callbacks on a separate thread?
     that way they can do more work without blocking client operation
     and client methods can be called without deadlocking.
-- [ ] URL-encode path in generated URLs.
+- [ ] Set Expires and Date header in the response headers of the loon server,
+    based on the "max_cache_duration" of the client's response.
+    The client should possibly also set a timestamp in the ContentHeader,
+    just like the server sets the timestamp in the request.
+    This way the cache should store it no longer than the max cache duration:
+    - https://github.com/caddyserver/cache-handler/issues/94
+    - https://www.rfc-editor.org/rfc/rfc9111.html#section-4.2.1-2.3
 - [ ] Currently the server synchronizes *all requests*
     through the client manager.
     There should be at least *some* concurrency (with goroutines)
@@ -48,20 +54,23 @@
     which can be registered with the server library API?
     That way, if prepopulation is required, users can write their own server
     instead of running "loon server" directly.
-- [ ] Add versioning to the server and client libraries.
-    Perhaps make releases on GitHub.
-
-## Low
-- [ ] Automatically update docs on commit or push.
-- [ ] Add test automation via GitHub Actions.
-    Run Go tests, generate coverage, run client tests.
-    Add badges to README for test coverage.
-- [ ] Write tests for heavy load (multiple parallel requests, no caching)
 - [ ] Add a way to clear cached paths for connected clients,
     so that anything that might be cached on the server can be removed.
     Just a way to free resources whenever needed.
     Maybe also add a server constraint "maximum cached paths per client",
     if it's ever exceeded the connection is closed.
+- [ ] Add versioning to the server and client libraries.
+    Perhaps make releases on GitHub.
+
+## Low
+
+- [ ] URL-encode path in generated URLs.
+- [ ] Add support for HTTP Content-Digest.
+- [ ] Automatically update docs on commit or push.
+- [ ] Add test automation via GitHub Actions.
+    Run Go tests, generate coverage, run client tests.
+    Add badges to README for test coverage.
+- [ ] Write tests for heavy load (multiple parallel requests, no caching)
 - [ ] Add flag in the Go CLI program to verify a server's certificate.
 - [ ] Change "-server" option in Go client to use the WSS endpoint url.
 - [ ] Wildcard content types are not supported in the server's constraints yet.
@@ -73,6 +82,8 @@
     (e.g. in a browser implementation)
     or to generally simplify client implementation.
 - [ ] Add support for rotation between multiple loon servers?
+- [ ] Add a way to reconnect with a client ID,
+    to allow persistent client IDs?
 
 ---
 
@@ -112,3 +123,10 @@
     Just reuse the connect timeout for this.
 - [x] Properly document and implement if and how
     content remains registered across reconnects with the C++ client.
+- [x] The way connection failed is logged is wrong. use on_close handler
+    and check if we weren't connected since the call of start.
+- [x] Fix internal restart blocking until fully stopped and started again.
+    Instead a call to restart should return immediately
+    and restarting should take place on another thread.
+- [x] Add support for QT websockets to the C++ client,
+    as an alternative to libhv.
