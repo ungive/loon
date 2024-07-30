@@ -91,7 +91,7 @@ func (s *serverImpl) serveWs(w http.ResponseWriter, r *http.Request) {
 	}
 	s.manager.Register(client)
 	activeClientCount.Add(1)
-	log = log.With("client_id", client.ID())
+	log = log.With("client_id", client.ID().UrlEncode())
 	log.Info("client connected", "active_clients", activeClientCount.Load())
 	go func() {
 		defer func() {
