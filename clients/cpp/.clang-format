@@ -21,12 +21,14 @@ AlignAfterOpenBracket: DontAlign
 Cpp11BracedListStyle: false
 IncludeBlocks: Regroup
 IncludeCategories:
-  - Regex: "<[[:alnum:]_.]+>"
+  - Regex: "<[^Q][[:alnum:]_.]+>"
     Priority: 1
-  - Regex: "<.+>"
+  - Regex: "<Q.+>"
     Priority: 2
-  - Regex: ".*"
+  - Regex: "<[^Q].+>"
     Priority: 3
+  - Regex: ".*"
+    Priority: 4
 SeparateDefinitionBlocks: Always
 AllowShortLambdasOnASingleLine: Empty
 AlwaysBreakTemplateDeclarations: true
