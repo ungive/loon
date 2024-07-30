@@ -394,8 +394,9 @@ void ClientImpl::on_request_closed(RequestClosed const& request_closed)
     auto it = m_requests.find(request_id);
     if (it == m_requests.end()) {
         log(Warning)
-            << "protocol: received request closed for an unknown request id";
-        assert(false);
+            << "protocol: received request closed for an unknown request id"
+            << var("rid", request_closed.request_id())
+            << var("message", request_closed.message());
         return;
     }
 
