@@ -421,8 +421,10 @@ TEST(Client, FailsWhenMinCacheDurationIsSetButResponseIsNotCached)
     // since it is expected to be cached on the server.
     ExpectCalled served(1);
     handle->served(served.get());
-    http_get(handle->url());
-    http_get(handle->url());
+    auto result1 = http_get(handle->url());
+    EXPECT_EQ(200, result1.status);
+    auto result2 = http_get(handle->url());
+    EXPECT_NE(200, result2.status);
 }
 
 TEST(Client, RestartsWhenReceivingTooManyNoContentRequests)
