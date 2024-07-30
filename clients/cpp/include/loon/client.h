@@ -220,6 +220,12 @@ struct WebsocketOptions
     /**
      * @brief A path to a CA certificate to authenticate the server.
      *
+     * In case the QT backend is used for websocket connections,
+     * this may be a QT resource path, as defined in the QT documentation,
+     * the path is then passed as an argument to the QFile constructor:
+     * https://doc.qt.io/qt-6/resources.html
+     * https://doc.qt.io/qt-6/qfile.html
+     *
      * If this value is set, ca_certificate must be empty.
      */
     std::optional<std::string> ca_certificate_path{};

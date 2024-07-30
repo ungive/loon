@@ -14,8 +14,10 @@ if(LOON_WEBSOCKET_BACKEND STREQUAL "LIBHV")
     set(USE_LIBHV true)
 elseif(LOON_WEBSOCKET_BACKEND STREQUAL "QT")
     message("Using QT as websocket backend")
+    set(CMAKE_AUTOMOC ON)
     list(APPEND LIB_SOURCES src/websocket/backend_qt.cpp)
-    set(USE_QTWEBSOCKETS true)
+    list(APPEND LIB_SOURCES src/websocket/backend_qt.h)
+    set(USE_QT true)
 else()
     message(FATAL_ERROR "Wrong value of the option 'LOON_WEBSOCKET_BACKEND'")
 endif()
@@ -39,6 +41,13 @@ if(DEFINED USE_LIBHV)
     FetchContent_MakeAvailable(libhv)
     target_link_libraries(loon hv_static)
     target_compile_definitions(loon PRIVATE USE_LIBHV)
+endif()
+
+# qt websockets
+if(DEFINED USE_QT)
+    find_package(Qt6 REQUIRED COMPONENTS Core Network WebSockets)
+    target_link_libraries(loon Qt6::Core Qt6::Network Qt6::WebSockets)
+    target_compile_definitions(loon PRIVATE USE_QT)
 endif()
 
 # protobuf + protocol buffers
@@ -86,7 +95,7 @@ if(LOON_BUILD_TESTS)
     add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
     include(GoogleTest)
     enable_testing()
-    set(TEST_SOURCES test/client_test.cpp)
+    set(TEST_SOURCES test/main.cpp test/client_test.cpp)
 
     add_executable(loon_test ${TEST_SOURCES})
     target_link_libraries(loon_test loon)
@@ -104,13 +113,60 @@ if(LOON_BUILD_TESTS)
     set_property(TARGET loon_test PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
     target_compile_definitions(loon_test PRIVATE LOON_TEST)
 
+    # Required because QWebSockets needs a QApplication instance.
+    if(DEFINED USE_QT)
+        find_package(Qt6 REQUIRED COMPONENTS Core Network WebSockets)
+        target_link_libraries(loon_test Qt6::Core Qt6::Network Qt6::WebSockets)
+        target_compile_definitions(loon_test PRIVATE USE_QT)
+
+        add_custom_command(
+            TARGET loon_test
+            POST_BUILD
+            COMMAND
+                ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_RUNTIME_DLLS:loon_test> $<TARGET_FILE_DIR:loon_test>
+            COMMAND_EXPAND_LISTS)
+    endif()
+
     add_custom_command(
         TARGET loon_test
         POST_BUILD
-        COMMAND
-            ${CMAKE_COMMAND} -E copy_directory_if_different
-            $<TARGET_RUNTIME_DLL_DIRS:loon_test> $<TARGET_FILE_DIR:loon_test>
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_RUNTIME_DLLS:loon_test> $<TARGET_FILE_DIR:loon_test>
         COMMAND_EXPAND_LISTS)
+
+    # Copy DLLs that aren't included with TARGET_RUNTIME_DLLS for some reason.
+    set(MISSING_DLLS "")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        list(APPEND MISSING_DLLS zlibd1.dll)
+        list(APPEND MISSING_DLLS debug/bin/libcrypto-3-x64.dll)
+        list(APPEND MISSING_DLLS debug/bin/libssl-3-x64.dll)
+        list(APPEND MISSING_DLLS debug/bin/legacy.dll)
+    else()
+        list(APPEND MISSING_DLLS zlib1.dll)
+        list(APPEND MISSING_DLLS libcrypto-3-x64.dll)
+        list(APPEND MISSING_DLLS libssl-3-x64.dll)
+        list(APPEND MISSING_DLLS legacy.dll)
+    endif()
+    foreach(MISSING_DLL ${MISSING_DLLS})
+        foreach(PREFIX_PATH ${CMAKE_PREFIX_PATH})
+            file(GLOB_RECURSE MISSING_DLL_PATHS ${PREFIX_PATH}/${MISSING_DLL})
+            file(GLOB_RECURSE MISSING_DLL_PATHS_NESTED
+                 ${PREFIX_PATH}/**/${MISSING_DLL})
+            list(APPEND MISSING_DLL_PATHS MISSING_DLL_PATHS_NESTED)
+            list(GET MISSING_DLL_PATHS 0 MISSING_DLL_PATH)
+            if(NOT ${MISSING_DLL_PATH} STREQUAL "")
+                message(${MISSING_DLL_PATH})
+                add_custom_command(
+                    TARGET loon_test
+                    POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                            ${MISSING_DLL_PATH} $<TARGET_FILE_DIR:loon_test>
+                    COMMAND_EXPAND_LISTS)
+                break()
+            endif()
+        endforeach()
+    endforeach()
 
     add_test(loon_test loon_test)
     gtest_discover_tests(loon_test)
