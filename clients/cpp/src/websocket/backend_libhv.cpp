@@ -57,6 +57,8 @@ Client::Client(std::string const& address, WebsocketOptions const& options)
     }
 }
 
+Client::~Client() {}
+
 ClientImpl::ClientImpl(
     std::string const& address, WebsocketOptions const& options)
     : BaseClient(address, options), m_conn{ create_conn() }

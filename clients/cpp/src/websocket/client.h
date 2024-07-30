@@ -113,6 +113,7 @@ class Client : public IClient
 {
 public:
     Client(std::string const& address, WebsocketOptions const& options);
+    ~Client();
 
     inline std::string const& address() override { return m_impl->address(); }
 
