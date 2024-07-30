@@ -9,6 +9,9 @@
 #include "logging.h"
 #include "loon/client.h"
 
+// TODO proper version string
+#define LOON_USER_AGENT "loon-cpp-client/0.1"
+
 namespace loon::websocket
 {
 extern std::chrono::milliseconds default_connect_timeout;

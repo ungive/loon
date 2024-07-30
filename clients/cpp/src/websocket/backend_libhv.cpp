@@ -115,6 +115,9 @@ void ClientImpl::internal_start()
     }
     // Headers
     http_headers headers;
+    // Default user-agent. The map is case-insensitive,
+    // so it will be overwritten, if set by the user.
+    headers["User-Agent"] = LOON_USER_AGENT;
     for (auto const& [key, value] : m_options.headers) {
         headers[key] = value;
     }
