@@ -112,7 +112,7 @@ std::string ClientImpl::make_url(std::string const& path)
     return oss.str();
 }
 
-loon::Logger loon::ClientImpl::make_logger(LogLevel level)
+inline loon::Logger loon::ClientImpl::make_logger(LogLevel level)
 {
     Logger logger(level);
     if (m_hello.has_value()) {
