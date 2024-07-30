@@ -1,6 +1,7 @@
 package client
 
 import (
+	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -225,6 +226,32 @@ func NewClient(address string, httpBasicAuth *string) (Client, error) {
 		auth := base64.StdEncoding.EncodeToString([]byte(*httpBasicAuth))
 		headers = http.Header{"Authorization": {"Basic " + auth}}
 	}
+
+	// For now, accept all certificates.
+	// TODO: check the certificate, let the user supply one.
+	websocket.DefaultDialer.TLSClientConfig = &tls.Config{
+		InsecureSkipVerify: true,
+		VerifyConnection: func(cs tls.ConnectionState) error {
+			// opts := x509.VerifyOptions{
+			// 	Roots: x509.NewCertPool(),
+			// }
+			// log.Println("VerifyConnection")
+			// for _, cert := range cs.PeerCertificates {
+			// 	log.Printf("pubkey: %#v\n", cert.PublicKey)
+			// 	log.Printf("pubkey-algo: %#v\n", cert.PublicKeyAlgorithm)
+			// 	publicKeyDer, _ := x509.MarshalPKIXPublicKey(cert.PublicKey)
+			// 	publicKeyBlock := pem.Block{
+			// 		Type:  "PUBLIC KEY",
+			// 		Bytes: publicKeyDer,
+			// 	}
+			// 	publicKeyPem := string(pem.EncodeToMemory(&publicKeyBlock))
+			// 	log.Printf("%v\n", publicKeyPem)
+			// }
+			return nil
+		},
+	}
+	log.Println(websocket.DefaultDialer.TLSClientConfig)
+
 	conn, _, err := websocket.DefaultDialer.Dial(address, headers)
 	if err != nil {
 		log.Fatalf("failed to dial websocket at %v: %v", address, err)
