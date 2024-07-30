@@ -33,9 +33,9 @@ protected:
     void internal_start() override;
     void internal_stop() override;
 
+private:
     std::unique_ptr<hv::WebSocketClient> create_conn();
 
-private:
     std::unique_ptr<hv::WebSocketClient> m_conn{};
 };
 
