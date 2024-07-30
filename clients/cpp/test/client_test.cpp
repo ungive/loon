@@ -231,6 +231,12 @@ class ExpectCalled
 public:
     ExpectCalled(int n = 1) { EXPECT_CALL(*this, callback()).Times(n); }
 
+    ~ExpectCalled()
+    {
+        // Give some time for the callback to be called.
+        std::this_thread::sleep_for(25ms);
+    }
+
     auto operator()() { wrap_callback(); }
 
     std::function<void()> get()
@@ -329,8 +335,6 @@ TEST(Client, UnregisteredCallbackIsCalledWhenServerClosesConnection)
     auto empty_response = message.mutable_empty_response();
     empty_response->set_request_id(1000);
     client->send(message);
-    std::this_thread::sleep_for(250ms);
-    EXPECT_EQ(1, callback.count());
 }
 
 TEST(Client, UnregisteredCallbackIsCalledWhenClientClosesConnection)
@@ -352,7 +356,6 @@ TEST(Client, ServedCallbackIsCalledWhenContentHandleUrlIsRequested)
     ExpectCalled callback;
     handle->served(callback.get());
     http_get(handle->url());
-    EXPECT_EQ(1, callback.count());
 }
 
 TEST(Client, NoActiveRequestsWhenHandleUrlRequestIsCanceled)
@@ -394,8 +397,6 @@ TEST(Client, FailsWhenMinCacheDurationIsSetAndServerDoesNotCacheResponses)
     // It's expected that the client is not connected anymore,
     // since the client should be in a failed state.
     EXPECT_THROW(client->wait_for_hello(), ClientNotConnectedException);
-    std::this_thread::sleep_for(25ms);
-    EXPECT_EQ(1, callback.count());
 }
 
 TEST(Client, FailsWhenMinCacheDurationIsSetButResponseIsNotCached)
@@ -543,6 +544,4 @@ TEST(Client, ServesReregisteredContentAfterRestart)
     auto response = http_get(handle->url());
     EXPECT_EQ(200, response.status);
     EXPECT_EQ(content.data, response.body);
-    std::this_thread::sleep_for(10ms);
-    EXPECT_EQ(1, served.count());
 }
