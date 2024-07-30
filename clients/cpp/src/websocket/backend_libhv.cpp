@@ -25,6 +25,7 @@ class ClientImpl : public BaseClient
 {
 public:
     ClientImpl(std::string const& address, WebsocketOptions const& options);
+    ~ClientImpl();
 
     int64_t send_binary(const char* data, size_t length) override;
     int64_t send_text(const char* data, size_t length) override;
@@ -63,7 +64,6 @@ ClientImpl::ClientImpl(
     std::string const& address, WebsocketOptions const& options)
     : BaseClient(address, options), m_conn{ create_conn() }
 {
-
     // It should be okay to set a global log handler,
     // as the libhv library is being statically linked.
     hlog_set_format("%s");
@@ -72,6 +72,14 @@ ClientImpl::ClientImpl(
         const std::lock_guard<std::mutex> lock(_mutex);
         hlog_set_level(_level);
     }
+}
+
+ClientImpl::~ClientImpl()
+{
+    // TODO: the destructor should not allocate a new object,
+    //   which is what internal_stop() does.
+    //   move construction/reconstruction into internal_start().
+    internal_stop();
 }
 
 std::unique_ptr<hv::WebSocketClient> ClientImpl::create_conn()
