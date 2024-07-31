@@ -27,6 +27,8 @@ using WebsocketOptions = loon::WebsocketOptions;
 std::chrono::milliseconds loon::websocket::default_connect_timeout =
     std::chrono::milliseconds{ 10000 /* same as libhv */ };
 
+void log_message(loon::LogLevel level, std::string const& message);
+
 Client::Client(std::string const& address, WebsocketOptions const& options)
     : m_impl{ std::make_unique<ClientImpl>(address, options) }
 {
@@ -205,10 +207,8 @@ void ClientImpl::on_error(QAbstractSocket::SocketError error)
         return;
     }
     std::ostringstream oss;
-    oss << LOG_PREFIX "socket error: "
-        << flatten_qt_enum_value(qt_enum_key(error), true);
-    const std::lock_guard<std::mutex> lock(_mutex);
-    _handler(LogLevel::Error, oss.str());
+    oss << "socket error: " << flatten_qt_enum_value(qt_enum_key(error), true);
+    log_message(LogLevel::Error, oss.str());
 }
 
 void ClientImpl::on_state(QAbstractSocket::SocketState state)
@@ -217,10 +217,8 @@ void ClientImpl::on_state(QAbstractSocket::SocketState state)
         return;
     }
     std::ostringstream oss;
-    oss << LOG_PREFIX "socket state: "
-        << flatten_qt_enum_value(qt_enum_key(state), true);
-    const std::lock_guard<std::mutex> lock(_mutex);
-    _handler(LogLevel::Info, oss.str());
+    oss << "socket state: " << flatten_qt_enum_value(qt_enum_key(state), true);
+    log_message(LogLevel::Info, oss.str());
 }
 
 void ClientImpl::on_ssl_errors(const QList<QSslError>& errors)
@@ -228,11 +226,10 @@ void ClientImpl::on_ssl_errors(const QList<QSslError>& errors)
     if (LogLevel::Error < _level.load()) {
         return;
     }
-    const std::lock_guard<std::mutex> lock(_mutex);
     for (auto const& error : errors) {
         std::ostringstream oss;
-        oss << LOG_PREFIX "ssl error: " << error.errorString().toStdString();
-        _handler(LogLevel::Error, oss.str());
+        oss << "ssl error: " << error.errorString().toStdString();
+        log_message(LogLevel::Error, oss.str());
     }
 }
 
@@ -245,4 +242,12 @@ void loon::websocket::log_handler(log_handler_t handler)
         handler = default_log_handler;
     }
     _handler = handler;
+}
+
+static inline void log_message(loon::LogLevel level, std::string const& message)
+{
+    const std::lock_guard<std::mutex> lock(_mutex);
+    if (_handler) {
+        _handler(level, LOG_PREFIX + message);
+    }
 }
