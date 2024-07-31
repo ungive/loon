@@ -46,7 +46,11 @@ Client::~Client() {}
 
 ClientImpl::ClientImpl(
     std::string const& address, WebsocketOptions const& options)
-    : BaseClient(address, options), QObject(), m_thread(this), m_conn()
+    : BaseClient(address, options), QObject(), m_thread(this),
+      // The following members may not be have "this" as parent,
+      // as they are moved to another thread.
+      // Useful reference: https://stackoverflow.com/a/25230470/6748004
+      m_conn(), m_reconnect_timer()
 {
     this->moveToThread(&m_thread);
     m_conn.moveToThread(&m_thread);
