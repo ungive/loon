@@ -7,6 +7,9 @@
 #include "logging.h"
 #include "util.h"
 
+#define BACKEND_NAME "libhv"
+#define LOG_PREFIX BACKEND_NAME ": "
+
 #define RECONNECT_DELAY_POLICY_FIXED 0
 #define RECONNECT_DELAY_POLICY_LINEAR 1
 #define RECONNECT_DELAY_POLICY_EXPONENTIAL 2
@@ -168,7 +171,7 @@ static void libhv_log_handler(int level, const char* buf, int len)
     }
     // Message
     std::ostringstream oss;
-    oss << "libhv: ";
+    oss << LOG_PREFIX;
     if (len > 0 && buf[len - 1] == '\n') {
         // Strip a possible linefeed at the end.
         len -= 1;
