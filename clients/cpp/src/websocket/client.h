@@ -187,7 +187,7 @@ protected:
     {
         // Note: No mutex used for performance reasons
         // and since it is prohibited in the client code
-        // that the mutex can be overwritten while the client is started.
+        // that the callback can be overwritten while the client is started.
         if (m_open_callback) {
             m_open_callback();
         }
