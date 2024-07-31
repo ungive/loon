@@ -441,6 +441,7 @@ void websocket_log_level(LogLevel level);
  * @brief A custom handler function for handling log messages.
  *
  * If not set, log messages will be written to stderr by default.
+ * If a nullptr is passed, the default log handler will be used.
  *
  * @param handler The log handler.
  */

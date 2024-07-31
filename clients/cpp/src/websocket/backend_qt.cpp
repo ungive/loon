@@ -241,5 +241,8 @@ void loon::websocket::log_level(LogLevel level) { _level.exchange(level); }
 void loon::websocket::log_handler(log_handler_t handler)
 {
     const std::lock_guard<std::mutex> lock(_mutex);
+    if (!handler) {
+        handler = default_log_handler;
+    }
     _handler = handler;
 }
