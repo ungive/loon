@@ -78,7 +78,6 @@ private Q_SLOTS:
     void on_binary_message_received(QByteArray const& message);
     void on_error(QAbstractSocket::SocketError error);
     void on_state(QAbstractSocket::SocketState state);
-    void on_private_destroyed(QObject* ptr);
     void on_ssl_errors(const QList<QSslError>& errors);
 
 private:

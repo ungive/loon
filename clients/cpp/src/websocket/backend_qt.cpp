@@ -1,6 +1,10 @@
 #include "backend_qt.h"
 
+#include <atomic>
 #include <iostream>
+#include <memory>
+#include <mutex>
+#include <sstream>
 
 #include <QAbstractEventDispatcher>
 #include <QCoreApplication>
@@ -12,6 +16,9 @@
 #include "client.h"
 #include "logging.h"
 #include "util.h"
+
+#define BACKEND_NAME "qt"
+#define LOG_PREFIX BACKEND_NAME ": "
 
 using namespace loon::websocket;
 
@@ -61,8 +68,6 @@ inline void ClientImpl::connect_conn(qt::WebSocket* conn)
     connect(conn, &qt::WebSocket::errorOccurred, this, &ClientImpl::on_error);
     connect(conn, &qt::WebSocket::stateChanged, this, &ClientImpl::on_state);
     connect(conn, &qt::WebSocket::sslErrors, this, &ClientImpl::on_ssl_errors);
-    connect(conn, &qt::WebSocket::destroyed, this,
-        &ClientImpl::on_private_destroyed);
 }
 
 inline Qt::ConnectionType ClientImpl::connection_type()
@@ -74,7 +79,6 @@ inline Qt::ConnectionType ClientImpl::connection_type()
 
 void ClientImpl::internal_start()
 {
-    std::cerr << "qt:internal_start\n";
     // Abort any existing connection first, before opening a new one.
     QMetaObject::invokeMethod(&m_conn, "abort", connection_type());
     // URL
@@ -147,65 +151,91 @@ int64_t ClientImpl::send_text(const char* data, size_t length)
     return n;
 }
 
-void ClientImpl::on_connected()
-{
-    std::cerr << "qt:connected\n";
-    on_websocket_open();
-}
+void ClientImpl::on_connected() { on_websocket_open(); }
 
-void ClientImpl::on_disconnected()
-{
-    std::cerr << "qt:disconnected\n";
-    on_websocket_close();
-}
+void ClientImpl::on_disconnected() { on_websocket_close(); }
 
 void ClientImpl::on_text_message_received(QString const& message)
 {
-    std::cerr << "qt:text_message_received\n";
     on_websocket_message(message.toStdString());
 }
 
 void ClientImpl::on_binary_message_received(QByteArray const& message)
 {
-    std::cerr << "qt:binary_message_received\n";
     on_websocket_message(message.toStdString());
 }
 
+static std::string flatten_qt_enum_value(
+    const char* str, bool remove_last_word = false)
+{
+    std::ostringstream oss;
+    size_t last_space_index = 0;
+    size_t space_count = 0;
+    for (auto ptr = str; *ptr; ptr++) {
+        char c = *ptr;
+        if (std::isupper(c) && ptr > str) {
+            oss << ' ';
+            last_space_index = ptr - str;
+            space_count += 1;
+        }
+        oss << char(std::tolower(c));
+    }
+    auto result = oss.str();
+    result.resize(last_space_index + space_count - 1);
+    return result;
+}
+
+template <typename T>
+inline const char* qt_enum_key(T value)
+{
+    return QMetaEnum::fromType<T>().valueToKey(value);
+}
+
+static std::mutex _mutex{};
+static std::atomic<loon::LogLevel> _level{ default_log_level };
+static loon::log_handler_t _handler{ loon::default_log_handler };
+
 void ClientImpl::on_error(QAbstractSocket::SocketError error)
 {
-    std::cerr << "qt:error: "
-              << QMetaEnum::fromType<QAbstractSocket::SocketError>().valueToKey(
-                     error)
-              << std::endl;
+    if (LogLevel::Error < _level.load()) {
+        return;
+    }
+    std::ostringstream oss;
+    oss << LOG_PREFIX "socket error: "
+        << flatten_qt_enum_value(qt_enum_key(error), true);
+    const std::lock_guard<std::mutex> lock(_mutex);
+    _handler(LogLevel::Error, oss.str());
 }
 
 void ClientImpl::on_state(QAbstractSocket::SocketState state)
 {
-    std::cerr << "qt:state: "
-              << QMetaEnum::fromType<QAbstractSocket::SocketState>().valueToKey(
-                     state)
-              << std::endl;
+    if (LogLevel::Info < _level.load()) {
+        return;
+    }
+    std::ostringstream oss;
+    oss << LOG_PREFIX "socket state: "
+        << flatten_qt_enum_value(qt_enum_key(state), true);
+    const std::lock_guard<std::mutex> lock(_mutex);
+    _handler(LogLevel::Info, oss.str());
 }
 
 void ClientImpl::on_ssl_errors(const QList<QSslError>& errors)
 {
+    if (LogLevel::Error < _level.load()) {
+        return;
+    }
+    const std::lock_guard<std::mutex> lock(_mutex);
     for (auto const& error : errors) {
-        std::cerr << "qt:ssl_error: " << error.errorString().toStdString()
-                  << std::endl;
+        std::ostringstream oss;
+        oss << LOG_PREFIX "ssl error: " << error.errorString().toStdString();
+        _handler(LogLevel::Error, oss.str());
     }
 }
 
-void loon::websocket::ClientImpl::on_private_destroyed(QObject* ptr)
-{
-    std::cerr << "qt:destroyed " << reinterpret_cast<size_t>(ptr) << std::endl;
-}
-
-void loon::websocket::log_level(LogLevel level)
-{
-    // TODO
-}
+void loon::websocket::log_level(LogLevel level) { _level.exchange(level); }
 
 void loon::websocket::log_handler(log_handler_t handler)
 {
-    // TODO
+    const std::lock_guard<std::mutex> lock(_mutex);
+    _handler = handler;
 }
