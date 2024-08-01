@@ -37,11 +37,6 @@ Client::Client(std::string const& address, WebsocketOptions const& options)
             "ignoring ping interval: "
             "this is handled internally by the QT websocket backend");
     }
-    if (options.reconnect_delay.has_value()) {
-        // TODO implement automatic reconnecting
-        throw std::runtime_error(
-            "reconnects are not supported yet with the QT websocket backend");
-    }
 }
 
 Client::~Client() {}
@@ -49,31 +44,46 @@ Client::~Client() {}
 ClientImpl::ClientImpl(
     std::string const& address, WebsocketOptions const& options)
     : BaseClient(address, options), QObject(), m_thread(this),
+      m_reconnect_delay{ options.reconnect_delay.value_or(
+          std::chrono::milliseconds::zero()) },
       // The following members may not be have "this" as parent,
       // as they are moved to another thread.
       // Useful reference: https://stackoverflow.com/a/25230470/6748004
       m_conn(), m_reconnect_timer()
 {
+    m_reconnect_timer.setSingleShot(true);
     this->moveToThread(&m_thread);
     m_conn.moveToThread(&m_thread);
+    m_reconnect_timer.moveToThread(&m_thread);
     connect_conn(&m_conn);
+    connect_reconnect_timer(&m_reconnect_timer);
     m_thread.start();
 }
 
-ClientImpl::~ClientImpl() { internal_stop(); }
+ClientImpl::~ClientImpl() { stop(); }
 
 inline void ClientImpl::connect_conn(qt::WebSocket* conn)
 {
-    connect(conn, &qt::WebSocket::connected, this, &ClientImpl::on_connected);
-    connect(
+    QObject::connect(
+        conn, &qt::WebSocket::connected, this, &ClientImpl::on_connected);
+    QObject::connect(
         conn, &qt::WebSocket::disconnected, this, &ClientImpl::on_disconnected);
-    connect(conn, &qt::WebSocket::textMessageReceived, this,
+    QObject::connect(conn, &qt::WebSocket::textMessageReceived, this,
         &ClientImpl::on_text_message_received);
-    connect(conn, &qt::WebSocket::binaryMessageReceived, this,
+    QObject::connect(conn, &qt::WebSocket::binaryMessageReceived, this,
         &ClientImpl::on_binary_message_received);
-    connect(conn, &qt::WebSocket::errorOccurred, this, &ClientImpl::on_error);
-    connect(conn, &qt::WebSocket::stateChanged, this, &ClientImpl::on_state);
-    connect(conn, &qt::WebSocket::sslErrors, this, &ClientImpl::on_ssl_errors);
+    QObject::connect(
+        conn, &qt::WebSocket::errorOccurred, this, &ClientImpl::on_error);
+    QObject::connect(
+        conn, &qt::WebSocket::stateChanged, this, &ClientImpl::on_state);
+    QObject::connect(
+        conn, &qt::WebSocket::sslErrors, this, &ClientImpl::on_ssl_errors);
+}
+
+void ClientImpl::connect_reconnect_timer(QTimer* timer)
+{
+    QObject::connect(
+        timer, &QTimer::timeout, this, &ClientImpl::open_connection);
 }
 
 inline Qt::ConnectionType ClientImpl::connection_type()
@@ -83,12 +93,73 @@ inline Qt::ConnectionType ClientImpl::connection_type()
         : Qt::AutoConnection;
 }
 
+std::chrono::milliseconds ClientImpl::next_reconnect_delay()
+{
+    using namespace std::chrono_literals;
+
+    auto value = m_reconnect_delay;
+    if (options().max_reconnect_delay.has_value()) {
+        // Exponentially increase reconnect delay.
+        auto next = std::min(
+            options().max_reconnect_delay.value(), 2 * m_reconnect_delay);
+        // In case of an overflow with the above multiplication,
+        // note that reconnect_delay is set if max_reconnect_delay is set:
+        next = std::max(options().reconnect_delay.value(), next);
+        m_reconnect_delay = next;
+    }
+    return value;
+}
+
+inline void ClientImpl::reset_reconnect_delay()
+{
+    using namespace std::chrono_literals;
+    m_reconnect_delay = options().reconnect_delay.value_or(0ms);
+}
+
+void ClientImpl::open_connection()
+{
+    // This method is only called by the internal timer's signal,
+    // which lives on the internal thread. Therefore the lock must be acquired,
+    // since this can run concurrently with a call to the
+    // internal_start() or internal_stop() methods.
+
+    auto lock = acquire_lock();
+
+    if (!active()) {
+        // Cancel if the websocket became inactive.
+        return;
+    }
+    if (m_conn.state() != QAbstractSocket::SocketState::UnconnectedState) {
+        // Cancel if the websocket is not unconnected.
+        return;
+    }
+
+    internal_open();
+}
+
 void ClientImpl::internal_start()
+{
+    // This method is only called from the user
+    // via the public start() method, which is synchronized with lock().
+
+    internal_open();
+}
+
+void ClientImpl::internal_stop()
+{
+    // This method is only called from the destructor or from the user
+    // via the public stop() method, which are both synchronized with lock().
+
+    QMetaObject::invokeMethod(&m_reconnect_timer, "stop", connection_type());
+    QMetaObject::invokeMethod(&m_conn, "close", connection_type());
+}
+
+void ClientImpl::internal_open()
 {
     // Abort any existing connection first, before opening a new one.
     QMetaObject::invokeMethod(&m_conn, "abort", connection_type());
     // URL
-    QUrl url(QString::fromStdString(m_address));
+    QUrl url(QString::fromStdString(address()));
     if (!url.isValid() || (url.scheme() != "ws" && url.scheme() != "wss")) {
         log_message(LogLevel::Error, "the websocket address is invalid");
         fail();
@@ -98,29 +169,29 @@ void ClientImpl::internal_start()
     QNetworkRequest request(url);
     // Default user-agent.
     request.setRawHeader("User-Agent", LOON_USER_AGENT);
-    for (auto const& [key, value] : m_options.headers) {
+    for (auto const& [key, value] : options().headers) {
         request.setRawHeader(QString::fromStdString(key).toLocal8Bit(),
             QString::fromStdString(value).toLocal8Bit());
     }
-    if (m_options.basic_authorization.has_value()) {
-        auto credentials = m_options.basic_authorization.value();
+    if (options().basic_authorization.has_value()) {
+        auto credentials = options().basic_authorization.value();
         auto encoded = QString::fromStdString(util::base64_encode(credentials));
         request.setRawHeader("Authorization", "Basic " + encoded.toLocal8Bit());
     }
     // Server verification (CA certificate)
     bool is_wss = url.scheme() == "wss";
-    if (is_wss && m_options.ca_certificate_path.has_value()) {
+    if (is_wss && options().ca_certificate_path.has_value()) {
         QSslConfiguration sslConfiguration;
-        auto const& path = m_options.ca_certificate_path.value();
+        auto const& path = options().ca_certificate_path.value();
         QFile certFile(QString::fromStdString(path));
         certFile.open(QIODevice::ReadOnly);
         QSslCertificate certificate(&certFile, QSsl::Pem);
         certFile.close();
         sslConfiguration.addCaCertificate(certificate);
         m_conn.setSslConfiguration(sslConfiguration);
-    } else if (is_wss && m_options.ca_certificate.has_value()) {
+    } else if (is_wss && options().ca_certificate.has_value()) {
         QSslConfiguration sslConfiguration;
-        auto const& raw_cert = m_options.ca_certificate.value();
+        auto const& raw_cert = options().ca_certificate.value();
         QByteArray cert_data(
             reinterpret_cast<const char*>(raw_cert.data()), raw_cert.size());
         QSslCertificate certificate(cert_data, QSsl::Pem);
@@ -130,17 +201,12 @@ void ClientImpl::internal_start()
         m_conn.setSslConfiguration({}); // reset
     }
     // Connect timeout
-    if (m_options.connect_timeout.has_value()) {
-        request.setTransferTimeout(m_options.connect_timeout.value().count());
+    if (options().connect_timeout.has_value()) {
+        request.setTransferTimeout(options().connect_timeout.value().count());
     } else {
-        request.setTransferTimeout(default_connect_timeout.count()); // reset
+        request.setTransferTimeout(default_connect_timeout.count());
     }
     QMetaObject::invokeMethod(&m_conn, "open", connection_type(), request);
-}
-
-void ClientImpl::internal_stop()
-{
-    QMetaObject::invokeMethod(&m_conn, "close", connection_type());
 }
 
 int64_t ClientImpl::send_binary(const char* data, size_t length)
@@ -159,9 +225,39 @@ int64_t ClientImpl::send_text(const char* data, size_t length)
     return n;
 }
 
-void ClientImpl::on_connected() { on_websocket_open(); }
+void ClientImpl::on_connected()
+{
+    on_websocket_open();
+    reset_reconnect_delay();
+}
 
-void ClientImpl::on_disconnected() { on_websocket_close(); }
+void ClientImpl::on_disconnected()
+{
+    on_websocket_close();
+    if (options().reconnect_delay.has_value()) {
+        // Only start the timer if the websocket is active.
+        if (active()) {
+            // Note that on_disconnected() is called during
+            // QWebSocket::stop's execution, which could cause a deadlock.
+            // In this case it is safe though because active() always
+            // returns false (which would lead to this code not being executed)
+            // if the lock is held while the connection is stopped:
+            // - QWebSocket::stop is only called in internal_stop()
+            // - internal_stop() is called in BaseClient::stop()
+            // - internal_stop() is called in BaseClient::fail()
+            // => Both of these last two methods always set active to false
+            // before calling internal_stop(), so if they are holding a lock
+            // then the lock will not be reacquired here.
+            auto lock = acquire_lock();
+            auto delay = next_reconnect_delay();
+            QMetaObject::invokeMethod(&m_reconnect_timer, "start",
+                connection_type(), static_cast<int>(delay.count()));
+            log_message(LogLevel::Debug,
+                "automatic reconnect with delay " +
+                    std::to_string(delay.count()) + "ms");
+        }
+    }
+}
 
 void ClientImpl::on_text_message_received(QString const& message)
 {

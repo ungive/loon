@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -234,11 +235,31 @@ protected:
         internal_stop();
     }
 
+    /**
+     * @brief Acquires the lock for the websocket client.
+     *
+     * All public methods, except send_binary() and send_text()
+     * are synchronized with the underlying mutex of this lock.
+     *
+     * @returns The acquired lock.
+     */
+    inline std::unique_lock<std::mutex> acquire_lock()
+    {
+        return std::unique_lock<std::mutex>(m_mutex);
+    }
+
+    inline WebsocketOptions const& options() const { return m_options; }
+
+    inline bool active() const { return m_active.load(); }
+
+    inline bool active(bool new_value) { return m_active.exchange(new_value); }
+
+private:
     const std::string m_address{};
-    WebsocketOptions m_options{};
+    const WebsocketOptions m_options{};
 
     std::mutex m_mutex{};
-    bool m_started{ false };
+    std::atomic<bool> m_active{ false };
     std::function<void()> m_open_callback{};
     std::function<void()> m_close_callback{};
     std::function<void(std::string const& message)> m_message_callback{};

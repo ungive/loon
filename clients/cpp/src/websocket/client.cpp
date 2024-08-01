@@ -38,7 +38,7 @@ BaseClient::~BaseClient() {}
 void BaseClient::on_open(std::function<void()> callback)
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_started) {
+    if (m_active.load()) {
         throw std::runtime_error("websocket client already started");
     }
     m_open_callback = callback;
@@ -47,7 +47,7 @@ void BaseClient::on_open(std::function<void()> callback)
 void BaseClient::on_close(std::function<void()> callback)
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_started) {
+    if (m_active.load()) {
         throw std::runtime_error("websocket client already started");
     }
     m_close_callback = callback;
@@ -57,7 +57,7 @@ void BaseClient::on_message(
     std::function<void(std::string const& message)> callback)
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_started) {
+    if (m_active.load()) {
         throw std::runtime_error("websocket client already started");
     }
     m_message_callback = callback;
@@ -66,19 +66,17 @@ void BaseClient::on_message(
 void BaseClient::start()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_started) {
+    if (m_active.exchange(true)) {
         return;
     }
-    m_started = true;
     internal_start();
 }
 
 void BaseClient::stop()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
-    if (!m_started) {
+    if (!m_active.exchange(false)) {
         return;
     }
-    m_started = false;
     internal_stop();
 }

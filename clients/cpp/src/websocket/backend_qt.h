@@ -1,7 +1,11 @@
 #pragma once
 
+#include <chrono>
+#include <string>
+
 #include <QObject>
 #include <QThread>
+#include <QTimer>
 #include <QWebSocket>
 
 #include "client.h"
@@ -30,6 +34,16 @@ public:
 #endif
         wait();
     }
+};
+
+class Timer : public QTimer
+{
+    Q_OBJECT
+
+public:
+    Timer(QObject* _parent = nullptr) : QTimer(_parent) {}
+
+    ~Timer() noexcept {}
 };
 
 class WebSocket : public QWebSocket
@@ -72,6 +86,17 @@ protected:
     void internal_stop() override;
 
 private Q_SLOTS:
+    /**
+     * @brief Attempts to open a connection to the server.
+     *
+     * This method may only be called internally,
+     * from the internal thread m_thread,
+     * by using QMetaObject::invokeMethod() or by connecting a signal.
+     *
+     * If the connection attempt fails, on_disconnected is triggered.
+     */
+    void open_connection();
+
     void on_connected();
     void on_disconnected();
     void on_text_message_received(QString const& message);
@@ -81,11 +106,17 @@ private Q_SLOTS:
     void on_ssl_errors(const QList<QSslError>& errors);
 
 private:
+    void internal_open();
     void connect_conn(qt::WebSocket* conn);
+    void connect_reconnect_timer(QTimer* timer);
     Qt::ConnectionType connection_type();
+    std::chrono::milliseconds next_reconnect_delay();
+    void reset_reconnect_delay();
 
 private:
     qt::WebSocket m_conn;
+    qt::Timer m_reconnect_timer;
+    std::chrono::milliseconds m_reconnect_delay;
 
     // The thread should be destroyed first, so define it last.
     // The websocket object above lives in this thread and may not be
