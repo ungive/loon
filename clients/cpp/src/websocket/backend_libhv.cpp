@@ -92,13 +92,13 @@ std::unique_ptr<hv::WebSocketClient> ClientImpl::create_conn()
     conn->onmessage = std::bind(
         &ClientImpl::on_websocket_message, this, std::placeholders::_1);
     conn->onclose = std::bind(&ClientImpl::on_websocket_close, this);
-    if (m_options.connect_timeout.has_value()) {
-        conn->setConnectTimeout(m_options.connect_timeout.value().count());
+    if (options().connect_timeout.has_value()) {
+        conn->setConnectTimeout(options().connect_timeout.value().count());
     } else {
         conn->setConnectTimeout(default_connect_timeout.count());
     }
-    if (m_options.ping_interval.has_value()) {
-        conn->setPingInterval(m_options.ping_interval.value().count());
+    if (options().ping_interval.has_value()) {
+        conn->setPingInterval(options().ping_interval.value().count());
     }
     return conn;
 }
@@ -106,12 +106,12 @@ std::unique_ptr<hv::WebSocketClient> ClientImpl::create_conn()
 void ClientImpl::internal_start()
 {
     // Reconnect
-    if (m_options.reconnect_delay.has_value()) {
+    if (options().reconnect_delay.has_value()) {
         reconn_setting_t reconnect;
         reconn_setting_init(&reconnect);
-        reconnect.min_delay = m_options.reconnect_delay.value().count();
-        if (m_options.max_reconnect_delay.has_value()) {
-            reconnect.max_delay = m_options.max_reconnect_delay.value().count();
+        reconnect.min_delay = options().reconnect_delay.value().count();
+        if (options().max_reconnect_delay.has_value()) {
+            reconnect.max_delay = options().max_reconnect_delay.value().count();
             reconnect.delay_policy = DEFAULT_RECONNECT_INCREASING_DELAY_POLICY;
         }
         m_conn->setReconnect(&reconnect);
@@ -121,24 +121,24 @@ void ClientImpl::internal_start()
     // Default user-agent. The map is case-insensitive,
     // so it will be overwritten, if set by the user.
     headers["User-Agent"] = LOON_USER_AGENT;
-    for (auto const& [key, value] : m_options.headers) {
+    for (auto const& [key, value] : options().headers) {
         headers[key] = value;
     }
-    if (m_options.basic_authorization.has_value()) {
-        auto credentials = m_options.basic_authorization.value();
+    if (options().basic_authorization.has_value()) {
+        auto credentials = options().basic_authorization.value();
         headers["Authorization"] = "Basic " + util::base64_encode(credentials);
     }
     // Server verification (CA certificate)
-    bool is_wss = m_address.rfind("wss", 0) == 0;
-    if (is_wss && m_options.ca_certificate_path.has_value()) {
+    bool is_wss = address().rfind("wss", 0) == 0;
+    if (is_wss && options().ca_certificate_path.has_value()) {
         hssl_ctx_opt_t param{};
         param.endpoint = HSSL_CLIENT;
         param.verify_peer = 1;
-        param.ca_file = m_options.ca_certificate_path.value().c_str();
+        param.ca_file = options().ca_certificate_path.value().c_str();
         m_conn->withTLS(&param);
     }
     // Open the connection
-    m_conn->open(m_address.c_str(), headers);
+    m_conn->open(address().c_str(), headers);
 }
 
 void ClientImpl::internal_stop()
