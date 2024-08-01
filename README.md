@@ -78,7 +78,8 @@ A deployment example can be found in [**deployments**](./deployments).
   - Dependencies: libhv or Qt for websocket communication + OpenSSL + Protobuf
   - Compatible with C++17 or newer
   - Uses the CMake build system
-  - Less than 2.000 lines of code: 1.849 lines for commit `b82c05`
+  - Small footprint: 2.624 lines for commit `ac252a`
+    (excluding websocket abstraction)
   - Documentation: *https://ungive.github.io/loon/clients/cpp*
 - A ready to use server Docker image:
   **[build/package/Dockerfile](./build/package/Dockerfile)**
