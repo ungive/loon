@@ -117,6 +117,7 @@ private:
     qt::WebSocket m_conn;
     qt::Timer m_reconnect_timer;
     std::chrono::milliseconds m_reconnect_delay;
+    size_t m_reconnect_count{ 0 };
 
     // The thread should be destroyed first, so define it last.
     // The websocket object above lives in this thread and may not be

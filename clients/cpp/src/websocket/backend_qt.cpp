@@ -22,7 +22,7 @@
 
 #define var loon::log_var
 #define log(level) \
-    loon_log_macro(level, _level.load(), log_message, loon::Logger)
+    loon_log_macro(level, _level.load(), ::log_message, loon::Logger)
 
 void log_message(loon::LogLevel level, std::string const& message);
 
@@ -104,8 +104,7 @@ std::chrono::milliseconds ClientImpl::next_reconnect_delay()
 {
     using namespace std::chrono_literals;
 
-    auto value = m_reconnect_delay;
-    if (options().max_reconnect_delay.has_value()) {
+    if (m_reconnect_count > 0 && options().max_reconnect_delay.has_value()) {
         // Exponentially increase reconnect delay.
         auto next = std::min(
             options().max_reconnect_delay.value(), 2 * m_reconnect_delay);
@@ -114,13 +113,15 @@ std::chrono::milliseconds ClientImpl::next_reconnect_delay()
         next = std::max(options().reconnect_delay.value(), next);
         m_reconnect_delay = next;
     }
-    return value;
+    m_reconnect_count += 1;
+    return m_reconnect_delay;
 }
 
 inline void ClientImpl::reset_reconnect_delay()
 {
     using namespace std::chrono_literals;
     m_reconnect_delay = options().reconnect_delay.value_or(0ms);
+    m_reconnect_count = 0;
 }
 
 void ClientImpl::open_connection()
@@ -140,6 +141,9 @@ void ClientImpl::open_connection()
         // Cancel if the websocket is not unconnected.
         return;
     }
+
+    log(Info) << "automatic reconnect" << var("count", m_reconnect_count)
+              << var("delay", m_reconnect_delay.count());
 
     internal_open();
 }
@@ -237,11 +241,13 @@ void ClientImpl::on_connected()
 {
     on_websocket_open();
     reset_reconnect_delay();
+    log(Info) << "connected";
 }
 
 void ClientImpl::on_disconnected()
 {
     on_websocket_close();
+    log(Info) << "disconnected";
     if (options().reconnect_delay.has_value()) {
         // Only start the timer if the websocket is active.
         if (active()) {
@@ -260,7 +266,6 @@ void ClientImpl::on_disconnected()
             auto delay = next_reconnect_delay();
             QMetaObject::invokeMethod(&m_reconnect_timer, "start",
                 connection_type(), static_cast<int>(delay.count()));
-            log(Debug) << "automatic reconnect";
         }
     }
 }
@@ -310,9 +315,9 @@ void ClientImpl::on_error(QAbstractSocket::SocketError error)
 
 void ClientImpl::on_state(QAbstractSocket::SocketState state)
 {
-    log(Info) << "socket state: "
-              << flatten_qt_enum_value(qt_enum_key(state), true)
-              << var("value", qt_enum_key(state));
+    log(Debug) << "socket state: "
+               << flatten_qt_enum_value(qt_enum_key(state), true)
+               << var("value", qt_enum_key(state));
 }
 
 void ClientImpl::on_ssl_errors(const QList<QSslError>& errors)
