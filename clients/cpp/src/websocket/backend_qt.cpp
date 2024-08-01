@@ -208,7 +208,7 @@ void ClientImpl::on_error(QAbstractSocket::SocketError error)
     }
     std::ostringstream oss;
     oss << "socket error: " << flatten_qt_enum_value(qt_enum_key(error), true);
-    log_message(LogLevel::Error, oss.str());
+    log_message(LogLevel::Warning, oss.str());
 }
 
 void ClientImpl::on_state(QAbstractSocket::SocketState state)
