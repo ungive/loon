@@ -21,9 +21,10 @@ type Options struct {
 }
 
 type ProtocolOptions struct {
-	BaseUrl     string               `json:"base_url"`
-	Constraints *ProtocolConstraints `json:"constraints"`
-	Intervals   *ProtocolIntervals   `json:"intervals"`
+	BaseUrl         string               `json:"base_url"`
+	ChunkBufferSize int                  `json:"chunk_buffer_size"`
+	Constraints     *ProtocolConstraints `json:"constraints"`
+	Intervals       *ProtocolIntervals   `json:"intervals"`
 }
 
 type ProtocolConstraints struct {
@@ -73,6 +74,12 @@ func (c *Options) Validate() error {
 }
 
 func (c *ProtocolOptions) Validate() error {
+	if len(c.BaseUrl) == 0 {
+		return errors.New("base URL cannot be empty")
+	}
+	if c.ChunkBufferSize <= 0 {
+		return errors.New("chunk buffer size must be larger than zero")
+	}
 	if err := c.Intervals.Validate(); err != nil {
 		return fmt.Errorf("failed to validate intervals: %w", err)
 	}
@@ -81,9 +88,6 @@ func (c *ProtocolOptions) Validate() error {
 	}
 	if structs.HasZero(c) {
 		return ErrUnsetConfigFields
-	}
-	if len(c.BaseUrl) == 0 {
-		return errors.New("base URL cannot be empty")
 	}
 	return nil
 }
@@ -166,15 +170,15 @@ func (c *ProtocolConstraints) Validate() error {
 				"content type must be lowercase and contain no spaces")
 		}
 	}
-	if structs.HasZero(c) {
-		return ErrUnsetConfigFields
-	}
 	if *c.CacheDuration < 0 {
 		return errors.New("maximum cache duration must be positive")
 	}
 	seconds := c.CacheDuration.Seconds()
 	if seconds-float64(uint64(seconds)) > 0.001 {
 		return errors.New("maximum cache duration must be in seconds")
+	}
+	if structs.HasZero(c) {
+		return ErrUnsetConfigFields
 	}
 	return nil
 }

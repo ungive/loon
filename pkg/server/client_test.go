@@ -1772,11 +1772,17 @@ func (s *websocketServer) getHandler() http.Handler {
 			s.errors <- err
 			return
 		}
-		client, err := NewClient(conn, &ProtocolOptions{
-			BaseUrl:     s.mockAddress,
-			Constraints: constraintsFromProto(s.constraints),
-			Intervals:   s.intervals,
-		})
+		options := &ProtocolOptions{
+			BaseUrl:         s.mockAddress,
+			ChunkBufferSize: 8,
+			Constraints:     constraintsFromProto(s.constraints),
+			Intervals:       s.intervals,
+		}
+		if err := options.Validate(); err != nil {
+			s.errors <- err
+			return
+		}
+		client, err := NewClient(conn, options)
 		if err != nil {
 			s.errors <- err
 			return
@@ -1820,9 +1826,11 @@ func (s *websocketServer) lastClient() *wrappedClient {
 	case client := <-s.clients:
 		return client
 	case err := <-s.errors:
-		assert.Error(s.t, err)
+		assert.NoError(s.t, err)
+		assert.FailNow(s.t, "cannot proceed")
 	case <-time.After(testTimeout):
 		assert.Error(s.t, errTestTimeout)
+		assert.FailNow(s.t, "cannot proceed")
 	}
 	panic("unreachable")
 }

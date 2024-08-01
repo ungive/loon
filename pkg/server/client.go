@@ -324,12 +324,13 @@ type internalResponse struct {
 func newResponse(
 	request *internalRequest,
 	header *pb.ContentHeader,
+	bufferSize int,
 ) *internalResponse {
 	return &internalResponse{
 		request:       request,
 		header:        header,
 		chunkSequence: 0,
-		chunks:        make(chan []byte, 8),
+		chunks:        make(chan []byte, bufferSize),
 	}
 }
 
@@ -973,7 +974,7 @@ func (c *clientImpl) onContentHeader(header *pb.ContentHeader) {
 		return
 	}
 	request.resetTimeout()
-	response := newResponse(request, header)
+	response := newResponse(request, header, c.config.ChunkBufferSize)
 	request.provideResponse(response)
 	// Content size is empty, the request is therefore immediately completed.
 	if header.ContentSize == 0 {
