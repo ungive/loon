@@ -220,6 +220,20 @@ protected:
         }
     }
 
+    /**
+     * @brief Call this method when there is a fatal error.
+     *
+     * Stops any running connection by calling internal_stop().
+     * Prevents the client from reconnecting, if reconnects are enabled
+     * and puts the client in a stopped state.
+     * After calling this method, active() returns false.
+     */
+    inline void fail()
+    {
+        m_active.exchange(false);
+        internal_stop();
+    }
+
     const std::string m_address{};
     WebsocketOptions m_options{};
 

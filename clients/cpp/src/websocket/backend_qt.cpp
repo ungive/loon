@@ -90,7 +90,9 @@ void ClientImpl::internal_start()
     // URL
     QUrl url(QString::fromStdString(m_address));
     if (!url.isValid() || (url.scheme() != "ws" && url.scheme() != "wss")) {
-        throw std::runtime_error("the websocket address is invalid");
+        log_message(LogLevel::Error, "the websocket address is invalid");
+        fail();
+        return;
     }
     // Headers
     QNetworkRequest request(url);
