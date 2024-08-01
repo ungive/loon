@@ -2,22 +2,14 @@
 
 ## High
 
-- [ ] Implement reconnecting for the QT websocket backend.
-- [ ] Option to auto-restart after a given timeout to rotate client IDs?
-    probably not a bad idea instead of e.g. staying connected for 24h
-    and still using the same client ID and client secret
-    and accumulating possibly a lot of authenticated generated URLs,
-    which, if accumulated/collected, could be used to spam the client
-    with requests, despite response caching.
-- [ ] Add config option to limit how many chunks are buffered on the server.
-- [ ] Add config option to enable TCP keep-alive or not.
-    This should be a choice.
-    If there's a cache in front of it it's e.g. probably a good idea,
-    to keep a connection open between the server and the cache,
-    instead of opening a new connection every time.
-
 ## Normal
 
+- [ ] Implement a content source which runs a function or lambda
+    and serves the return value.
+    This needs a timeout, which should probably be passed by the server
+    in the constraints message, so that the client knows how long
+    it may run the function before it should return.
+    This value should probably be the "timeout_duration" from the server config.
 - [ ] Implement upload speed limitation across all handled requests.
 - [ ] Switch to std::string_view with websocket message in C++ client?
 - [ ] Call served/unregistered/failed callbacks on a separate thread?
@@ -54,6 +46,10 @@
     which can be registered with the server library API?
     That way, if prepopulation is required, users can write their own server
     instead of running "loon server" directly.
+    Note that the cache should then support streaming the response,
+    e.g. if 100MB is uploaded it shouldn't wait with forwarding the response
+    until the entire 100MB have been sent by the client,
+    but start sending chunks once they come in WHILE storing them in the cache.
 - [ ] Add a way to clear cached paths for connected clients,
     so that anything that might be cached on the server can be removed.
     Just a way to free resources whenever needed.
@@ -64,6 +60,12 @@
 
 ## Low
 
+- [ ] Option to auto-restart after a given timeout to rotate client IDs?
+    probably not a bad idea instead of e.g. staying connected for 24h
+    and still using the same client ID and client secret
+    and accumulating possibly a lot of authenticated generated URLs,
+    which, if accumulated/collected, could be used to spam the client
+    with requests, despite response caching.
 - [ ] URL-encode path in generated URLs.
 - [ ] Add support for HTTP Content-Digest.
 - [ ] Automatically update docs on commit or push.
@@ -89,6 +91,8 @@
 
 ## Done
 
+- [x] Add config option to limit how many chunks are buffered on the server.
+- [x] Implement reconnecting for the QT websocket backend.
 - [x] Request handler thread should be joined
 - [x] Fix deadlock with request handler when restarting in send().
 - [x] Websocket client: on_websocket_open does not use mutex?
