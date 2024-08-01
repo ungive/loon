@@ -78,7 +78,7 @@ inline void ClientImpl::connect_conn(qt::WebSocket* conn)
 
 inline Qt::ConnectionType ClientImpl::connection_type()
 {
-    return QThread::currentThread() != m_conn.thread()
+    return QThread::currentThread() != m_thread.thread()
         ? Qt::BlockingQueuedConnection
         : Qt::AutoConnection;
 }
