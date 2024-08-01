@@ -159,6 +159,8 @@ class BaseClient : public IClient
 public:
     BaseClient(std::string const& address, WebsocketOptions const& options);
 
+    ~BaseClient();
+
     inline std::string const& address() override { return m_address; }
 
     void on_open(std::function<void()> callback) override;

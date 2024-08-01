@@ -33,6 +33,8 @@ BaseClient::BaseClient(
     }
 }
 
+BaseClient::~BaseClient() {}
+
 void BaseClient::on_open(std::function<void()> callback)
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
