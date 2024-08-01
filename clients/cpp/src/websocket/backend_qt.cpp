@@ -20,20 +20,27 @@
 #define BACKEND_NAME "qt"
 #define LOG_PREFIX BACKEND_NAME ": "
 
-using namespace loon::websocket;
+#define var loon::log_var
+#define log(level) \
+    loon_log_macro(level, _level.load(), log_message, loon::Logger)
 
+void log_message(loon::LogLevel level, std::string const& message);
+
+using namespace loon::websocket;
 using WebsocketOptions = loon::WebsocketOptions;
+
+static std::mutex _mutex{};
+static std::atomic<loon::LogLevel> _level{ default_log_level };
+static loon::log_handler_t _handler{ loon::default_log_handler };
 
 std::chrono::milliseconds loon::websocket::default_connect_timeout =
     std::chrono::milliseconds{ 10000 /* same as libhv */ };
-
-void log_message(loon::LogLevel level, std::string const& message);
 
 Client::Client(std::string const& address, WebsocketOptions const& options)
     : m_impl{ std::make_unique<ClientImpl>(address, options) }
 {
     if (options.ping_interval) {
-        log(LogLevel::Warning,
+        log_message(LogLevel::Warning,
             "ignoring ping interval: "
             "this is handled internally by the QT websocket backend");
     }
@@ -161,7 +168,8 @@ void ClientImpl::internal_open()
     // URL
     QUrl url(QString::fromStdString(address()));
     if (!url.isValid() || (url.scheme() != "ws" && url.scheme() != "wss")) {
-        log_message(LogLevel::Error, "the websocket address is invalid");
+        log(Error) << "the websocket address is invalid"
+                   << var("address", address());
         fail();
         return;
     }
@@ -252,9 +260,7 @@ void ClientImpl::on_disconnected()
             auto delay = next_reconnect_delay();
             QMetaObject::invokeMethod(&m_reconnect_timer, "start",
                 connection_type(), static_cast<int>(delay.count()));
-            log_message(LogLevel::Debug,
-                "automatic reconnect with delay " +
-                    std::to_string(delay.count()) + "ms");
+            log(Debug) << "automatic reconnect";
         }
     }
 }
@@ -295,39 +301,24 @@ inline const char* qt_enum_key(T value)
     return QMetaEnum::fromType<T>().valueToKey(value);
 }
 
-static std::mutex _mutex{};
-static std::atomic<loon::LogLevel> _level{ default_log_level };
-static loon::log_handler_t _handler{ loon::default_log_handler };
-
 void ClientImpl::on_error(QAbstractSocket::SocketError error)
 {
-    if (LogLevel::Error < _level.load()) {
-        return;
-    }
-    std::ostringstream oss;
-    oss << "socket error: " << flatten_qt_enum_value(qt_enum_key(error), true);
-    log_message(LogLevel::Warning, oss.str());
+    log(Warning) << "socket error: "
+                 << flatten_qt_enum_value(qt_enum_key(error), true)
+                 << var("value", qt_enum_key(error));
 }
 
 void ClientImpl::on_state(QAbstractSocket::SocketState state)
 {
-    if (LogLevel::Info < _level.load()) {
-        return;
-    }
-    std::ostringstream oss;
-    oss << "socket state: " << flatten_qt_enum_value(qt_enum_key(state), true);
-    log_message(LogLevel::Info, oss.str());
+    log(Info) << "socket state: "
+              << flatten_qt_enum_value(qt_enum_key(state), true)
+              << var("value", qt_enum_key(state));
 }
 
 void ClientImpl::on_ssl_errors(const QList<QSslError>& errors)
 {
-    if (LogLevel::Error < _level.load()) {
-        return;
-    }
     for (auto const& error : errors) {
-        std::ostringstream oss;
-        oss << "ssl error: " << error.errorString().toStdString();
-        log_message(LogLevel::Error, oss.str());
+        log(Error) << "ssl error: " << error.errorString().toStdString();
     }
 }
 

@@ -120,7 +120,7 @@ void loon::init_logging()
     google::protobuf::SetLogHandler(protobuf_log_handler);
 }
 
-void loon::log(LogLevel level, std::string const& message)
+void loon::log_message(LogLevel level, std::string const& message)
 {
     const std::lock_guard<std::mutex> lock(_mutex);
     if (_handler && level >= _level) {

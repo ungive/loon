@@ -10,7 +10,7 @@ namespace loon
 {
 LogLevel log_level();
 void init_logging();
-void log(LogLevel level, std::string const& message);
+void log_message(LogLevel level, std::string const& message);
 void default_log_handler(LogLevel level, const std::string& message);
 
 template <typename K, typename V>
@@ -123,10 +123,14 @@ private:
 class Logger
 {
 public:
-    Logger(LogLevel level) : m_level{ level }, m_buffer{} {}
+    Logger(LogLevel level, log_handler_t handler)
+        : m_level{ level }, m_handler{ handler }, m_buffer{}
+    {
+    }
 
     Logger(Logger&& other)
-        : m_level{ other.m_level }, m_buffer{ std::move(other.m_buffer) },
+        : m_level{ other.m_level }, m_handler{ other.m_handler },
+          m_buffer{ std::move(other.m_buffer) },
           m_after_buffer{ std::move(other.m_after_buffer) }
     {
         other.m_moved = true;
@@ -148,14 +152,22 @@ public:
                 m_buffer.write(' ');
                 m_buffer.write(m_after_buffer.str());
             }
-            loon::log(m_level, m_buffer.str());
+            m_handler(m_level, m_buffer.str());
         }
     }
 
 private:
     LogLevel m_level;
+    log_handler_t m_handler;
     LogBuffer m_buffer;
     LogBuffer m_after_buffer;
     bool m_moved{ false };
 };
 } // namespace loon
+
+// Wrapper for creating a concise log macro.
+#define loon_log_macro(log_level, log_max_level, log_handler, logger_factory) \
+    if (LogLevel::log_level < log_max_level)                                  \
+        ;                                                                     \
+    else                                                                      \
+        logger_factory(LogLevel::log_level, log_handler)

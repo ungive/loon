@@ -204,7 +204,7 @@ private:
      */
     void fail();
 
-    Logger make_logger(LogLevel level);
+    Logger logger_factory(LogLevel level, log_handler_t handler);
 
     void on_websocket_open();
     void on_websocket_close();

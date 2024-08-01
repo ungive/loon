@@ -15,11 +15,8 @@ using namespace loon;
 using namespace std::chrono_literals;
 
 #define var loon::log_var
-#define log(level)                           \
-    if (LogLevel::level < loon::log_level()) \
-        ;                                    \
-    else                                     \
-        make_logger(LogLevel::level)
+#define log(level) \
+    loon_log_macro(level, loon::log_level(), loon::log_message, logger_factory)
 
 Client::Client(std::string const& address, ClientOptions options)
     : m_impl{ std::make_unique<ClientImpl>(address, options) }
@@ -112,9 +109,10 @@ std::string ClientImpl::make_url(std::string const& path)
     return oss.str();
 }
 
-inline loon::Logger loon::ClientImpl::make_logger(LogLevel level)
+inline loon::Logger ClientImpl::logger_factory(
+    LogLevel level, log_handler_t handler)
 {
-    Logger logger(level);
+    Logger logger(level, handler);
     if (m_hello.has_value()) {
         logger.after() << var("cid", m_hello->client_id());
     }
