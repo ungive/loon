@@ -164,7 +164,6 @@ func (s *serverImpl) serve(
 ) {
 	// Make sure the request is closed, if it isn't already.
 	defer request.Close("request closed")
-	w.Header().Set("Connection", "Keep-Alive")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	var response Response
 	select {
