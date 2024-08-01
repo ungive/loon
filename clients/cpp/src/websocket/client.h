@@ -26,7 +26,7 @@ public:
      *
      * @returns The websocket address.
      */
-    virtual std::string const& address() = 0;
+    virtual std::string const& address() const = 0;
 
     /**
      * @brief Sets the callback for when the connection is opened.
@@ -118,7 +118,10 @@ public:
     Client(std::string const& address, WebsocketOptions const& options);
     ~Client();
 
-    inline std::string const& address() override { return m_impl->address(); }
+    inline std::string const& address() const override
+    {
+        return m_impl->address();
+    }
 
     inline void on_open(std::function<void()> callback) override
     {
@@ -161,7 +164,7 @@ public:
 
     ~BaseClient();
 
-    inline std::string const& address() override { return m_address; }
+    inline std::string const& address() const override { return m_address; }
 
     void on_open(std::function<void()> callback) override;
 
