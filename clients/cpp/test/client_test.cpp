@@ -53,8 +53,10 @@ public:
 
     inline void start_and_wait_until_connected()
     {
+        EXPECT_FALSE(connected());
         start();
         wait_until_connected();
+        EXPECT_TRUE(connected());
     }
 
     inline void restart_and_wait() { ClientImpl::restart_and_wait(); }

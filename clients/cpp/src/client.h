@@ -33,6 +33,12 @@ public:
 
     void stop() override;
 
+    inline bool connected() override
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        return m_connected;
+    }
+
     inline bool wait_until_connected()
     {
         return wait_until_connected(connect_timeout());

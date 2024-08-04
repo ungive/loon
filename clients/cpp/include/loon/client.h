@@ -87,6 +87,13 @@ public:
     virtual void stop() = 0;
 
     /**
+     * @brief Whether the client is connected and ready for content.
+     *
+     * @returns If the client is ready for registering content.
+     */
+    virtual bool connected() = 0;
+
+    /**
      * @brief Waits until the client is connected.
      *
      * Times out after the connect timeout that was configured
@@ -363,6 +370,8 @@ public:
     inline void start() override { return m_impl->start(); }
 
     inline void stop() override { return m_impl->stop(); }
+
+    inline bool connected() override { return m_impl->connected(); }
 
     inline bool wait_until_connected() override
     {
