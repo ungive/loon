@@ -235,6 +235,8 @@ void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
 
 std::vector<std::shared_ptr<ContentHandle>> loon::ClientImpl::content()
 {
+    const std::lock_guard<std::mutex> lock(m_request_mutex);
+
     std::vector<std::shared_ptr<ContentHandle>> result;
     result.reserve(m_content.size());
     std::transform(m_content.begin(), m_content.end(),
