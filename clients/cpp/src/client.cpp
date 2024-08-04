@@ -207,18 +207,21 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
 
 void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
 {
+    if (handle == nullptr) {
+        throw MalformedContentException("the content handle is a null pointer");
+    }
+
     std::unique_lock<std::mutex> lock(m_mutex);
 
-    // Verify that the content is valid and that it is registered.
+    // Verify that the content is valid and check if it is registered.
     auto ptr = std::dynamic_pointer_cast<InternalContentHandle>(handle);
     if (!ptr) {
-        throw ContentNotRegisteredException(
-            "failed to cast handle to internal content handle type");
+        throw MalformedContentException(
+            "the content handle has the wrong type");
     }
     auto it = m_content.find(ptr->path());
     if (it == m_content.end()) {
-        throw ContentNotRegisteredException(
-            "this content is not registered with this client");
+        return;
     }
 
     // Wait until the connection is ready.
@@ -249,10 +252,19 @@ std::vector<std::shared_ptr<ContentHandle>> loon::ClientImpl::content()
 
 bool loon::ClientImpl::is_registered(std::shared_ptr<ContentHandle> handle)
 {
+    if (handle == nullptr) {
+        throw MalformedContentException("the content handle is a null pointer");
+    }
+
     const std::lock_guard<std::mutex> lock(m_request_mutex);
 
     auto ptr = std::dynamic_pointer_cast<InternalContentHandle>(handle);
-    return ptr != nullptr && m_content.find(ptr->path()) != m_content.end();
+    if (ptr == nullptr) {
+        throw MalformedContentException(
+            "the content handle has the wrong type");
+    }
+
+    return m_content.find(ptr->path()) != m_content.end();
 }
 
 void ClientImpl::on_hello(Hello const& hello)

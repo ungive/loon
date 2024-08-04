@@ -179,14 +179,12 @@ public:
     /**
      * @brief Unregisters registered content from this client.
      *
+     * Does nothing if the content is already not registered anymore
+     * or the client has disconnected from the server or failed.
+     *
      * @param handle The handle for which the content should be unregistered.
      *
-     * @throws ClientNotConnectedException
-     * if the client is not started or connected.
-     * @throws ClientFailedException
-     * if the client failed, while attempting to unregister the content.
-     * @throws ContentNotRegisteredException
-     * if the content is not registered with this client.
+     * @throws MalformedContentException if the content is invalid.
      */
     virtual void unregister_content(std::shared_ptr<ContentHandle> handle) = 0;
 
@@ -201,12 +199,17 @@ public:
      */
     virtual std::vector<std::shared_ptr<ContentHandle>> content() = 0;
 
+    // TODO: maybe call this "content_state" which returns one of many states,
+    //   like "invalid content", "client not connected", "not registered", ...
+
     /**
      * @brief Checks whether the content handle is still registered and served.
      *
      * @param handle The content handle to check.
      *
      * @returns Whether the content handle is still registered with this client.
+     *
+     * @throws MalformedContentException if the content is invalid.
      */
     virtual bool is_registered(std::shared_ptr<ContentHandle> handle) = 0;
 };
@@ -512,6 +515,18 @@ public:
  * @brief No content is registered under this handle with this client.
  */
 class ContentNotRegisteredException : public std::runtime_error
+{
+public:
+    using runtime_error::runtime_error;
+};
+
+/**
+ * @brief The content is malformed.
+ *
+ * This could either be because the pointer is a null pointer
+ * or it points to a content instance that has an invalid type.
+ */
+class MalformedContentException : public std::runtime_error
 {
 public:
     using runtime_error::runtime_error;
