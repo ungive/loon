@@ -238,7 +238,7 @@ void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
 
 std::vector<std::shared_ptr<ContentHandle>> loon::ClientImpl::content()
 {
-    const std::lock_guard<std::mutex> lock(m_request_mutex);
+    const std::lock_guard<std::mutex> lock(m_mutex);
 
     std::vector<std::shared_ptr<ContentHandle>> result;
     result.reserve(m_content.size());
@@ -256,7 +256,7 @@ bool loon::ClientImpl::is_registered(std::shared_ptr<ContentHandle> handle)
         throw MalformedContentException("the content handle is a null pointer");
     }
 
-    const std::lock_guard<std::mutex> lock(m_request_mutex);
+    const std::lock_guard<std::mutex> lock(m_mutex);
 
     auto ptr = std::dynamic_pointer_cast<InternalContentHandle>(handle);
     if (ptr == nullptr) {
