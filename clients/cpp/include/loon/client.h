@@ -38,6 +38,9 @@ public:
      * The callback should therefore be set first,
      * before calling url() and request or sharing the returned URL.
      *
+     * It is safe to call client methods within the callback,
+     * as no locks are held when it is called.
+     *
      * @param callback The callback function to set.
      */
     virtual void served(std::function<void()> callback) = 0;
@@ -54,7 +57,9 @@ public:
      * when this method was called to set the callback.
      *
      * The callback is called at most once.
-     * Do not call any client methods within the callback.
+     * Do not call any client methods within the callback,
+     * as client locks are held when it is called,
+     * which would cause a deadlock.
      *
      * @param callback The callback function to set.
      */
@@ -134,7 +139,9 @@ public:
      *
      * It is recommended to call this method before start(),
      * to reliably detect client failures.
-     * Do not call any client methods within the callback.
+     * Do not call any client methods within the callback,
+     * as client locks are held when it is called,
+     * which would cause a deadlock.
      *
      * @param callback The function to call when the client failed.
      */
