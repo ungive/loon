@@ -305,6 +305,16 @@ TEST(Client, UnregisteredCallbackIsCalledWhenUnregistering)
     client->unregister_content(handle);
 }
 
+TEST(Client, IsUnregisteredReturnsFalseAfterUnregistering)
+{
+    auto client = create_client();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    EXPECT_TRUE(client->is_registered(handle));
+    client->unregister_content(handle);
+    EXPECT_FALSE(client->is_registered(handle));
+}
+
 TEST(Client, UrlIsInvalidWhenContentIsUnregistered)
 {
     auto client = create_client();
@@ -337,6 +347,21 @@ TEST(Client, UnregisteredCallbackIsCalledWhenServerClosesConnection)
     auto empty_response = message.mutable_empty_response();
     empty_response->set_request_id(1000);
     client->send(message);
+}
+
+TEST(Client, IsUnregisteredReturnsFalseWhenServerClosesConnection)
+{
+    auto client = create_client();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    // Trigger connection close with an invalid message.
+    loon::ClientMessage message;
+    auto empty_response = message.mutable_empty_response();
+    empty_response->set_request_id(1000);
+    EXPECT_TRUE(client->is_registered(handle));
+    client->send(message);
+    std::this_thread::sleep_for(25ms);
+    EXPECT_FALSE(client->is_registered(handle));
 }
 
 TEST(Client, UnregisteredCallbackIsCalledWhenClientClosesConnection)

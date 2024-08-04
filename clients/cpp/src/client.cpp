@@ -247,6 +247,14 @@ std::vector<std::shared_ptr<ContentHandle>> loon::ClientImpl::content()
     return result;
 }
 
+bool loon::ClientImpl::is_registered(std::shared_ptr<ContentHandle> handle)
+{
+    const std::lock_guard<std::mutex> lock(m_request_mutex);
+
+    auto ptr = std::dynamic_pointer_cast<InternalContentHandle>(handle);
+    return ptr != nullptr && m_content.find(ptr->path()) != m_content.end();
+}
+
 void ClientImpl::on_hello(Hello const& hello)
 {
 #ifdef LOON_TEST

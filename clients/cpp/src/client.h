@@ -64,6 +64,8 @@ public:
 
     std::vector<std::shared_ptr<ContentHandle>> content() override;
 
+    bool is_registered(std::shared_ptr<ContentHandle> handle) override;
+
 protected:
     // Methods that should be accessible from tests.
 

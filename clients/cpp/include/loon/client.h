@@ -140,6 +140,8 @@ public:
      */
     virtual void on_failed(std::function<void()> callback) = 0;
 
+    // TODO: probably wanna rename these to register() and unregister().
+
     /**
      * @brief Registers content with this client and returns a handle for it.
      *
@@ -192,12 +194,21 @@ public:
      * @brief Returns all handles of content that is currently registered.
      *
      * Represents a snapshot of registered content.
-     * Might get invalidated if any of the handle are unregistered
+     * Might get invalidated if any of the handles are unregistered
      * or if the client disconnects, fails or is stopped in the meantime.
      *
      * @returns A list of content handles.
      */
     virtual std::vector<std::shared_ptr<ContentHandle>> content() = 0;
+
+    /**
+     * @brief Checks whether the content handle is still registered and served.
+     *
+     * @param handle The content handle to check.
+     *
+     * @returns Whether the content handle is still registered with this client.
+     */
+    virtual bool is_registered(std::shared_ptr<ContentHandle> handle) = 0;
 };
 
 /**
@@ -404,6 +415,11 @@ public:
     inline std::vector<std::shared_ptr<ContentHandle>> content() override
     {
         return m_impl->content();
+    }
+
+    inline bool is_registered(std::shared_ptr<ContentHandle> handle) override
+    {
+        return m_impl->is_registered(handle);
     }
 
 private:
