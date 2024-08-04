@@ -38,8 +38,9 @@ public:
      * The callback should therefore be set first,
      * before calling url() and request or sharing the returned URL.
      *
-     * It is safe to call client methods within the callback,
-     * as no locks are held when it is called.
+     * Do not call any client methods within the callback,
+     * as client locks are held when it is called,
+     * which would cause a deadlock.
      *
      * @param callback The callback function to set.
      */
