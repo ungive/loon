@@ -731,6 +731,10 @@ void ClientImpl::manager_loop()
         if (m_track_idling.has_value()) {
             bool do_track = m_track_idling.value();
             m_track_idling = std::nullopt; // Make sure this is reset.
+            if (!m_started) {
+                // The client is not even started.
+                continue;
+            }
             if (m_idle_stopped) {
                 // Already stopped by a previous idle.
                 continue;
