@@ -55,7 +55,7 @@ public:
     {
         EXPECT_FALSE(connected());
         start();
-        wait_until_connected();
+        wait_until_ready();
         EXPECT_TRUE(connected());
     }
 
@@ -63,14 +63,11 @@ public:
 
     inline bool connected() { return ClientImpl::connected(); }
 
-    inline bool wait_until_connected()
-    {
-        return ClientImpl::wait_until_connected();
-    }
+    inline void wait_until_ready() { return ClientImpl::wait_until_ready(); }
 
-    inline bool wait_until_connected(std::chrono::milliseconds timeout)
+    inline void wait_until_ready(std::chrono::milliseconds timeout)
     {
-        return ClientImpl::wait_until_connected(timeout);
+        return ClientImpl::wait_until_ready(timeout);
     }
 };
 
@@ -90,7 +87,7 @@ static std::shared_ptr<TestClient> create_client(
     auto client = std::make_shared<TestClient>(TEST_ADDRESS, options);
     if (started) {
         client->start();
-        client->wait_until_connected();
+        client->wait_until_ready();
     }
     return client;
 }
@@ -431,7 +428,7 @@ TEST(Client, FailsWhenMinCacheDurationIsSetAndServerDoesNotCacheResponses)
     });
     ExpectCalled callback;
     client->on_failed(callback.get());
-    client->start_and_wait_until_connected();
+    client->start();
     // Wait for the Hello message to have been handled.
     // It's expected that the client is not connected anymore,
     // since the client should be in a failed state.
@@ -481,7 +478,7 @@ TEST(Client, RestartsWhenReceivingTooManyNoContentRequests)
     EXPECT_EQ(404, response1.status);
     auto response2 = http_get(handle->url());
     EXPECT_NE(200, response2.status);
-    client->wait_until_connected();
+    client->wait_until_ready();
     // Check that the client restarted, i.e. it has no content.
     EXPECT_EQ(0, client->content().size());
 }
@@ -501,7 +498,7 @@ TEST(Client, DoesNotRestartWhenReceivingNoContentRequestsWithinLimit)
     EXPECT_EQ(404, response1.status);
     auto response2 = http_get(handle->url());
     EXPECT_EQ(404, response2.status);
-    client->wait_until_connected();
+    client->wait_until_ready();
     // Check that the client did not restart.
     EXPECT_EQ(1, client->content().size());
 }
@@ -564,7 +561,7 @@ TEST(Client, ClientRestartsWhenSendErrorOccurs)
     client->inject_send_error(true);
     auto response = http_get(handle->url());
     EXPECT_NE(200, response.status);
-    EXPECT_NO_THROW(client->wait_until_connected());
+    EXPECT_NO_THROW(client->wait_until_ready());
     EXPECT_EQ(0, client->content().size()); // should be restarted
 }
 
@@ -577,7 +574,7 @@ TEST(Client, ServesReregisteredContentAfterRestart)
     auto failed_response = http_get(handle->url());
     client->inject_send_error(false);
     EXPECT_NE(200, failed_response.status);
-    EXPECT_NO_THROW(client->wait_until_connected());
+    EXPECT_NO_THROW(client->wait_until_ready());
     EXPECT_EQ(0, client->content().size()); // should be restarted
     handle = client->register_content(content.source, content.info);
     ExpectCalled served(1);
@@ -674,7 +671,7 @@ TEST(Client, CanBeStartedAgainWhenStoppedByFailure)
     });
     ExpectCalled callback;
     client->on_failed(callback.get());
-    client->start_and_wait_until_connected();
+    client->start();
     EXPECT_THROW(client->wait_for_hello(), ClientNotConnectedException);
     client->inject_hello_modifier([](Hello& hello) {
         // Increase the cache duration, so it won't fail again.
@@ -740,5 +737,37 @@ TEST(Client, ReconnectsWhenIdleDisconnectedAndWaitUntilConnectedIsCalled)
     client->start_and_wait_until_connected();
     EXPECT_CONNECTION_STATE_SWAP_AFTER(
         false, options.disconnect_after_idle.value(), 25ms);
-    EXPECT_TRUE(client->wait_until_connected());
+    client->wait_until_ready();
+    EXPECT_TRUE(client->connected());
+}
+
+TEST(Client, RegisterContentTimesOutWhenTimeoutIsSetAndServerUnreachable)
+{
+    ClientOptions options;
+    options.no_content_request_limit = std::nullopt; // required
+    auto client = std::make_shared<TestClient>("ws://127.0.0.1:8071", options);
+    client->start();
+    auto content = example_content();
+    auto t1 = std::chrono::high_resolution_clock::now();
+    EXPECT_ANY_THROW(
+        client->register_content(content.source, content.info, 500ms));
+    auto t2 = std::chrono::high_resolution_clock::now();
+    auto delta = t2 - t1;
+    EXPECT_GT(delta, 475ms);
+}
+
+TEST(Client, RegisterContentWorksWhenConnectedAndTimeoutIsZero)
+{
+    auto client = create_client(false);
+    auto content = example_content();
+    client->start();
+    client->wait_until_ready();
+    auto t1 = std::chrono::high_resolution_clock::now();
+    std::shared_ptr<loon::ContentHandle> handle;
+    EXPECT_NO_THROW(
+        handle = client->register_content(content.source, content.info, 0ms));
+    auto t2 = std::chrono::high_resolution_clock::now();
+    auto delta = t2 - t1;
+    EXPECT_LT(delta, 25ms);
+    EXPECT_NE(nullptr, handle);
 }

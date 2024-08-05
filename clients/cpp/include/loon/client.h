@@ -118,37 +118,36 @@ public:
     virtual void idle() = 0;
 
     /**
-     * @brief Wait until the client is connected.
-     *
-     * Times out after the connect timeout that was configured
-     * within the WebsocketOptions of the client
-     * or the default timeout if not explicitly configured.
-     *
-     * Must be called while the client is started.
-     *
-     * @throws ClientNotStartedException if the client is not started.
-     *
-     * @returns Whether the client is connected.
-     */
-    virtual bool wait_until_connected() = 0;
-
-    /**
-     * @brief Wait until the client is connected.
+     * @brief Wait until the client is ready.
      *
      * Times out after the given timeout duration,
      * if the client has not successfully connected within that period.
      * The timeout duration must be greater or equal to zero.
      *
-     * Can be used to check whether the client is connected
+     * Can be used to check whether the client is ready
      * at a specific moment, by using a timeout duration of zero.
+     *
+     * Does not throw any exception if the connection is ready.
      *
      * @param timeout The timeout period.
      *
-     * @throws ClientNotStartedException if the client is not started.
-     *
-     * @returns Whether the client is connected.
+     * @throws TimeoutException
+     * if an operation timed out.
+     * @throws ClientNotConnectedException
+     * if the client is not started, connected or
+     * if the client disconnected while waiting for the connection to be ready.
      */
-    virtual bool wait_until_connected(std::chrono::milliseconds timeout) = 0;
+    virtual void wait_until_ready(std::chrono::milliseconds timeout) = 0;
+
+    /**
+     * @brief Wait until the client is ready.
+     *
+     * Uses the connect timeout or a sane default value for the timeout.
+     *
+     * @see IClient::wait_until_ready(timeout)
+     * @see WebsocketOptions::connect_timeout
+     */
+    virtual void wait_until_ready() = 0;
 
     /**
      * @brief Sets a callback for when the client has unrecoverably failed.
@@ -170,8 +169,6 @@ public:
      */
     virtual void on_failed(std::function<void()> callback) = 0;
 
-    // TODO: probably wanna rename these to register() and unregister().
-
     /**
      * @brief Registers content with this client and returns a handle for it.
      *
@@ -189,19 +186,34 @@ public:
      *
      * @param source The source for the content.
      * @param info Information about how to provide the content.
+     * @param timeout How long to wait until the connection is ready,
+     * if it isn't yet.
      *
      * @returns A handle to the content.
      * For use with unregister_content() to unregister this content again.
+     *
+     * @throws TimeoutException
+     * if an operation timed out.
      * @throws ClientNotConnectedException
      * if the client is not started, connected or
      * if the client disconnected while waiting for the connection to be ready.
-     * @throws ClientFailedException
-     * if the client failed while attempting to register the content.
      * @throws PathAlreadyRegisteredException
      * if content has already been registered under the path
      * that was specified in the info parameter.
      * @throws UnacceptableContentException
      * if the server's constraints do not allow this content.
+     */
+    virtual std::shared_ptr<ContentHandle> register_content(
+        std::shared_ptr<ContentSource> source, ContentInfo const& info,
+        std::chrono::milliseconds timeout) = 0;
+
+    /**
+     * @brief Registers content with this client and returns a handle for it.
+     *
+     * Uses the connect timeout or a sane default value for the timeout.
+     *
+     * @see IClient::register_content(source, info, timeout)
+     * @see WebsocketOptions::connect_timeout
      */
     virtual std::shared_ptr<ContentHandle> register_content(
         std::shared_ptr<ContentSource> source, ContentInfo const& info) = 0;
@@ -432,19 +444,27 @@ public:
 
     inline void idle() override { return m_impl->idle(); }
 
-    inline bool wait_until_connected()
+    inline void wait_until_ready() override
     {
-        return m_impl->wait_until_connected();
+        return m_impl->wait_until_ready();
     }
 
-    inline bool wait_until_connected(std::chrono::milliseconds timeout)
+    inline void wait_until_ready(std::chrono::milliseconds timeout) override
     {
-        return m_impl->wait_until_connected(timeout);
+        return m_impl->wait_until_ready(timeout);
     }
 
     inline void on_failed(std::function<void()> callback) override
     {
         return m_impl->on_failed(callback);
+    }
+
+    inline std::shared_ptr<ContentHandle> register_content(
+        std::shared_ptr<loon::ContentSource> source,
+        loon::ContentInfo const& info,
+        std::chrono::milliseconds timeout) override
+    {
+        return m_impl->register_content(source, info, timeout);
     }
 
     inline std::shared_ptr<ContentHandle> register_content(
@@ -539,15 +559,6 @@ public:
 };
 
 /**
- * @brief The client is in a failed state and was stopped.
- */
-class ClientFailedException : public std::runtime_error
-{
-public:
-    using runtime_error::runtime_error;
-};
-
-/**
  * @brief Content is already registered under this path.
  */
 class PathAlreadyRegisteredException : public std::runtime_error
@@ -581,6 +592,16 @@ public:
  * @brief The content does not conform with the server's constraints.
  */
 class UnacceptableContentException : public std::runtime_error
+{
+public:
+    using runtime_error::runtime_error;
+};
+
+/**
+ * @brief The operation timed out.
+ *
+ */
+class TimeoutException : public std::runtime_error
 {
 public:
     using runtime_error::runtime_error;

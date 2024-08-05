@@ -45,15 +45,16 @@ public:
         trigger_idle(true);
     }
 
-    inline bool wait_until_connected() override
-    {
-        return wait_until_connected(connect_timeout());
-    }
-
-    inline bool wait_until_connected(std::chrono::milliseconds timeout) override
+    inline void wait_until_ready() override
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        return wait_until_connected(lock, timeout);
+        wait_until_ready(lock, connect_timeout());
+    }
+
+    inline void wait_until_ready(std::chrono::milliseconds timeout) override
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        wait_until_ready(lock, timeout);
     }
 
     inline void on_failed(std::function<void()> callback) override
@@ -64,7 +65,15 @@ public:
 
     std::shared_ptr<ContentHandle> register_content(
         std::shared_ptr<loon::ContentSource> source,
-        loon::ContentInfo const& info) override;
+        loon::ContentInfo const& info,
+        std::chrono::milliseconds timeout) override;
+
+    inline std::shared_ptr<ContentHandle> register_content(
+        std::shared_ptr<loon::ContentSource> source,
+        loon::ContentInfo const& info) override
+    {
+        return register_content(source, info, connect_timeout());
+    }
 
     void unregister_content(std::shared_ptr<ContentHandle> handle) override;
 
@@ -124,8 +133,7 @@ protected:
     inline Hello wait_for_hello()
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        wait_until_connected(lock, connect_timeout());
-        wait_until_ready(lock);
+        wait_until_ready(lock, connect_timeout());
         return m_hello.value();
     }
 
@@ -244,7 +252,8 @@ private:
     bool update_connected(bool state);
     bool wait_until_connected(
         std::unique_lock<std::mutex>& lock, std::chrono::milliseconds timeout);
-    void wait_until_ready(std::unique_lock<std::mutex>& lock);
+    void wait_until_ready(
+        std::unique_lock<std::mutex>& lock, std::chrono::milliseconds timeout);
     void check_content_constraints(std::shared_ptr<loon::ContentSource> source,
         loon::ContentInfo const& info);
 

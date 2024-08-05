@@ -183,7 +183,8 @@ bool loon::ClientImpl::wait_until_connected(
 }
 
 std::shared_ptr<ContentHandle> ClientImpl::register_content(
-    std::shared_ptr<loon::ContentSource> source, loon::ContentInfo const& info)
+    std::shared_ptr<loon::ContentSource> source, loon::ContentInfo const& info,
+    std::chrono::milliseconds timeout)
 {
     std::unique_lock<std::mutex> lock(m_mutex);
 
@@ -207,7 +208,7 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
     }
 
     // Wait until the connection is ready for content registration.
-    wait_until_ready(lock);
+    wait_until_ready(lock, timeout);
 
     // Check that the content is within the server's constraints.
     check_content_constraints(source, info);
@@ -471,23 +472,28 @@ void ClientImpl::on_close(Close const& close)
     restart();
 }
 
-void ClientImpl::wait_until_ready(std::unique_lock<std::mutex>& lock)
+void ClientImpl::wait_until_ready(
+    std::unique_lock<std::mutex>& lock, std::chrono::milliseconds timeout)
 {
-    // Also wait until the connection is opened.
-    wait_until_connected(lock, connect_timeout());
+    using namespace std::chrono;
 
-    // Use the connect timeout here, as it makes the perfect timeout value.
-    // Receiving the Hello message should not take longer than connecting.
-    m_cv_connection_ready.wait_for(lock, connect_timeout(), [this] {
+    // Wait until the connection is opened.
+    auto start = high_resolution_clock::now();
+    if (!wait_until_connected(lock, timeout)) {
+        throw ClientNotConnectedException("the client is not connected");
+    }
+    auto delta = high_resolution_clock::now() - start;
+    auto remaining = std::max(timeout - delta, nanoseconds::zero());
+
+    // Wait until Hello has been received and the connection is ready.
+    m_cv_connection_ready.wait_for(lock, remaining, [this] {
         return !m_connected || m_hello.has_value();
     });
     if (!m_connected) {
         throw ClientNotConnectedException("the client is not connected");
     }
     if (!m_hello.has_value()) {
-        log(Fatal) << "did not receive initial server message in time";
-        fail();
-        throw ClientFailedException(
+        throw TimeoutException(
             "did not receive initial server message in time");
     }
 }
