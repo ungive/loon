@@ -731,3 +731,14 @@ TEST(Client, StaysConnectedWhenIdleIsCalledAndThenRegisteringNewContent)
     EXPECT_CONNECTION_STATE_AFTER(
         true, options.disconnect_after_idle.value(), 25ms);
 }
+
+TEST(Client, ReconnectsWhenIdleDisconnectedAndWaitUntilConnectedIsCalled)
+{
+    ClientOptions options;
+    options.disconnect_after_idle = 250ms;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    EXPECT_CONNECTION_STATE_SWAP_AFTER(
+        false, options.disconnect_after_idle.value(), 25ms);
+    EXPECT_TRUE(client->wait_until_connected());
+}

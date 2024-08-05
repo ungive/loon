@@ -118,6 +118,39 @@ public:
     virtual void idle() = 0;
 
     /**
+     * @brief Wait until the client is connected.
+     *
+     * Times out after the connect timeout that was configured
+     * within the WebsocketOptions of the client
+     * or the default timeout if not explicitly configured.
+     *
+     * Must be called while the client is started.
+     *
+     * @throws ClientNotStartedException if the client is not started.
+     *
+     * @returns Whether the client is connected.
+     */
+    virtual bool wait_until_connected() = 0;
+
+    /**
+     * @brief Wait until the client is connected.
+     *
+     * Times out after the given timeout duration,
+     * if the client has not successfully connected within that period.
+     * The timeout duration must be greater or equal to zero.
+     *
+     * Can be used to check whether the client is connected
+     * at a specific moment, by using a timeout duration of zero.
+     *
+     * @param timeout The timeout period.
+     *
+     * @throws ClientNotStartedException if the client is not started.
+     *
+     * @returns Whether the client is connected.
+     */
+    virtual bool wait_until_connected(std::chrono::milliseconds timeout) = 0;
+
+    /**
      * @brief Sets a callback for when the client has unrecoverably failed.
      *
      * This callback is only called when an abnormal event occurs,
@@ -398,6 +431,16 @@ public:
     inline bool started() override { return m_impl->started(); }
 
     inline void idle() override { return m_impl->idle(); }
+
+    inline bool wait_until_connected()
+    {
+        return m_impl->wait_until_connected();
+    }
+
+    inline bool wait_until_connected(std::chrono::milliseconds timeout)
+    {
+        return m_impl->wait_until_connected(timeout);
+    }
 
     inline void on_failed(std::function<void()> callback) override
     {

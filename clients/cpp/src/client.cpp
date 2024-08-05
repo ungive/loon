@@ -174,6 +174,9 @@ bool loon::ClientImpl::wait_until_connected(
     if (!m_started) {
         throw ClientNotStartedException("the client must be started");
     }
+    // Ensure that the underlying connection is started.
+    ensure_started();
+    // Wait until the connected signal arrives.
     return m_cv_connection_ready.wait_for(lock, timeout, [this] {
         return m_connected;
     });
@@ -470,9 +473,6 @@ void ClientImpl::on_close(Close const& close)
 
 void ClientImpl::wait_until_ready(std::unique_lock<std::mutex>& lock)
 {
-    // Ensure that the connection is started.
-    ensure_started();
-
     // Also wait until the connection is opened.
     wait_until_connected(lock, connect_timeout());
 
