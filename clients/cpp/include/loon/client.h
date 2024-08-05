@@ -399,13 +399,14 @@ struct ClientOptions
     /**
      * @brief Automatically disconnect after the given idle duration.
      *
-     * Idling is defined as being connect without having content registered.
-     * If there is no registered content and no content is registered
-     * within the given duration, the client will disconnect from the server.
+     * Idling is defined as being connected without having content registered
+     * or having entered idle state explicitly with the IClient::idle() method.
+     * If content is registered within the given duration,
+     * the client will disconnect from the server.
      *
-     * Should content be registered while being disconnected,
-     * the client will reconnect to the server and then register the content,
-     * given that the client is in a started state of course.
+     * Should content be registered while being disconnected due to idling,
+     * then the client will reconnect to and then register the content,
+     * if the client is in started state.
      */
     std::optional<std::chrono::milliseconds> disconnect_after_idle{};
 
