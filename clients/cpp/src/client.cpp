@@ -487,7 +487,8 @@ void ClientImpl::wait_until_ready(std::unique_lock<std::mutex>& lock)
         throw ClientNotConnectedException("the client is not connected");
     }
     if (!m_hello.has_value()) {
-        // FIXME: the client actually isn't in a failed state here...
+        log(Fatal) << "did not receive initial server message in time";
+        fail();
         throw ClientFailedException(
             "did not receive initial server message in time");
     }
@@ -536,14 +537,14 @@ void ClientImpl::on_websocket_message(std::string const& message)
     switch (server_message.data_case()) {
     case ServerMessage::kHello:
         if (m_hello.has_value()) {
-            log(Error) << "protocol: received more than one Hello message";
-            return restart();
+            log(Fatal) << "protocol: received more than one Hello message";
+            return fail();
         }
         break;
     default:
         if (!m_hello.has_value()) {
-            log(Error) << "protocol: first message is not a Hello message";
-            return restart();
+            log(Fatal) << "protocol: first message is not a Hello message";
+            return fail();
         }
         break;
     }
