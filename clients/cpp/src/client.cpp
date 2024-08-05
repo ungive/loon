@@ -85,6 +85,7 @@ ClientImpl::~ClientImpl()
 void ClientImpl::start()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
+    ensure_started();
     if (m_started) {
         return;
     }

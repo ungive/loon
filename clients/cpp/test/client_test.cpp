@@ -771,3 +771,19 @@ TEST(Client, RegisterContentWorksWhenConnectedAndTimeoutIsZero)
     EXPECT_LT(delta, 25ms);
     EXPECT_NE(nullptr, handle);
 }
+
+TEST(Client, ReconnectsWhenIdleDisconnectedAndStartIsCalled)
+{
+    ClientOptions options;
+    options.disconnect_after_idle = 250ms;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    EXPECT_CONNECTION_STATE_SWAP_AFTER(
+        false, options.disconnect_after_idle.value(), 25ms);
+    client->start();
+    // Make sure to not call wait_until_ready by accident,
+    // since that also guarantees that the client will reconnect after idle.
+    // Instead sleep for a small duration.
+    std::this_thread::sleep_for(25ms);
+    EXPECT_TRUE(client->connected());
+}
