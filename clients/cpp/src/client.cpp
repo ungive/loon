@@ -180,7 +180,7 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
     auto const& path = info.path;
     auto it = m_content.find(path);
     if (it != m_content.end()) {
-        throw ContentNotRegisteredException(
+        throw PathAlreadyRegisteredException(
             "content under this path is already registered with this client");
     }
 
