@@ -279,9 +279,7 @@ private:
     bool m_connected{ false };
     bool m_was_explicitly_started{ false };
     bool m_was_explicitly_stopped{ false };
-    // Use a recursive mutex, since many methods could trigger a reconnect,
-    // which would call close and would trigger the close callback,
-    // which locks this mutex again.
+    // Mutex for data fields.
     std::mutex m_mutex{};
     // Mutex for writing to the connection.
     std::mutex m_write_mutex{};
