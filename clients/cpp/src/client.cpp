@@ -674,6 +674,8 @@ void ClientImpl::internal_restart(std::unique_lock<std::mutex>& lock)
 
 void loon::ClientImpl::idle_stop(std::unique_lock<std::mutex>& lock)
 {
+    log(Info) << "disconnecting after idle"
+              << var("duration", m_options.disconnect_after_idle);
     m_idle_stopped = true;
     internal_stop(lock);
 }
