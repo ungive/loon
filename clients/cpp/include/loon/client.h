@@ -362,7 +362,7 @@ struct ClientOptions
      * the client will reconnect to the server and then register the content,
      * given that the client is in a started state of course.
      */
-    std::optional<std::chrono::seconds> disconnect_after_idle{};
+    std::optional<std::chrono::milliseconds> disconnect_after_idle{};
 
     // TODO: not yet implemented
     /**
