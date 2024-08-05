@@ -632,7 +632,7 @@ void ClientImpl::internal_restart(std::unique_lock<std::mutex>& lock)
 {
     internal_stop(lock);
     internal_start();
-    log(Warning) << "restarted";
+}
 }
 
 void ClientImpl::restart()
