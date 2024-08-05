@@ -641,3 +641,27 @@ TEST(Client, DisconnectsWhenDisconnectAfterIdleIsSetAndContentRegistrationFails)
     std::this_thread::sleep_for(options.disconnect_after_idle.value() + 100ms);
     ASSERT_FALSE(client->connected());
 }
+
+TEST(Client, CanBeStartedAgainWhenStoppedByFailure)
+{
+    ClientOptions options;
+    options.min_cache_duration = std::chrono::seconds{ 10 };
+    auto client = create_client(options, false);
+    client->inject_hello_modifier([](Hello& hello) {
+        hello.mutable_constraints()->set_cache_duration(0);
+    });
+    ExpectCalled callback;
+    client->on_failed(callback.get());
+    client->start_and_wait_until_connected();
+    EXPECT_THROW(client->wait_for_hello(), ClientNotConnectedException);
+    client->inject_hello_modifier([](Hello& hello) {
+        // Increase the cache duration, so it won't fail again.
+        hello.mutable_constraints()->set_cache_duration(30);
+    });
+    auto content = example_content();
+    EXPECT_THROW(client->register_content(content.source, content.info),
+        ClientNotStartedException);
+    // Start the client again after failure.
+    client->start_and_wait_until_connected();
+    EXPECT_TRUE(client->connected());
+}

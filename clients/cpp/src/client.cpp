@@ -654,6 +654,13 @@ void ClientImpl::internal_stop(std::unique_lock<std::mutex>& lock)
     m_manager_action = ManagerAction::Nothing{};
 }
 
+void ClientImpl::internal_stop_and_reset(std::unique_lock<std::mutex>& lock)
+{
+    internal_stop(lock);
+    // Make sure the user can start the client again manually.
+    m_started = false;
+}
+
 void ClientImpl::internal_restart(std::unique_lock<std::mutex>& lock)
 {
     internal_stop(lock);
@@ -755,7 +762,7 @@ void ClientImpl::manager_loop()
         if (auto* restart = std::get_if<Action::Restart>(&m_manager_action)) {
             internal_restart(lock);
         } else if (auto* fail = std::get_if<Action::Fail>(&m_manager_action)) {
-            internal_stop(lock);
+            internal_stop_and_reset(lock);
             if (m_failed_callback) {
                 m_failed_callback();
             }

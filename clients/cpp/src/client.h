@@ -257,6 +257,7 @@ private:
     void reset_connection_state();
     void internal_start();
     void internal_stop(std::unique_lock<std::mutex>& lock);
+    void internal_stop_and_reset(std::unique_lock<std::mutex>& lock);
     void internal_restart(std::unique_lock<std::mutex>& lock);
 
     bool m_idle_stopped{ false };
