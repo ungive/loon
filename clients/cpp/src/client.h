@@ -39,6 +39,12 @@ public:
         return m_started;
     }
 
+    inline void idle() override
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        trigger_idle(true);
+    }
+
     inline void on_failed(std::function<void()> callback) override
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -298,6 +304,12 @@ private:
     bool m_idle_stopped{ false };
     void idle_stop(std::unique_lock<std::mutex>& lock);
     void ensure_started();
+
+    inline void trigger_idle(bool state)
+    {
+        m_track_idling = state;
+        m_cv_manager.notify_one();
+    }
 
     inline std::chrono::milliseconds connect_timeout() const
     {

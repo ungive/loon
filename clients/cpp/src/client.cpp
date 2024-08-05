@@ -185,16 +185,14 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
     std::unique_lock<std::mutex> lock(m_mutex);
 
     // The connection is not idling anymore.
-    m_track_idling = false;
-    m_cv_manager.notify_one();
+    trigger_idle(false);
 
     // Idling if no content is registered when execution ends.
     std::shared_ptr<void> scope_guard(nullptr, std::bind([this] {
         // Make sure we notify both true and false values,
         // as it's possible that idling has been enabled in the meantime,
         // while we want it to be disabled.
-        m_track_idling = m_content.empty();
-        m_cv_manager.notify_one();
+        trigger_idle(m_content.empty());
     }));
 
     // Check if the path is already in use.
@@ -236,8 +234,9 @@ void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
 
     // Idling if no content is registered when execution ends.
     std::shared_ptr<void> scope_guard(nullptr, std::bind([this] {
-        m_track_idling = m_content.empty();
-        m_cv_manager.notify_one();
+        if (m_content.empty()) {
+            trigger_idle(true);
+        }
     }));
 
     // Verify that the content is valid and check if it is registered.
@@ -327,8 +326,7 @@ void ClientImpl::on_hello(Hello const& hello)
 
     // The connection is idling if no content was registered yet.
     if (m_content.empty()) {
-        m_track_idling = true;
-        m_cv_manager.notify_one();
+        trigger_idle(true);
     }
 }
 

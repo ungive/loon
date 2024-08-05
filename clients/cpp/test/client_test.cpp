@@ -676,3 +676,49 @@ TEST(Client, CanBeStartedAgainWhenStoppedByFailure)
     client->start_and_wait_until_connected();
     EXPECT_TRUE(client->connected());
 }
+
+TEST(Client, DisconnectsWhenContentIsRegisteredAndIdleIsCalled)
+{
+    ClientOptions options;
+    options.disconnect_after_idle = 1s;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    client->idle();
+    std::this_thread::sleep_for(options.disconnect_after_idle.value() + 100ms);
+    ASSERT_FALSE(client->connected());
+}
+
+TEST(Client, DisconnectsWhenIdleIsCalledAndContentRegisteredAfterUnregistering)
+{
+    ClientOptions options;
+    options.disconnect_after_idle = 1s;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    auto content1 = example_content("1.txt");
+    auto content2 = example_content("2.txt");
+    auto handle1 = client->register_content(content1.source, content1.info);
+    auto handle2 = client->register_content(content2.source, content2.info);
+    client->idle();
+    std::this_thread::sleep_for(25ms);
+    client->unregister_content(handle2);
+    std::this_thread::sleep_for(options.disconnect_after_idle.value() + 100ms);
+    ASSERT_FALSE(client->connected());
+}
+
+TEST(Client, StaysConnectedWhenIdleIsCalledAndThenRegisteringNewContent)
+{
+    ClientOptions options;
+    options.disconnect_after_idle = 1s;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    auto content1 = example_content("1.txt");
+    auto content2 = example_content("2.txt");
+    auto handle1 = client->register_content(content1.source, content1.info);
+    client->idle();
+    std::this_thread::sleep_for(25ms);
+    auto handle2 = client->register_content(content2.source, content2.info);
+    std::this_thread::sleep_for(options.disconnect_after_idle.value() + 100ms);
+    ASSERT_TRUE(client->connected());
+}
