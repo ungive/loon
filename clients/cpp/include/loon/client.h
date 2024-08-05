@@ -362,6 +362,19 @@ struct ClientOptions
         no_content_request_limit{ std::make_pair(
             -1, std::chrono::seconds{ 0 }) };
 
+    /**
+     * @brief Automatically disconnect after the given idle duration.
+     *
+     * Idling is defined as being connect without having content registered.
+     * If there is no registered content and no content is registered
+     * within the given duration, the client will disconnect from the server.
+     *
+     * Should content be registered while being disconnected,
+     * the client will reconnect to the server and then register the content,
+     * given that the client is in a started state of course.
+     */
+    std::optional<std::chrono::seconds> disconnect_after_idle{};
+
     // TODO: not yet implemented
     /**
      * @brief Maximum total upload speed for the client in bytes per second.

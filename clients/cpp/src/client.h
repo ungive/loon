@@ -251,12 +251,17 @@ private:
     std::thread m_manager_loop_thread{};
     std::condition_variable m_cv_manager{};
     ManagerAction::variant m_manager_action{};
+    std::optional<bool> m_track_idling{};
     bool m_stop_manager_loop{ false };
 
     void reset_connection_state();
     void internal_start();
     void internal_stop(std::unique_lock<std::mutex>& lock);
     void internal_restart(std::unique_lock<std::mutex>& lock);
+
+    bool m_idle_stopped{ false };
+    void idle_stop(std::unique_lock<std::mutex>& lock);
+    void ensure_started();
 
     inline std::chrono::milliseconds connect_timeout() const
     {

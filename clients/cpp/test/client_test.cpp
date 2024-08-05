@@ -574,3 +574,70 @@ TEST(Client, ServesReregisteredContentAfterRestart)
     EXPECT_EQ(200, response.status);
     EXPECT_EQ(content.data, response.body);
 }
+
+TEST(Client, DisconnectsAfterDurationWhenDisconnectAfterIdleIsSet)
+{
+    ClientOptions options;
+    options.disconnect_after_idle = 1s;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    std::this_thread::sleep_for(options.disconnect_after_idle.value() + 100ms);
+    ASSERT_FALSE(client->connected());
+}
+
+TEST(Client, DoesNotDisconnectWhenDisconnectAfterIdleIsSetAndContentRegistered)
+{
+    ClientOptions options;
+    options.disconnect_after_idle = 1s;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    std::this_thread::sleep_for(options.disconnect_after_idle.value() + 100ms);
+    ASSERT_TRUE(client->connected());
+}
+
+TEST(Client, RegisteringContentConnectsAgainWhenDisconnectAfterIdleIsSet)
+{
+    ClientOptions options;
+    options.disconnect_after_idle = 1s;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    std::this_thread::sleep_for(options.disconnect_after_idle.value() + 100ms);
+    ASSERT_FALSE(client->connected());
+    auto content = example_content();
+    std::shared_ptr<loon::ContentHandle> handle;
+    EXPECT_NO_THROW(
+        handle = client->register_content(content.source, content.info));
+    ASSERT_TRUE(client->connected());
+}
+
+TEST(Client, DisconnectsWhenDisconnectAfterIdleIsSetAndAllContentUnregistered)
+{
+    ClientOptions options;
+    options.disconnect_after_idle = 1s;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    std::this_thread::sleep_for(options.disconnect_after_idle.value() + 100ms);
+    ASSERT_TRUE(client->connected());
+    client->unregister_content(handle);
+    ASSERT_EQ(0, client->content().size());
+    std::this_thread::sleep_for(options.disconnect_after_idle.value() + 100ms);
+    ASSERT_FALSE(client->connected());
+}
+
+TEST(Client, DisconnectsWhenDisconnectAfterIdleIsSetAndContentRegistrationFails)
+{
+    ClientOptions options;
+    options.disconnect_after_idle = 1s;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    // Registration fails, as this content type is not allowed.
+    auto content = create_content("path", "image/png", "content");
+    EXPECT_THROW(client->register_content(content.source, content.info),
+        UnacceptableContentException);
+    std::this_thread::sleep_for(options.disconnect_after_idle.value() + 100ms);
+    ASSERT_FALSE(client->connected());
+}

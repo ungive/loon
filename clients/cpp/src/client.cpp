@@ -85,14 +85,22 @@ ClientImpl::~ClientImpl()
 void ClientImpl::start()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_started) {
+        return;
+    }
     m_was_explicitly_started = true;
+    m_started = true;
     internal_start();
 }
 
 void ClientImpl::stop()
 {
     std::unique_lock<std::mutex> lock(m_mutex);
+    if (!m_started) {
+        return;
+    }
     m_was_explicitly_stopped = true;
+    m_started = false;
     internal_stop(lock);
 }
 
@@ -176,6 +184,19 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
 {
     std::unique_lock<std::mutex> lock(m_mutex);
 
+    // The connection is not idling anymore.
+    m_track_idling = false;
+    m_cv_manager.notify_one();
+
+    // Idling if no content is registered when execution ends.
+    std::shared_ptr<void> scope_guard(nullptr, std::bind([this] {
+        // Make sure we notify both true and false values,
+        // as it's possible that idling has been enabled in the meantime,
+        // while we want it to be disabled.
+        m_track_idling = m_content.empty();
+        m_cv_manager.notify_one();
+    }));
+
     // Check if the path is already in use.
     auto const& path = info.path;
     auto it = m_content.find(path);
@@ -212,6 +233,12 @@ void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
     }
 
     std::unique_lock<std::mutex> lock(m_mutex);
+
+    // Idling if no content is registered when execution ends.
+    std::shared_ptr<void> scope_guard(nullptr, std::bind([this] {
+        m_track_idling = m_content.empty();
+        m_cv_manager.notify_one();
+    }));
 
     // Verify that the content is valid and check if it is registered.
     auto ptr = std::dynamic_pointer_cast<InternalContentHandle>(handle);
@@ -297,6 +324,12 @@ void ClientImpl::on_hello(Hello const& hello)
 
     m_cv_connection_ready.notify_all();
     log(Info) << "ready" << var("base_url", m_hello->base_url());
+
+    // The connection is idling if no content was registered yet.
+    if (m_content.empty()) {
+        m_track_idling = true;
+        m_cv_manager.notify_one();
+    }
 }
 
 bool ClientImpl::check_request_limit(decltype(m_content)::iterator it)
@@ -439,6 +472,12 @@ void ClientImpl::on_close(Close const& close)
 
 void ClientImpl::wait_until_ready(std::unique_lock<std::mutex>& lock)
 {
+    // Ensure that the connection is started.
+    ensure_started();
+
+    // Also wait until the connection is opened.
+    wait_until_connected(lock, connect_timeout());
+
     // Use the connect timeout here, as it makes the perfect timeout value.
     // Receiving the Hello message should not take longer than connecting.
     m_cv_connection_ready.wait_for(lock, connect_timeout(), [this] {
@@ -448,6 +487,7 @@ void ClientImpl::wait_until_ready(std::unique_lock<std::mutex>& lock)
         throw ClientNotConnectedException("the client is not connected");
     }
     if (!m_hello.has_value()) {
+        // FIXME: the client actually isn't in a failed state here...
         throw ClientFailedException(
             "did not receive initial server message in time");
     }
@@ -567,14 +607,7 @@ bool ClientImpl::update_connected(bool state)
     return old_state;
 }
 
-void ClientImpl::internal_start()
-{
-    if (m_started) {
-        return;
-    }
-    m_started = true;
-    m_conn->start();
-}
+void ClientImpl::internal_start() { m_conn->start(); }
 
 void ClientImpl::reset_connection_state()
 {
@@ -600,9 +633,6 @@ void ClientImpl::reset_connection_state()
 
 void ClientImpl::internal_stop(std::unique_lock<std::mutex>& lock)
 {
-    if (!m_started) {
-        return;
-    }
     // Note: the order of the following operations is critical.
     {
         // Unlock the lock while stopping the websocket connection,
@@ -618,8 +648,6 @@ void ClientImpl::internal_stop(std::unique_lock<std::mutex>& lock)
     reset_connection_state();
     // Notify any client methods that are waiting for state changes.
     update_connected(false);
-    // Reset started state.
-    m_started = false;
     // Reset any manager state by removing pending actions.
     // We do not want to carry those into a fresh connection.
     m_manager_action = ManagerAction::Nothing{};
@@ -630,6 +658,19 @@ void ClientImpl::internal_restart(std::unique_lock<std::mutex>& lock)
     internal_stop(lock);
     internal_start();
 }
+
+void loon::ClientImpl::idle_stop(std::unique_lock<std::mutex>& lock)
+{
+    m_idle_stopped = true;
+    internal_stop(lock);
+}
+
+void loon::ClientImpl::ensure_started()
+{
+    if (m_idle_stopped) {
+        m_idle_stopped = false;
+        internal_start();
+    }
 }
 
 void ClientImpl::restart()
@@ -664,14 +705,51 @@ void loon::ClientImpl::fail()
 void ClientImpl::manager_loop()
 {
     using Action = ManagerAction;
+    using namespace std::chrono;
+
     std::unique_lock<std::mutex> lock(m_mutex);
+    auto idle_time_point = system_clock::time_point::max();
+    bool idling = false;
     while (true) {
-        m_cv_manager.wait(lock, [this] {
-            return m_stop_manager_loop ||
+        m_cv_manager.wait_until(lock, idle_time_point, [&] {
+            return m_stop_manager_loop || m_track_idling.has_value() ||
+                idling && system_clock::now() >= idle_time_point ||
                 !std::holds_alternative<Action::Nothing>(m_manager_action);
         });
         if (m_stop_manager_loop) {
             return;
+        }
+        // It's important to check if idling should not be tracked anymore
+        // before checking if the idle timeout expired,
+        // in case idling is being cancelled.
+        if (m_track_idling.has_value()) {
+            bool do_track = m_track_idling.value();
+            m_track_idling = std::nullopt; // Make sure this is reset.
+            if (m_idle_stopped) {
+                // Already stopped by a previous idle.
+                continue;
+            }
+            if (do_track) {
+                if (idling) {
+                    // Already idling.
+                    continue;
+                }
+                if (m_options.disconnect_after_idle.has_value()) {
+                    auto duration = m_options.disconnect_after_idle.value();
+                    idle_time_point = system_clock::now() + duration;
+                    idling = true;
+                }
+            } else {
+                idle_time_point = system_clock::time_point::max();
+                idling = false;
+            }
+            continue;
+        }
+        if (idling && system_clock::now() >= idle_time_point) {
+            idle_stop(lock);
+            idle_time_point = system_clock::time_point::max();
+            idling = false;
+            continue;
         }
         if (auto* restart = std::get_if<Action::Restart>(&m_manager_action)) {
             internal_restart(lock);
@@ -680,8 +758,6 @@ void ClientImpl::manager_loop()
             if (m_failed_callback) {
                 m_failed_callback();
             }
-        } else {
-            assert(false);
         }
         m_manager_action = Action::Nothing{};
     }
