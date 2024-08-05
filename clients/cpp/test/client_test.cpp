@@ -60,6 +60,18 @@ public:
     }
 
     inline void restart_and_wait() { ClientImpl::restart_and_wait(); }
+
+    inline bool connected() { return ClientImpl::connected(); }
+
+    inline bool wait_until_connected()
+    {
+        return ClientImpl::wait_until_connected();
+    }
+
+    inline bool wait_until_connected(std::chrono::milliseconds timeout)
+    {
+        return ClientImpl::wait_until_connected(timeout);
+    }
 };
 
 static std::shared_ptr<TestClient> create_client(

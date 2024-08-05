@@ -93,40 +93,11 @@ public:
     virtual void stop() = 0;
 
     /**
-     * @brief Whether the client is connected and ready for content.
+     * @brief Whether the client is started and ready for content.
      *
      * @returns If the client is ready for registering content.
      */
-    virtual bool connected() = 0;
-
-    /**
-     * @brief Waits until the client is connected.
-     *
-     * Times out after the connect timeout that was configured
-     * within the WebsocketOptions of the client
-     * or the default timeout if not explicitly configured.
-     *
-     * Must be called while the client is started.
-     *
-     * @param timeout
-     * @throws ClientNotStartedException if the client is not started.
-     */
-    virtual bool wait_until_connected() = 0;
-
-    /**
-     * @brief Waits until the client is connected.
-     *
-     * Times out after the given timeout duration,
-     * if the client has not successfully connected within that period.
-     * The timeout duration must be greater or equal to zero.
-     *
-     * Can be used to check whether the client is connected
-     * at a specific moment, by using a timeout duration of zero.
-     *
-     * @param timeout The timeout period.
-     * @throws ClientNotStartedException if the client is not started.
-     */
-    virtual bool wait_until_connected(std::chrono::milliseconds timeout) = 0;
+    virtual bool started() = 0;
 
     /**
      * @brief Sets a callback for when the client has unrecoverably failed.
@@ -406,17 +377,7 @@ public:
 
     inline void stop() override { return m_impl->stop(); }
 
-    inline bool connected() override { return m_impl->connected(); }
-
-    inline bool wait_until_connected() override
-    {
-        return m_impl->wait_until_connected();
-    }
-
-    inline bool wait_until_connected(std::chrono::milliseconds timeout) override
-    {
-        return m_impl->wait_until_connected(timeout);
-    }
+    inline bool started() override { return m_impl->started(); }
 
     inline void on_failed(std::function<void()> callback) override
     {

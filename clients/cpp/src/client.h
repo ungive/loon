@@ -33,21 +33,10 @@ public:
 
     void stop() override;
 
-    inline bool connected() override
+    inline bool started() override
     {
         const std::lock_guard<std::mutex> lock(m_mutex);
-        return m_connected;
-    }
-
-    inline bool wait_until_connected()
-    {
-        return wait_until_connected(connect_timeout());
-    }
-
-    inline bool wait_until_connected(std::chrono::milliseconds timeout) override
-    {
-        std::unique_lock<std::mutex> lock(m_mutex);
-        return wait_until_connected(lock, timeout);
+        return m_started;
     }
 
     inline void on_failed(std::function<void()> callback) override
@@ -170,6 +159,52 @@ protected:
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         internal_restart(lock);
+    }
+
+    /**
+     * @brief Whether the client is connected and ready for content.
+     *
+     * @returns If the client is ready for registering content.
+     */
+    inline bool connected()
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        return m_connected;
+    }
+
+    /**
+     * @brief Waits until the client is connected.
+     *
+     * Times out after the connect timeout that was configured
+     * within the WebsocketOptions of the client
+     * or the default timeout if not explicitly configured.
+     *
+     * Must be called while the client is started.
+     *
+     * @throws ClientNotStartedException if the client is not started.
+     */
+    inline bool wait_until_connected()
+    {
+        return wait_until_connected(connect_timeout());
+    }
+
+    /**
+     * @brief Waits until the client is connected.
+     *
+     * Times out after the given timeout duration,
+     * if the client has not successfully connected within that period.
+     * The timeout duration must be greater or equal to zero.
+     *
+     * Can be used to check whether the client is connected
+     * at a specific moment, by using a timeout duration of zero.
+     *
+     * @param timeout The timeout period.
+     * @throws ClientNotStartedException if the client is not started.
+     */
+    inline bool wait_until_connected(std::chrono::milliseconds timeout)
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        return wait_until_connected(lock, timeout);
     }
 
 private:
