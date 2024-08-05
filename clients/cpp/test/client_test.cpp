@@ -301,7 +301,7 @@ TEST(Client, UnregisteredCallbackIsCalledWhenUnregistering)
     auto content = example_content();
     auto handle = client->register_content(content.source, content.info);
     ExpectCalled callback;
-    handle->unregistered(callback.get());
+    handle->on_unregistered(callback.get());
     client->unregister_content(handle);
 }
 
@@ -332,7 +332,7 @@ TEST(Client, UnregisteredCallbackIsCalledWhenSetAfterUnregistering)
     auto handle = client->register_content(content.source, content.info);
     client->unregister_content(handle);
     ExpectCalled callback;
-    handle->unregistered(callback.get());
+    handle->on_unregistered(callback.get());
 }
 
 TEST(Client, UnregisteredCallbackIsCalledWhenServerClosesConnection)
@@ -341,7 +341,7 @@ TEST(Client, UnregisteredCallbackIsCalledWhenServerClosesConnection)
     auto content = example_content();
     auto handle = client->register_content(content.source, content.info);
     ExpectCalled callback;
-    handle->unregistered(callback.get());
+    handle->on_unregistered(callback.get());
     // Trigger connection close with an invalid message.
     loon::ClientMessage message;
     auto empty_response = message.mutable_empty_response();
@@ -370,7 +370,7 @@ TEST(Client, UnregisteredCallbackIsCalledWhenClientClosesConnection)
     auto content = example_content();
     auto handle = client->register_content(content.source, content.info);
     ExpectCalled callback;
-    handle->unregistered(callback.get());
+    handle->on_unregistered(callback.get());
     client->stop();
     EXPECT_EQ(1, callback.count());
 }
@@ -381,7 +381,7 @@ TEST(Client, ServedCallbackIsCalledWhenContentHandleUrlIsRequested)
     auto content = example_content();
     auto handle = client->register_content(content.source, content.info);
     ExpectCalled callback;
-    handle->served(callback.get());
+    handle->on_served(callback.get());
     http_get(handle->url());
 }
 
@@ -447,7 +447,7 @@ TEST(Client, FailsWhenMinCacheDurationIsSetButResponseIsNotCached)
     // The served callback should only be called once,
     // since it is expected to be cached on the server.
     ExpectCalled served(1);
-    handle->served(served.get());
+    handle->on_served(served.get());
     auto result1 = http_get(handle->url());
     EXPECT_EQ(200, result1.status);
     auto result2 = http_get(handle->url());
@@ -548,7 +548,7 @@ TEST(Client, ClientRestartsWhenSendErrorOccurs)
     auto content = example_content();
     auto handle = client->register_content(content.source, content.info);
     ExpectCalled served(0);
-    handle->served(served.get());
+    handle->on_served(served.get());
     client->inject_send_error(true);
     auto response = http_get(handle->url());
     EXPECT_NE(200, response.status);
@@ -569,7 +569,7 @@ TEST(Client, ServesReregisteredContentAfterRestart)
     EXPECT_EQ(0, client->content().size()); // should be restarted
     handle = client->register_content(content.source, content.info);
     ExpectCalled served(1);
-    handle->served(served.get());
+    handle->on_served(served.get());
     auto response = http_get(handle->url());
     EXPECT_EQ(200, response.status);
     EXPECT_EQ(content.data, response.body);

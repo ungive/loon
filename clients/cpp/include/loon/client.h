@@ -44,7 +44,7 @@ public:
      *
      * @param callback The callback function to set.
      */
-    virtual void served(std::function<void()> callback) = 0;
+    virtual void on_served(std::function<void()> callback) = 0;
 
     /**
      * @brief Sets a callback for when the content is unregistered.
@@ -64,7 +64,7 @@ public:
      *
      * @param callback The callback function to set.
      */
-    virtual void unregistered(std::function<void()> callback) = 0;
+    virtual void on_unregistered(std::function<void()> callback) = 0;
 };
 
 /**

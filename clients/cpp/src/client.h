@@ -330,13 +330,13 @@ public:
         return m_request_handler;
     }
 
-    void served(std::function<void()> callback) override
+    void on_served(std::function<void()> callback) override
     {
         const std::lock_guard<std::mutex> lock(m_mutex);
         m_served_callback = callback;
     }
 
-    void unregistered(std::function<void()> callback) override
+    void on_unregistered(std::function<void()> callback) override
     {
         const std::lock_guard<std::mutex> lock(m_mutex);
         if (!m_registered) {
