@@ -224,9 +224,6 @@ void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
         return;
     }
 
-    // Wait until the connection is ready.
-    wait_until_ready(lock);
-
     // Notify that the content is being unregistered (rather early than late).
     it->second->unregistered();
 
