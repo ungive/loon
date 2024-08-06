@@ -75,15 +75,15 @@ A deployment example can be found in [**deployments**](./deployments).
 - A simple reference client library written in Go: **[pkg/client](./pkg/client)**
 - A CLI program to run the server and client: **[cmd/loon](./cmd/loon)**
   - It makes use of the above server and client library
-- A more feature-complete client library written in C++:
-  **[clients/cpp](./clients/cpp)**
+- A feature-complete, reference client library written in C++:
+  **[client](./client)**
   - Well-tested and has more features than the reference client implementation
   - Dependencies: libhv or Qt for websocket communication + OpenSSL + Protobuf
   - Compatible with C++17 or newer
   - Uses the CMake build system
   - Small footprint: 2.624 lines for commit `ac252a`
     (excluding websocket abstraction)
-  - Documentation: *https://ungive.github.io/loon/clients/cpp*
+  - Documentation: *https://ungive.github.io/loon/client*
 - A ready to use server Docker image:
   **[build/package/Dockerfile](./build/package/Dockerfile)**
 - A server deployment example with Docker Compose and Caddy:

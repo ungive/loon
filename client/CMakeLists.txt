@@ -55,7 +55,7 @@ set(Protobuf_USE_STATIC_LIBS ON CACHE BOOL "Override option" FORCE)
 find_package(Protobuf CONFIG REQUIRED)
 target_include_directories(loon PRIVATE ${Protobuf_INCLUDE_DIRS})
 target_include_directories(loon PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-configure_file(../../api/messages.proto
+configure_file(../api/messages.proto
                ${CMAKE_CURRENT_BINARY_DIR}/loon/messages.proto COPYONLY)
 add_library(loon_proto STATIC ${CMAKE_CURRENT_BINARY_DIR}/loon/messages.proto)
 target_include_directories(loon_proto PRIVATE ${Protobuf_INCLUDE_DIRS})
