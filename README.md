@@ -1,3 +1,6 @@
+> Note: The project is still a WIP,
+> a license and proper versioning will be added soon.
+
 # local files online &ndash; loon
 
 ![loon logo](./assets/loon-small.png)
