@@ -2,14 +2,30 @@
 
 ## High
 
-## Normal
-
+- [ ] Throw ClientFailedException instead of ClientNotStartedException
+    if the client is in a failed state,
+    i.e. track the failed state properly.
+- [ ] Add option for registered content to expire after a certain timeout.
+    That way content can be registered and forgotten about,
+    while still ensuring that it won't stay registered forever.
 - [ ] Implement a content source which runs a function or lambda
     and serves the return value.
     This needs a timeout, which should probably be passed by the server
     in the constraints message, so that the client knows how long
     it may run the function before it should return.
     This value should probably be the "timeout_duration" from the server config.
+    Optionally, the return value should be cacheable,
+    i.e. it's either a "delayed computation"
+    or it's computed whenever a request is made (presuming it's not cached).
+- [ ] Currently the server synchronizes *all requests*
+    through the client manager.
+    There should be at least *some* concurrency (with goroutines)
+    to handle simultaneous requests concurrently.
+- [ ] Add versioning to the server and client libraries.
+    Perhaps make releases on GitHub.
+
+## Normal
+
 - [ ] Implement upload speed limitation across all handled requests.
 - [ ] Switch to std::string_view with websocket message in C++ client?
 - [ ] Call served/unregistered/failed callbacks on a separate thread?
@@ -22,10 +38,6 @@
     This way the cache should store it no longer than the max cache duration:
     - https://github.com/caddyserver/cache-handler/issues/94
     - https://www.rfc-editor.org/rfc/rfc9111.html#section-4.2.1-2.3
-- [ ] Currently the server synchronizes *all requests*
-    through the client manager.
-    There should be at least *some* concurrency (with goroutines)
-    to handle simultaneous requests concurrently.
 - [ ] Add a feature to "prepopulate" the cache:
     The client makes a request to the URL, but maybe a special URL,
     which causes the server to request and cache the response,
@@ -55,8 +67,6 @@
     Just a way to free resources whenever needed.
     Maybe also add a server constraint "maximum cached paths per client",
     if it's ever exceeded the connection is closed.
-- [ ] Add versioning to the server and client libraries.
-    Perhaps make releases on GitHub.
 
 ## Low
 
