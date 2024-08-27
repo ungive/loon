@@ -739,6 +739,12 @@ void ClientImpl::manager_loop()
         if (m_track_idling.has_value()) {
             bool do_track = m_track_idling.value();
             m_track_idling = std::nullopt; // Make sure this is reset.
+            if (!do_track) {
+                // Make sure everything is reset, if idle tracking is stopped.
+                idle_time_point = system_clock::time_point::max();
+                m_idle_waiting = false;
+                continue;
+            }
             if (!m_started) {
                 // The client is not even started.
                 continue;
@@ -757,9 +763,6 @@ void ClientImpl::manager_loop()
                     idle_time_point = system_clock::now() + duration;
                     m_idle_waiting = true;
                 }
-            } else {
-                idle_time_point = system_clock::time_point::max();
-                m_idle_waiting = false;
             }
             continue;
         }
