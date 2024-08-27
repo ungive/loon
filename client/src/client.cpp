@@ -724,11 +724,10 @@ void ClientImpl::manager_loop()
 
     std::unique_lock<std::mutex> lock(m_mutex);
     auto idle_time_point = system_clock::time_point::max();
-    bool idling = false;
     while (true) {
         m_cv_manager.wait_until(lock, idle_time_point, [&] {
             return m_stop_manager_loop || m_track_idling.has_value() ||
-                idling && system_clock::now() >= idle_time_point ||
+                m_idle_waiting && system_clock::now() >= idle_time_point ||
                 !std::holds_alternative<Action::Nothing>(m_manager_action);
         });
         if (m_stop_manager_loop) {
@@ -749,25 +748,25 @@ void ClientImpl::manager_loop()
                 continue;
             }
             if (do_track) {
-                if (idling) {
+                if (m_idle_waiting) {
                     // Already idling.
                     continue;
                 }
                 if (m_options.disconnect_after_idle.has_value()) {
                     auto duration = m_options.disconnect_after_idle.value();
                     idle_time_point = system_clock::now() + duration;
-                    idling = true;
+                    m_idle_waiting = true;
                 }
             } else {
                 idle_time_point = system_clock::time_point::max();
-                idling = false;
+                m_idle_waiting = false;
             }
             continue;
         }
-        if (idling && system_clock::now() >= idle_time_point) {
+        if (m_idle_waiting && system_clock::now() >= idle_time_point) {
             idle_stop(lock);
             idle_time_point = system_clock::time_point::max();
-            idling = false;
+            m_idle_waiting = false;
             continue;
         }
         if (auto* restart = std::get_if<Action::Restart>(&m_manager_action)) {

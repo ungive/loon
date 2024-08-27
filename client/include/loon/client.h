@@ -100,6 +100,13 @@ public:
     virtual bool started() = 0;
 
     /**
+     * @brief Whether the client is idling at the moment.
+     *
+     * @returns If the client is idling.
+     */
+    virtual bool idling() = 0;
+
+    /**
      * @brief Puts the client into an idling state.
      *
      * If called, the client will disconnect after the idle timeout,
@@ -442,6 +449,8 @@ public:
     inline void stop() override { return m_impl->stop(); }
 
     inline bool started() override { return m_impl->started(); }
+
+    inline bool idling() override { return m_impl->idling(); }
 
     inline void idle() override { return m_impl->idle(); }
 

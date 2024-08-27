@@ -694,8 +694,10 @@ TEST(Client, DisconnectsWhenContentIsRegisteredAndIdleIsCalled)
     auto content = example_content();
     auto handle = client->register_content(content.source, content.info);
     client->idle();
+    EXPECT_TRUE(client->idling());
     EXPECT_CONNECTION_STATE_SWAP_AFTER(
         false, options.disconnect_after_idle.value(), 25ms);
+    EXPECT_TRUE(client->idling());
 }
 
 TEST(Client, DisconnectsWhenIdleIsCalledAndContentRegisteredAfterUnregistering)
@@ -709,9 +711,11 @@ TEST(Client, DisconnectsWhenIdleIsCalledAndContentRegisteredAfterUnregistering)
     auto handle1 = client->register_content(content1.source, content1.info);
     auto handle2 = client->register_content(content2.source, content2.info);
     client->idle();
+    EXPECT_TRUE(client->idling());
     client->unregister_content(handle2);
     EXPECT_CONNECTION_STATE_SWAP_AFTER(
         false, options.disconnect_after_idle.value(), 25ms);
+    EXPECT_TRUE(client->idling());
 }
 
 TEST(Client, StaysConnectedWhenIdleIsCalledAndThenRegisteringNewContent)
@@ -724,10 +728,13 @@ TEST(Client, StaysConnectedWhenIdleIsCalledAndThenRegisteringNewContent)
     auto content2 = example_content("2.txt");
     auto handle1 = client->register_content(content1.source, content1.info);
     client->idle();
+    EXPECT_TRUE(client->idling());
     std::this_thread::sleep_for(25ms);
+    EXPECT_TRUE(client->idling());
     auto handle2 = client->register_content(content2.source, content2.info);
     EXPECT_CONNECTION_STATE_AFTER(
         true, options.disconnect_after_idle.value(), 25ms);
+    EXPECT_FALSE(client->idling());
 }
 
 TEST(Client, ReconnectsWhenIdleDisconnectedAndWaitUntilConnectedIsCalled)
