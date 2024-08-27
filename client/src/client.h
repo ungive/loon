@@ -39,13 +39,6 @@ public:
         return m_started;
     }
 
-    inline bool idling() override
-    {
-        const std::lock_guard<std::mutex> lock(m_mutex);
-        return m_idle_waiting || m_idle_stopped ||
-            m_track_idling.value_or(false);
-    }
-
     inline void idle() override
     {
         const std::lock_guard<std::mutex> lock(m_mutex);
@@ -202,6 +195,13 @@ protected:
     {
         const std::lock_guard<std::mutex> lock(m_mutex);
         return m_connected;
+    }
+
+    inline bool idling()
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        return m_idle_waiting || m_idle_stopped ||
+            m_track_idling.value_or(false);
     }
 
 private:

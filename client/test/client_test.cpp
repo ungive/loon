@@ -69,6 +69,8 @@ public:
     {
         return ClientImpl::wait_until_ready(timeout);
     }
+
+    inline bool idling() { return ClientImpl::idling(); }
 };
 
 static std::shared_ptr<TestClient> create_client(
