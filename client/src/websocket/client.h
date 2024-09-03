@@ -174,9 +174,9 @@ public:
     void on_message(
         std::function<void(std::string const& message)> callback) override;
 
-    virtual int64_t send_binary(const char* data, size_t length) = 0;
+    virtual int64_t send_binary(const char* data, size_t length) override = 0;
 
-    virtual int64_t send_text(const char* data, size_t length) = 0;
+    virtual int64_t send_text(const char* data, size_t length) override = 0;
 
     void start() override;
 

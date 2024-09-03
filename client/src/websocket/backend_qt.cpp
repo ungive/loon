@@ -338,7 +338,7 @@ void loon::websocket::log_handler(log_handler_t handler)
     _handler = handler;
 }
 
-static inline void log_message(loon::LogLevel level, std::string const& message)
+inline void log_message(loon::LogLevel level, std::string const& message)
 {
     const std::lock_guard<std::mutex> lock(_mutex);
     if (_handler) {

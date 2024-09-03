@@ -7,6 +7,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <thread>
 
 #include "loon/client.h"
 #include "loon/messages.pb.h"
