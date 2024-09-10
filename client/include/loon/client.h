@@ -31,7 +31,7 @@ public:
      * @brief Sets a callback for when the content was successfully served.
      *
      * The callback function is called in the event that
-     * the registered content has been request and successfully served.
+     * the registered content has been requested and successfully served.
      *
      * The callback will not be called for past served requests,
      * if it is set after the URL for this content has been requested.
@@ -401,12 +401,12 @@ struct ClientOptions
      *
      * Idling is defined as being connected without having content registered
      * or having entered idle state explicitly with the IClient::idle() method.
-     * If content is registered within the given duration,
+     * If no content is registered within the given duration,
      * the client will disconnect from the server.
      *
      * Should content be registered while being disconnected due to idling,
-     * then the client will reconnect to and then register the content,
-     * if the client is in started state.
+     * then the client will reconnect to the server
+     * and then register the content, if the client is in started state.
      */
     std::optional<std::chrono::milliseconds> disconnect_after_idle{};
 
