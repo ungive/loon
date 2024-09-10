@@ -118,7 +118,7 @@ Public Member Functions</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Sets a callback for when the content was successfully served. </p>
-<p>The callback function is called in the event that the registered content has been request and successfully served.</p>
+<p>The callback function is called in the event that the registered content has been requested and successfully served.</p>
 <p>The callback will not be called for past served requests, if it is set after the URL for this content has been requested. The callback should therefore be set first, before calling <a class="el" href="classloon_1_1_content_handle.html#a194f7a2bcbb41b4e77a77709224fe301" title="The URL under which the content is accessible.">url()</a> and request or sharing the returned URL.</p>
 <p>Do not call any client methods within the callback, as client locks are held when it is called, which would cause a deadlock.</p>
 <dl class="params"><dt>Parameters</dt><dd>

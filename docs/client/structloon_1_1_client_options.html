@@ -112,8 +112,8 @@ Public Attributes</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Automatically disconnect after the given idle duration. </p>
-<p>Idling is defined as being connected without having content registered or having entered idle state explicitly with the <a class="el" href="classloon_1_1_i_client.html#a89a40d5d4b165f47b63f3943e4129ce1" title="Puts the client into an idling state.">IClient::idle()</a> method. If content is registered within the given duration, the client will disconnect from the server.</p>
-<p>Should content be registered while being disconnected due to idling, then the client will reconnect to and then register the content, if the client is in started state. </p>
+<p>Idling is defined as being connected without having content registered or having entered idle state explicitly with the <a class="el" href="classloon_1_1_i_client.html#a89a40d5d4b165f47b63f3943e4129ce1" title="Puts the client into an idling state.">IClient::idle()</a> method. If no content is registered within the given duration, the client will disconnect from the server.</p>
+<p>Should content be registered while being disconnected due to idling, then the client will reconnect to the server and then register the content, if the client is in started state. </p>
 
 </div>
 </div>
