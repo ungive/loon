@@ -104,13 +104,17 @@ std::chrono::milliseconds ClientImpl::next_reconnect_delay()
 {
     using namespace std::chrono_literals;
 
-    auto count = m_reconnect_count;
     m_reconnect_count += 1;
 
-    if (count == 0) {
-        return 0ms; // Attempt to reconnect immediately.
+    if (m_reconnect_count == 1) {
+        // Attempt to reconnect immediately first.
+        m_reconnect_delay = 0ms;
+        return 0ms;
     }
-    if (count > 1 && options().max_reconnect_delay.has_value()) {
+    if (m_reconnect_count == 2) {
+        m_reconnect_delay = options().reconnect_delay.value_or(1000ms);
+    }
+    if (m_reconnect_count > 2 && options().max_reconnect_delay.has_value()) {
         // Exponentially increase reconnect delay.
         auto next = std::min(
             options().max_reconnect_delay.value(), 2 * m_reconnect_delay);
@@ -125,7 +129,7 @@ std::chrono::milliseconds ClientImpl::next_reconnect_delay()
 inline void ClientImpl::reset_reconnect_delay()
 {
     using namespace std::chrono_literals;
-    m_reconnect_delay = options().reconnect_delay.value_or(0ms);
+    m_reconnect_delay = 0ms;
     m_reconnect_count = 0;
 }
 
