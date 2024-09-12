@@ -171,13 +171,19 @@ void ClientImpl::internal_stop()
     // via the public stop() method, which are both synchronized with lock().
 
     QMetaObject::invokeMethod(&m_reconnect_timer, "stop", connection_type());
-    QMetaObject::invokeMethod(&m_conn, "close", connection_type());
+    QMetaObject::invokeMethod(&m_conn, "close", Qt::AutoConnection);
 }
 
 void ClientImpl::internal_open()
 {
     // Abort any existing connection first, before opening a new one.
-    QMetaObject::invokeMethod(&m_conn, "abort", connection_type());
+    // NOTE abort(), close() and open() should ideally not be called
+    // with a blocking connection, as these are state-changing methods
+    // which might invoke connected/disconnected callbacks
+    // (abort definitely does and will cause a deadlock in some cases).
+    // Instead we are directly executing them on this thread
+    // or queueing them in the background (decided by auto-connection).
+    QMetaObject::invokeMethod(&m_conn, "abort", Qt::AutoConnection);
     // URL
     QUrl url(QString::fromStdString(address()));
     if (!url.isValid() || (url.scheme() != "ws" && url.scheme() != "wss")) {
@@ -227,7 +233,7 @@ void ClientImpl::internal_open()
     } else {
         request.setTransferTimeout(default_connect_timeout.count());
     }
-    QMetaObject::invokeMethod(&m_conn, "open", connection_type(), request);
+    QMetaObject::invokeMethod(&m_conn, "open", Qt::AutoConnection, request);
 }
 
 int64_t ClientImpl::send_binary(const char* data, size_t length)
