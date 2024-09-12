@@ -39,10 +39,10 @@ public:
         return m_started;
     }
 
-    inline void idle() override
+    inline void idle(bool state = true) override
     {
         const std::lock_guard<std::mutex> lock(m_mutex);
-        set_idle(true);
+        set_idle(state);
     }
 
     inline void wait_until_ready() override

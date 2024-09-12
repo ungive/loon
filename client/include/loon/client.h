@@ -100,14 +100,15 @@ public:
     virtual bool started() = 0;
 
     /**
-     * @brief Puts the client into an idling state.
+     * @brief Enables or disables the client's idling state.
      *
-     * If called, the client will disconnect after the idle timeout,
+     * If called with true, the client will disconnect after the idle timeout,
      * even when content is currently registered.
      * If no idle timeout is set, this method has no effect.
      * @see ClientOptions::disconnect_after_idle
      *
-     * If new content is registered, the idle state will be reset to false,
+     * Whenever new content is registered,
+     * the idle state will be reset to false,
      * since it is expected that newly registered content remains available.
      *
      * This method is useful if the client should disconnect soon
@@ -115,7 +116,7 @@ public:
      * (which would be the only other option to put the client into idle).
      * Content remains registered and is only unregistered upon idle timeout.
      */
-    virtual void idle() = 0;
+    virtual void idle(bool state = true) = 0;
 
     /**
      * @brief Wait until the client is ready.
@@ -457,7 +458,7 @@ public:
 
     inline bool started() override { return m_impl->started(); }
 
-    inline void idle() override { return m_impl->idle(); }
+    inline void idle(bool state = true) override { return m_impl->idle(); }
 
     inline void wait_until_ready() override
     {
