@@ -190,14 +190,14 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
     std::unique_lock<std::mutex> lock(m_mutex);
 
     // The connection is not idling anymore.
-    trigger_idle(false);
+    set_idle(false);
 
     // Idling if no content is registered when execution ends.
     std::shared_ptr<void> scope_guard(nullptr, std::bind([this] {
         // Make sure we notify both true and false values,
         // as it's possible that idling has been enabled in the meantime,
         // while we want it to be disabled.
-        trigger_idle(m_content.empty());
+        set_idle(m_content.empty());
     }));
 
     // Check if the path is already in use.
@@ -240,7 +240,7 @@ void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
     // Idling if no content is registered when execution ends.
     std::shared_ptr<void> scope_guard(nullptr, std::bind([this] {
         if (m_content.empty()) {
-            trigger_idle(true);
+            set_idle(true);
         }
     }));
 
@@ -331,7 +331,7 @@ void ClientImpl::on_hello(Hello const& hello)
 
     // The connection is idling if no content was registered yet.
     if (m_content.empty()) {
-        trigger_idle(true);
+        set_idle(true);
     }
 }
 
@@ -511,6 +511,7 @@ void ClientImpl::on_websocket_close()
     const std::lock_guard<std::mutex> lock(m_mutex);
     update_connected(false);
     reset_connection_state();
+    reset_idle();
     if (m_was_explicitly_started) {
         m_was_explicitly_started = false;
         auto retrying = m_options.websocket.reconnect_delay.has_value();
@@ -635,7 +636,6 @@ void ClientImpl::reset_connection_state()
     }
     m_hello = std::nullopt;
     m_no_content_request_history.clear();
-    m_idle_waiting = false;
 }
 
 void ClientImpl::internal_stop(std::unique_lock<std::mutex>& lock)
@@ -653,6 +653,8 @@ void ClientImpl::internal_stop(std::unique_lock<std::mutex>& lock)
     }
     // Unregister all content and stop all request handlers.
     reset_connection_state();
+    // Not idling anymore.
+    reset_idle();
     // Notify any client methods that are waiting for state changes.
     update_connected(false);
     // Reset any manager state by removing pending actions.
