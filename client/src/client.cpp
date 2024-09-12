@@ -635,6 +635,7 @@ void ClientImpl::reset_connection_state()
     }
     m_hello = std::nullopt;
     m_no_content_request_history.clear();
+    m_idle_waiting = false;
 }
 
 void ClientImpl::internal_stop(std::unique_lock<std::mutex>& lock)
