@@ -458,7 +458,7 @@ public:
 
     inline bool started() override { return m_impl->started(); }
 
-    inline void idle(bool state = true) override { return m_impl->idle(); }
+    inline void idle(bool state = true) override { return m_impl->idle(state); }
 
     inline void wait_until_ready() override
     {
