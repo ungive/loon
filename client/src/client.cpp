@@ -756,10 +756,14 @@ void ClientImpl::manager_loop()
                 m_idle_waiting = false;
                 continue;
             }
-            if (!m_started || !m_connected) {
-                // The client is not started or connected.
+            if (!m_started) {
+                // The client is not started.
                 continue;
             }
+            // If the client is not connected, we still start the idle timeout
+            // because while it might not be connect, it might attempt to
+            // reconnect in the background, which needs to be cancelled after
+            // the idle timeout by calling the websocket client's stop method.
             if (do_track) {
                 if (m_idle_waiting) {
                     // Already idling.
