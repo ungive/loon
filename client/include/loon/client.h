@@ -152,6 +152,9 @@ public:
     /**
      * @brief Sets a callback for when the client is connected and ready.
      *
+     * The registered callback is guaranteed to be executed
+     * before any call to wait_until_ready() returns.
+     *
      * It is recommended to call this method before start(),
      * to reliably detect client ready state.
      * Do not call any client methods within the callback,
