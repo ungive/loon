@@ -708,7 +708,7 @@ TEST(Client, DisconnectsWhenContentIsRegisteredAndIdleIsCalled)
     EXPECT_TRUE(client->idling());
     EXPECT_CONNECTION_STATE_SWAP_AFTER(
         false, options.disconnect_after_idle.value(), 25ms);
-    EXPECT_TRUE(client->idling());
+    EXPECT_FALSE(client->idling());
 }
 
 TEST(Client, DisconnectsWhenIdleIsCalledAndContentRegisteredAfterUnregistering)
@@ -726,7 +726,7 @@ TEST(Client, DisconnectsWhenIdleIsCalledAndContentRegisteredAfterUnregistering)
     client->unregister_content(handle2);
     EXPECT_CONNECTION_STATE_SWAP_AFTER(
         false, options.disconnect_after_idle.value(), 25ms);
-    EXPECT_TRUE(client->idling());
+    EXPECT_FALSE(client->idling());
 }
 
 TEST(Client, StaysConnectedWhenIdleIsCalledAndThenRegisteringNewContent)

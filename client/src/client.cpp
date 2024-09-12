@@ -85,8 +85,8 @@ ClientImpl::~ClientImpl()
 void ClientImpl::start()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
-    ensure_started();
     if (m_started) {
+        ensure_started();
         return;
     }
     m_was_explicitly_started = true;
@@ -613,13 +613,18 @@ bool ClientImpl::update_connected(bool state)
 {
     auto old_state = m_connected;
     m_connected = state;
+    m_connecting = false;
     // Notify any thread that might be waiting for connection state changes.
     // Just to be sure, always notify, even if the state might not have changed.
     m_cv_connection_ready.notify_all();
     return old_state;
 }
 
-void ClientImpl::internal_start() { m_conn->start(); }
+void ClientImpl::internal_start()
+{
+    m_connecting = true;
+    m_conn->start();
+}
 
 void ClientImpl::reset_connection_state()
 {
@@ -684,14 +689,12 @@ void loon::ClientImpl::idle_stop(std::unique_lock<std::mutex>& lock)
 {
     log(Info) << "disconnecting after idle"
               << var("duration", m_options.disconnect_after_idle);
-    m_idle_stopped = true;
     internal_stop(lock);
 }
 
 void loon::ClientImpl::ensure_started()
 {
-    if (m_idle_stopped) {
-        m_idle_stopped = false;
+    if (!m_connected && !m_connecting) {
         internal_start();
     }
 }
@@ -753,12 +756,8 @@ void ClientImpl::manager_loop()
                 m_idle_waiting = false;
                 continue;
             }
-            if (!m_started) {
-                // The client is not even started.
-                continue;
-            }
-            if (m_idle_stopped) {
-                // Already stopped by a previous idle.
+            if (!m_started || !m_connected) {
+                // The client is not started or connected.
                 continue;
             }
             if (do_track) {

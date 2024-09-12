@@ -206,8 +206,7 @@ protected:
     inline bool idling()
     {
         const std::lock_guard<std::mutex> lock(m_mutex);
-        return m_idle_waiting || m_idle_stopped ||
-            m_track_idling.value_or(false);
+        return m_idle_waiting || m_track_idling.value_or(false);
     }
 
 private:
@@ -300,7 +299,6 @@ private:
     void internal_restart(std::unique_lock<std::mutex>& lock);
 
     bool m_idle_waiting{ false };
-    bool m_idle_stopped{ false };
     void idle_stop(std::unique_lock<std::mutex>& lock);
     void ensure_started();
 
@@ -326,6 +324,7 @@ private:
 
     bool m_started{ false };
     bool m_connected{ false };
+    bool m_connecting{ false };
     bool m_was_explicitly_started{ false };
     bool m_was_explicitly_stopped{ false };
     // Mutex for data fields.
