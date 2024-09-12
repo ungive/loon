@@ -66,7 +66,7 @@ void BaseClient::on_message(
 void BaseClient::start()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_active.exchange(true)) {
+    if (m_active.exchange(true) && m_connected) {
         return;
     }
     internal_start();

@@ -191,6 +191,7 @@ protected:
      */
     inline void on_websocket_open()
     {
+        m_connected.store(true);
         // Note: No mutex used for performance reasons
         // and since it is prohibited in the client code
         // that the callback can be overwritten while the client is started.
@@ -204,6 +205,7 @@ protected:
      */
     inline void on_websocket_close()
     {
+        m_connected.store(false);
         // Note: No mutex, for the same reason as in on_websocket_open.
         if (m_close_callback) {
             m_close_callback();
@@ -260,6 +262,7 @@ private:
 
     std::mutex m_mutex{};
     std::atomic<bool> m_active{ false };
+    std::atomic<bool> m_connected{ false };
     std::function<void()> m_open_callback{};
     std::function<void()> m_close_callback{};
     std::function<void(std::string const& message)> m_message_callback{};
