@@ -326,13 +326,18 @@ void ClientImpl::on_hello(Hello const& hello)
         }
     }
 
-    m_cv_connection_ready.notify_all();
-    log(Info) << "ready" << var("base_url", m_hello->base_url());
-
     // The connection is idling if no content was registered yet.
     if (m_content.empty()) {
         set_idle(true);
     }
+
+    log(Info) << "ready" << var("base_url", m_hello->base_url());
+
+    // Call the callback before notifying that the connection is ready.
+    if (m_ready_callback) {
+        m_ready_callback();
+    }
+    m_cv_connection_ready.notify_all();
 }
 
 bool ClientImpl::check_request_limit(decltype(m_content)::iterator it)

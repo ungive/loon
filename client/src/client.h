@@ -57,6 +57,12 @@ public:
         wait_until_ready(lock, timeout);
     }
 
+    inline void on_ready(std::function<void()> callback) override
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_ready_callback = callback;
+    }
+
     inline void on_failed(std::function<void()> callback) override
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -315,6 +321,7 @@ private:
     const ClientOptions m_options{};
     std::deque<std::chrono::steady_clock::time_point>
         m_no_content_request_history{};
+    std::function<void()> m_ready_callback{};
     std::function<void()> m_failed_callback{};
 
     bool m_started{ false };

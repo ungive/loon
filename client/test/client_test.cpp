@@ -437,6 +437,15 @@ TEST(Client, FailsWhenMinCacheDurationIsSetAndServerDoesNotCacheResponses)
     EXPECT_THROW(client->wait_for_hello(), ClientNotConnectedException);
 }
 
+TEST(Client, ReadyWhenClientIsStarted)
+{
+    auto client = create_client(false);
+    ExpectCalled callback;
+    client->on_ready(callback.get());
+    client->start();
+    EXPECT_NO_THROW(client->wait_until_ready());
+}
+
 TEST(Client, FailsWhenMinCacheDurationIsSetButResponseIsNotCached)
 {
     uint32_t cache_duration = 10;
