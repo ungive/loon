@@ -516,7 +516,6 @@ void ClientImpl::on_websocket_close()
     const std::lock_guard<std::mutex> lock(m_mutex);
     update_connected(false);
     reset_connection_state();
-    reset_idle();
     if (m_was_explicitly_started) {
         m_was_explicitly_started = false;
         auto retrying = m_options.websocket.reconnect_delay.has_value();
