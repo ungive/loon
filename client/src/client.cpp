@@ -338,7 +338,7 @@ void ClientImpl::on_hello(Hello const& hello)
 bool ClientImpl::check_request_limit(decltype(m_content)::iterator it)
 {
     auto has_content = it != m_content.end();
-    auto now = std::chrono::system_clock::now();
+    auto now = std::chrono::steady_clock::now();
     if (has_content && m_options.min_cache_duration.has_value()) {
         auto& last_request = it->second->last_request;
         if (last_request.has_value() &&
@@ -723,11 +723,11 @@ void ClientImpl::manager_loop()
     using namespace std::chrono;
 
     std::unique_lock<std::mutex> lock(m_mutex);
-    auto idle_time_point = system_clock::time_point::max();
+    auto idle_time_point = steady_clock::time_point::max();
     while (true) {
         m_cv_manager.wait_until(lock, idle_time_point, [&] {
             return m_stop_manager_loop || m_track_idling.has_value() ||
-                m_idle_waiting && system_clock::now() >= idle_time_point ||
+                m_idle_waiting && steady_clock::now() >= idle_time_point ||
                 !std::holds_alternative<Action::Nothing>(m_manager_action);
         });
         if (m_stop_manager_loop) {
@@ -741,7 +741,7 @@ void ClientImpl::manager_loop()
             m_track_idling = std::nullopt; // Make sure this is reset.
             if (!do_track) {
                 // Make sure everything is reset, if idle tracking is stopped.
-                idle_time_point = system_clock::time_point::max();
+                idle_time_point = steady_clock::time_point::max();
                 m_idle_waiting = false;
                 continue;
             }
@@ -760,15 +760,15 @@ void ClientImpl::manager_loop()
                 }
                 if (m_options.disconnect_after_idle.has_value()) {
                     auto duration = m_options.disconnect_after_idle.value();
-                    idle_time_point = system_clock::now() + duration;
+                    idle_time_point = steady_clock::now() + duration;
                     m_idle_waiting = true;
                 }
             }
             continue;
         }
-        if (m_idle_waiting && system_clock::now() >= idle_time_point) {
+        if (m_idle_waiting && steady_clock::now() >= idle_time_point) {
             idle_stop(lock);
-            idle_time_point = system_clock::time_point::max();
+            idle_time_point = steady_clock::time_point::max();
             m_idle_waiting = false;
             continue;
         }

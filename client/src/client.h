@@ -311,7 +311,7 @@ private:
     }
 
     const ClientOptions m_options{};
-    std::deque<std::chrono::system_clock::time_point>
+    std::deque<std::chrono::steady_clock::time_point>
         m_no_content_request_history{};
     std::function<void()> m_failed_callback{};
 
@@ -414,7 +414,7 @@ public:
      *
      * Has no value if not request was received before.
      */
-    std::optional<std::chrono::system_clock::time_point> last_request{};
+    std::optional<std::chrono::steady_clock::time_point> last_request{};
 
 private:
     std::string m_url{};
