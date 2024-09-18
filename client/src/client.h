@@ -63,6 +63,12 @@ public:
         m_ready_callback = callback;
     }
 
+    inline void on_disconnect(std::function<void()> callback) override
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_disconnect_callback = callback;
+    }
+
     inline void on_failed(std::function<void()> callback) override
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -320,6 +326,7 @@ private:
     std::deque<std::chrono::steady_clock::time_point>
         m_no_content_request_history{};
     std::function<void()> m_ready_callback{};
+    std::function<void()> m_disconnect_callback{};
     std::function<void()> m_failed_callback{};
 
     bool m_started{ false };

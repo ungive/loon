@@ -165,6 +165,19 @@ public:
     virtual void on_ready(std::function<void()> callback) = 0;
 
     /**
+     * @brief Sets a callback for when the client disconnected.
+     *
+     * This callback is guaranteed to be called, even when the client fails.
+     *
+     * It is recommended to call this method before start(),
+     * to reliably detect client ready state.
+     * Do not call any client methods within the callback,
+     * as client locks are held when it is called,
+     * which would cause a deadlock.
+     */
+    virtual void on_disconnect(std::function<void()> callback) = 0;
+
+    /**
      * @brief Sets a callback for when the client has unrecoverably failed.
      *
      * This callback is only called when an abnormal event occurs,
@@ -473,6 +486,11 @@ public:
     inline void on_ready(std::function<void()> callback) override
     {
         return m_impl->on_ready(callback);
+    }
+
+    inline void on_disconnect(std::function<void()> callback) override
+    {
+        return m_impl->on_disconnect(callback);
     }
 
     inline void on_failed(std::function<void()> callback) override

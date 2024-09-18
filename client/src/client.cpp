@@ -532,6 +532,9 @@ void ClientImpl::on_websocket_close()
         m_was_explicitly_stopped = false;
         log(Info) << "client stopped";
     }
+    if (m_disconnect_callback) {
+        m_disconnect_callback();
+    }
 }
 
 void ClientImpl::on_websocket_message(std::string const& message)

@@ -1,9 +1,11 @@
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <ctime>
 #include <iostream>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <thread>
 #include <utility>
@@ -444,6 +446,28 @@ TEST(Client, ReadyWhenClientIsStarted)
     client->on_ready(callback.get());
     client->start();
     EXPECT_NO_THROW(client->wait_until_ready());
+}
+
+TEST(Client, OnDisconnectWhenClientIsStopped)
+{
+    auto client = create_client(false);
+    ExpectCalled callback;
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::unique_lock lock(mutex);
+    bool done;
+    client->on_disconnect([&] {
+        std::lock_guard lock(mutex);
+        callback();
+        cv.notify_one();
+    });
+    client->start();
+    EXPECT_NO_THROW(client->wait_until_ready());
+    client->stop();
+    cv.wait_for(lock, 2s, [&] {
+        return done;
+    });
+    EXPECT_TRUE(done);
 }
 
 TEST(Client, FailsWhenMinCacheDurationIsSetButResponseIsNotCached)
