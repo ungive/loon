@@ -2,6 +2,8 @@
 
 #include <cassert>
 
+#include "util.h"
+
 using namespace loon;
 
 // Macros for locking with low and high priority threads.
@@ -246,7 +248,10 @@ void RequestHandler::spawn_serve_thread()
     if (m_stop) {
         throw std::runtime_error("request handle is stopped");
     }
-    m_serve_thread = std::thread(&RequestHandler::serve, this);
+    m_serve_thread = std::thread([this] {
+        util::log_exception_and_rethrow(
+            "RequestHandler::serve", std::bind(&RequestHandler::serve, this));
+    });
     m_running = true;
 }
 

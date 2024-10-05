@@ -63,7 +63,10 @@ ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
     // Logging
     loon::init_logging();
     // Start the manager loop thread
-    m_manager_loop_thread = std::thread(&ClientImpl::manager_loop, this);
+    m_manager_loop_thread = std::thread([this] {
+        util::log_exception_and_rethrow("ClientImpl::manager_loop",
+            std::bind(&ClientImpl::manager_loop, this));
+    });
 }
 
 ClientImpl::~ClientImpl()

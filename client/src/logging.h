@@ -167,7 +167,7 @@ private:
 
 // Wrapper for creating a concise log macro.
 #define loon_log_macro(log_level, log_max_level, log_handler, logger_factory) \
-    if (LogLevel::log_level < log_max_level)                                  \
+    if (loon::LogLevel::log_level < log_max_level)                            \
         ;                                                                     \
     else                                                                      \
-        logger_factory(LogLevel::log_level, log_handler)
+        logger_factory(loon::LogLevel::log_level, log_handler)
