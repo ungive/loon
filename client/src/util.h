@@ -41,6 +41,7 @@ void log_exception_and_rethrow(std::string label, F&& f)
         loon_log_macro(
             Fatal, loon::log_level(), loon::log_message, loon::Logger)
             << label << ": unknown exception";
+        throw std::runtime_error("unknown error");
     }
 }
 } // namespace util
