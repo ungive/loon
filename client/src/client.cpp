@@ -193,6 +193,7 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
     std::unique_lock<std::mutex> lock(m_mutex);
 
     // The connection is not idling anymore.
+    log(Debug) << "ClientImpl::register_content: set_idle(false)";
     set_idle(false);
 
     // Idling if no content is registered when execution ends.
@@ -200,6 +201,8 @@ std::shared_ptr<ContentHandle> ClientImpl::register_content(
         // Make sure we notify both true and false values,
         // as it's possible that idling has been enabled in the meantime,
         // while we want it to be disabled.
+        log(Debug) << "ClientImpl::register_content: scope_guard: set_idle("
+                   << (m_content.empty() ? "<true>" : "<false>") << ")";
         set_idle(m_content.empty());
     }));
 
@@ -243,6 +246,8 @@ void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
     // Idling if no content is registered when execution ends.
     std::shared_ptr<void> scope_guard(nullptr, std::bind([this] {
         if (m_content.empty()) {
+            log(Debug) << "ClientImpl::unregister_content: scope_guard: "
+                          "set_idle(true)";
             set_idle(true);
         }
     }));
@@ -331,6 +336,7 @@ void ClientImpl::on_hello(Hello const& hello)
 
     // The connection is idling if no content was registered yet.
     if (m_content.empty()) {
+        log(Debug) << "ClientImpl::on_hello: set_idle(true)";
         set_idle(true);
     }
 
@@ -669,6 +675,7 @@ void ClientImpl::internal_stop(std::unique_lock<std::mutex>& lock)
     // Unregister all content and stop all request handlers.
     reset_connection_state();
     // Not idling anymore.
+    log(Debug) << "ClientImpl::internal_stop: reset_idle()";
     reset_idle();
     // Notify any client methods that are waiting for state changes.
     update_connected(false);
@@ -759,6 +766,8 @@ void ClientImpl::manager_loop()
                 // Make sure everything is reset, if idle tracking is stopped.
                 idle_time_point = steady_clock::time_point::max();
                 m_idle_waiting = false;
+                log(Debug)
+                    << "ClientImpl::manager_loop: m_idle_waiting = false";
                 continue;
             }
             if (!m_started) {
@@ -778,11 +787,15 @@ void ClientImpl::manager_loop()
                     auto duration = m_options.disconnect_after_idle.value();
                     idle_time_point = steady_clock::now() + duration;
                     m_idle_waiting = true;
+                    log(Debug) << "ClientImpl::manager_loop: m_idle_waiting = "
+                                  "true; duration = "
+                               << duration.count() << "ms";
                 }
             }
             continue;
         }
         if (m_idle_waiting && steady_clock::now() >= idle_time_point) {
+            log(Debug) << "ClientImpl::manager_loop: idle_stop()";
             idle_stop(lock);
             idle_time_point = steady_clock::time_point::max();
             m_idle_waiting = false;
