@@ -26,7 +26,7 @@ QByteArray base64_encode(QByteArray const& text);
  * Handles both standard exception types and unknown exception types.
  */
 template <typename F>
-void log_exception_and_rethrow(std::string label, F&& f)
+void log_exception_and_rethrow(const char* label, F&& f)
 {
     try {
         f();
