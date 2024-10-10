@@ -256,6 +256,8 @@ protected:
 
     inline bool active(bool new_value) { return m_active.exchange(new_value); }
 
+    inline bool connected() const { return m_connected.load(); }
+
 private:
     const std::string m_address{};
     const WebsocketOptions m_options{};

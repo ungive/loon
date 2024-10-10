@@ -239,16 +239,28 @@ void ClientImpl::internal_open()
 int64_t ClientImpl::send_binary(const char* data, size_t length)
 {
     qint64 n = 0;
-    QMetaObject::invokeMethod(&m_conn, "sendBinaryMessage", connection_type(),
-        QByteArray(data, length), &n);
+    // While this check is not thread-safe (the client could disconnect after),
+    // calling sendBinaryMessage can freeze if the connection isn't established
+    // (for whatever bizarre reason).
+    // This behaviour can be confirmed by commenting out this line:
+    // QMetaObject::invokeMethod(&m_conn, "close", Qt::AutoConnection);
+    // That will freeze some of the tests.
+    // Commenting "sendBinaryMessage" will then unfreeze them again.
+    if (connected()) {
+        QMetaObject::invokeMethod(&m_conn, "sendBinaryMessage",
+            connection_type(), QByteArray(data, length), &n);
+    }
     return n;
 }
 
 int64_t ClientImpl::send_text(const char* data, size_t length)
 {
     qint64 n = 0;
-    QMetaObject::invokeMethod(&m_conn, "sendTextMessage", connection_type(),
-        QByteArray(data, length), &n);
+    // Making this check for the same reason as in send_binary().
+    if (connected()) {
+        QMetaObject::invokeMethod(&m_conn, "sendTextMessage", connection_type(),
+            QByteArray(data, length), &n);
+    }
     return n;
 }
 
