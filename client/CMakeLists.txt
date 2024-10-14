@@ -58,6 +58,7 @@ target_include_directories(loon PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 configure_file(../api/messages.proto
                ${CMAKE_CURRENT_BINARY_DIR}/loon/messages.proto COPYONLY)
 add_library(loon_proto STATIC ${CMAKE_CURRENT_BINARY_DIR}/loon/messages.proto)
+target_link_libraries(loon_proto PRIVATE protobuf::libprotobuf)
 target_include_directories(loon_proto PRIVATE ${Protobuf_INCLUDE_DIRS} ${protobuf_INCLUDE_DIRS})
 target_include_directories(loon_proto PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 protobuf_generate(
