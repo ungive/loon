@@ -119,54 +119,58 @@ if(LOON_BUILD_TESTS)
         target_link_libraries(loon_test Qt6::Core Qt6::Network Qt6::WebSockets)
         target_compile_definitions(loon_test PRIVATE USE_QT)
 
+        if (WIN32)
+            add_custom_command(
+                TARGET loon_test
+                POST_BUILD
+                COMMAND
+                    ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_RUNTIME_DLLS:loon_test> $<TARGET_FILE_DIR:loon_test>
+                COMMAND_EXPAND_LISTS)
+        endif()
+    endif()
+
+    if (WIN32)
         add_custom_command(
             TARGET loon_test
             POST_BUILD
-            COMMAND
-                ${CMAKE_COMMAND} -E copy_if_different
-                $<TARGET_RUNTIME_DLLS:loon_test> $<TARGET_FILE_DIR:loon_test>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_RUNTIME_DLLS:loon_test> $<TARGET_FILE_DIR:loon_test>
             COMMAND_EXPAND_LISTS)
-    endif()
 
-    add_custom_command(
-        TARGET loon_test
-        POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                $<TARGET_RUNTIME_DLLS:loon_test> $<TARGET_FILE_DIR:loon_test>
-        COMMAND_EXPAND_LISTS)
-
-    # Copy DLLs that aren't included with TARGET_RUNTIME_DLLS for some reason.
-    set(MISSING_DLLS "")
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        list(APPEND MISSING_DLLS zlibd1.dll)
-        list(APPEND MISSING_DLLS debug/bin/libcrypto-3-x64.dll)
-        list(APPEND MISSING_DLLS debug/bin/libssl-3-x64.dll)
-        list(APPEND MISSING_DLLS debug/bin/legacy.dll)
-    else()
-        list(APPEND MISSING_DLLS zlib1.dll)
-        list(APPEND MISSING_DLLS libcrypto-3-x64.dll)
-        list(APPEND MISSING_DLLS libssl-3-x64.dll)
-        list(APPEND MISSING_DLLS legacy.dll)
-    endif()
-    foreach(MISSING_DLL ${MISSING_DLLS})
-        foreach(PREFIX_PATH ${CMAKE_PREFIX_PATH})
-            file(GLOB_RECURSE MISSING_DLL_PATHS ${PREFIX_PATH}/${MISSING_DLL})
-            file(GLOB_RECURSE MISSING_DLL_PATHS_NESTED
-                 ${PREFIX_PATH}/**/${MISSING_DLL})
-            list(APPEND MISSING_DLL_PATHS MISSING_DLL_PATHS_NESTED)
-            list(GET MISSING_DLL_PATHS 0 MISSING_DLL_PATH)
-            if(NOT ${MISSING_DLL_PATH} STREQUAL "")
-                message(${MISSING_DLL_PATH})
-                add_custom_command(
-                    TARGET loon_test
-                    POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                            ${MISSING_DLL_PATH} $<TARGET_FILE_DIR:loon_test>
-                    COMMAND_EXPAND_LISTS)
-                break()
-            endif()
+        # Copy DLLs that aren't included with TARGET_RUNTIME_DLLS for some reason.
+        set(MISSING_DLLS "")
+        if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+            list(APPEND MISSING_DLLS zlibd1.dll)
+            list(APPEND MISSING_DLLS debug/bin/libcrypto-3-x64.dll)
+            list(APPEND MISSING_DLLS debug/bin/libssl-3-x64.dll)
+            list(APPEND MISSING_DLLS debug/bin/legacy.dll)
+        else()
+            list(APPEND MISSING_DLLS zlib1.dll)
+            list(APPEND MISSING_DLLS libcrypto-3-x64.dll)
+            list(APPEND MISSING_DLLS libssl-3-x64.dll)
+            list(APPEND MISSING_DLLS legacy.dll)
+        endif()
+        foreach(MISSING_DLL ${MISSING_DLLS})
+            foreach(PREFIX_PATH ${CMAKE_PREFIX_PATH})
+                file(GLOB_RECURSE MISSING_DLL_PATHS ${PREFIX_PATH}/${MISSING_DLL})
+                file(GLOB_RECURSE MISSING_DLL_PATHS_NESTED
+                    ${PREFIX_PATH}/**/${MISSING_DLL})
+                list(APPEND MISSING_DLL_PATHS MISSING_DLL_PATHS_NESTED)
+                list(GET MISSING_DLL_PATHS 0 MISSING_DLL_PATH)
+                if(NOT ${MISSING_DLL_PATH} STREQUAL "")
+                    message(${MISSING_DLL_PATH})
+                    add_custom_command(
+                        TARGET loon_test
+                        POST_BUILD
+                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                                ${MISSING_DLL_PATH} $<TARGET_FILE_DIR:loon_test>
+                        COMMAND_EXPAND_LISTS)
+                    break()
+                endif()
+            endforeach()
         endforeach()
-    endforeach()
+    endif()
 
     add_test(loon_test loon_test)
     gtest_discover_tests(loon_test)
