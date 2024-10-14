@@ -454,16 +454,17 @@ TEST(Client, OnDisconnectWhenClientIsStopped)
     ExpectCalled callback;
     std::mutex mutex;
     std::condition_variable cv;
-    std::unique_lock lock(mutex);
     bool done;
     client->on_disconnect([&] {
         std::lock_guard lock(mutex);
         callback();
         cv.notify_one();
+        done = true;
     });
     client->start();
     EXPECT_NO_THROW(client->wait_until_ready());
     client->stop();
+    std::unique_lock lock(mutex);
     cv.wait_for(lock, 2s, [&] {
         return done;
     });
