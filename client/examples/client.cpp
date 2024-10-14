@@ -66,10 +66,7 @@ int run(loon::Client* client)
     // options.min_cache_duration = (cache_duration * 4) / 5;
     // options.max_requests_per_second = 1.0f;
 
-    if (!client->wait_until_connected(20s)) {
-        std::cerr << "Failed to connect, exiting\n";
-        return -1;
-    }
+    client->wait_until_ready(20s);
 
     std::ostringstream oss;
     oss << "<h1>It works!</h1><br>";
@@ -88,7 +85,7 @@ int run(loon::Client* client)
     content_info.max_cache_duration = cache_duration;
     auto handle = client->register_content(content_source, content_info);
 
-    handle->unregistered([] {
+    handle->on_unregistered([] {
         std::cout << "unregistered\n";
     });
 
