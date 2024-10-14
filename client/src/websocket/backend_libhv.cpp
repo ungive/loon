@@ -45,7 +45,7 @@ private:
 
 static constexpr int loon_to_libhv_level(loon::LogLevel level);
 static constexpr loon::LogLevel libhv_to_loon_level(int level);
-void libhv_log_handler(int level, const char* buf, int len);
+static void libhv_log_handler(int level, const char* buf, int len);
 
 static std::mutex _mutex{};
 static std::atomic<int> _level{ loon_to_libhv_level(default_log_level) };
