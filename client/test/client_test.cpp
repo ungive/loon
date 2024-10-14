@@ -697,6 +697,32 @@ TEST(Client, DisconnectsWhenDisconnectAfterIdleIsSetAndContentRegistrationFails)
         false, options.disconnect_after_idle.value(), 25ms);
 }
 
+/*
+
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::unique_lock lock(mutex);
+    bool done;
+    client->on_disconnect([&] {
+        std::lock_guard lock(mutex);
+        callback();
+        cv.notify_one();
+        done = true;
+    });
+    {
+        lock.unlock();
+        client->start();
+        EXPECT_NO_THROW(client->wait_until_ready());
+        client->stop();
+        lock.lock();
+    }
+    cv.wait_for(lock, 10s, [&] {
+        return done;
+    });
+    EXPECT_TRUE(done);
+
+ */
+
 TEST(Client, CanBeStartedAgainWhenStoppedByFailure)
 {
     ClientOptions options;
@@ -707,12 +733,24 @@ TEST(Client, CanBeStartedAgainWhenStoppedByFailure)
         hello.mutable_constraints()->set_cache_duration(0);
     });
     ExpectCalled callback;
-    client->on_failed(callback.get());
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool done;
+    client->on_failed([&] {
+        std::lock_guard lock(mutex);
+        callback();
+        cv.notify_one();
+        done = true;
+    });
     client->start();
     EXPECT_THROW(client->wait_for_hello(), ClientNotConnectedException);
     client->inject_hello_modifier([](Hello& hello) {
         // Increase the cache duration, so it won't fail again.
         hello.mutable_constraints()->set_cache_duration(30);
+    });
+    std::unique_lock lock(mutex);
+    cv.wait_for(lock, 2s, [&] {
+        return done;
     });
     auto content = example_content();
     EXPECT_ANY_THROW(client->register_content(content.source, content.info));
