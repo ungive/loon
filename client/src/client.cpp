@@ -48,6 +48,12 @@ ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
                                      "must be greater than zero");
         }
     }
+    if (m_options.disconnect_after_idle.has_value() &&
+        m_options.disconnect_after_idle.value() <=
+            std::chrono::milliseconds::zero()) {
+        throw std::runtime_error(
+            "the disconnect_after_idle timeout must be greater than zero");
+    }
     if (m_options.max_upload_speed.has_value() &&
         m_options.max_upload_speed.value() == 0) {
         throw std::runtime_error("max_upload_speed may not be zero");
