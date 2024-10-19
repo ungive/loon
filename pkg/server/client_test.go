@@ -142,21 +142,26 @@ func Test_Request_Response_chan_yields_Response_when_client_sends_ContentHeader(
 	conn.writeContentHeader(&pb.ContentHeader{
 		RequestId:   request.ID(),
 		ContentType: testContentType,
-		ContentSize: 0,
+		ContentSize: uint64(1),
 	})
 	close := conn.waitCloseErr()
 	response := waitForChanValue(t, request.Response(), close)
 	assert.Equal(t, request.ID(), response.Header().RequestId)
 	assert.Equal(t, testContentType, response.Header().ContentType)
-	assert.Equal(t, uint64(0), response.Header().ContentSize)
+	assert.Equal(t, uint64(1), response.Header().ContentSize)
 	assert.Equal(t, request, response.Request())
+	conn.writeContentChunk(&pb.ContentChunk{
+		RequestId: request.ID(),
+		Sequence:  0,
+		Data:      []byte("_"),
+	})
 	waitForChanClose(t, request.Completed(), close)
 	assertNoChanValue(t, request.Closed())
 	client.expectActiveRequests(1)
 }
 
-func Test_Response_Chunks_chan_yields_empty_chunk_when_client_sends_empty_ContentHeader(t *testing.T) {
-	_, conn, client, _, done := getServerConnClientHello(t)
+func Test_server_sends_Closed_when_client_sends_empty_ContentHeader(t *testing.T) {
+	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
 	request, err := client.request(testPath)
 	assert.NoError(t, err)
@@ -166,13 +171,9 @@ func Test_Response_Chunks_chan_yields_empty_chunk_when_client_sends_empty_Conten
 		ContentType: testContentType,
 		ContentSize: 0,
 	})
-	close := conn.waitCloseErr()
-	response := waitForChanValue(t, request.Response(), close)
-	chunk := waitForChanValue(t, response.Chunks(), close)
-	assert.Equal(t, 0, len(chunk))
-	waitForChanClose(t, request.Completed(), close)
-	assertNoChanValue(t, request.Closed())
-	client.expectActiveRequests(1)
+	time.Sleep(server.intervals.ClientTimeout)
+	conn.expectClose(pb.Close_REASON_INVALID_CONTENT_SIZE)
+	client.waitForExit()
 }
 
 func Test_Response_Chunks_chan_yields_single_chunk_when_client_sends_ContentChunk(t *testing.T) {
@@ -244,16 +245,7 @@ func Test_Response_Chunks_chan_is_closed_when_all_chunks_have_been_received(t *t
 	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
-	conn.writeContentHeader(&pb.ContentHeader{
-		RequestId:   request.ID(),
-		ContentType: testContentType,
-		ContentSize: uint64(1),
-	})
-	conn.writeContentChunk(&pb.ContentChunk{
-		RequestId: request.ID(),
-		Sequence:  0,
-		Data:      []byte("_"),
-	})
+	conn.sendCompletedResponse(request.ID())
 	close := conn.waitCloseErr()
 	response := waitForChanValue(t, request.Response(), close)
 	waitForChanValue(t, response.Chunks(), close)
@@ -406,25 +398,19 @@ func Test_server_sends_Success_when_calling_Request_Success_after_receiving_all_
 	client.expectActiveRequests(0)
 }
 
-func Test_server_sends_Success_when_calling_Request_Success_after_receiving_empty_ContentHeader(t *testing.T) {
+func Test_server_sends_no_Success_when_calling_Request_Success_after_receiving_EmptyResponse(t *testing.T) {
 	_, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
 	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
-	conn.writeContentHeader(&pb.ContentHeader{
-		RequestId:   request.ID(),
-		ContentType: testContentType,
-		ContentSize: uint64(0),
+	conn.writeEmptyResponse(&pb.EmptyResponse{
+		RequestId: request.ID(),
 	})
-	response := waitForChanValue(t, request.Response(), nil)
-	chunk := waitForChanValue(t, response.Chunks(), nil)
-	assert.Equal(t, 0, len(chunk))
+	response := waitForNullableChanValue(t, request.Response(), nil)
+	assert.Nil(t, response)
 	err = request.Success()
-	assert.NoError(t, err)
-	m := conn.readSuccess()
-	assert.Equal(t, request.ID(), m.RequestId)
-	client.expectActiveRequests(0)
+	assert.Error(t, err)
 }
 
 func Test_Request_Success_returns_error_after_receiving_EmptyResponse(t *testing.T) {
@@ -513,16 +499,14 @@ func Test_server_has_one_active_request_when_client_timed_out_after_non_empty_Co
 	client.expectActiveRequests(1)
 }
 
-func Test_server_has_zero_active_requests_when_client_timed_out_after_sending_empty_ContentHeader(t *testing.T) {
+func Test_server_has_zero_active_requests_when_client_timed_out_after_sending_EmptyResponse(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
 	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
-	conn.writeContentHeader(&pb.ContentHeader{
-		RequestId:   request.ID(),
-		ContentType: testContentType,
-		ContentSize: uint64(0),
+	conn.writeEmptyResponse(&pb.EmptyResponse{
+		RequestId: request.ID(),
 	})
 	time.Sleep(2 * server.intervals.ClientTimeout)
 	client.expectActiveRequests(0)
@@ -534,16 +518,7 @@ func Test_server_has_zero_active_requests_when_client_timed_out_after_sending_la
 	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
-	conn.writeContentHeader(&pb.ContentHeader{
-		RequestId:   request.ID(),
-		ContentType: testContentType,
-		ContentSize: uint64(1),
-	})
-	conn.writeContentChunk(&pb.ContentChunk{
-		RequestId: request.ID(),
-		Sequence:  0,
-		Data:      []byte("_"),
-	})
+	conn.sendCompletedResponse(request.ID())
 	time.Sleep(2 * server.intervals.ClientTimeout)
 	client.expectActiveRequests(0)
 }
@@ -638,11 +613,7 @@ func Test_server_sends_Close_when_client_sends_CloseResponse_after_response_is_c
 	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
-	conn.writeContentHeader(&pb.ContentHeader{
-		RequestId:   request.ID(),
-		ContentType: testContentType,
-		ContentSize: uint64(0),
-	})
+	conn.sendCompletedResponse(request.ID())
 	waitForChanClose(t, request.Completed(), nil)
 	time.Sleep(2 * server.intervals.ClientTimeout)
 	conn.writeCloseResponse(&pb.CloseResponse{
@@ -678,23 +649,6 @@ func Test_server_sends_Close_when_client_sends_CloseResponse_after_EmptyResponse
 	// The request is immediately concluded after an EmptyResponse,
 	// so the connection should be closed with an invalid request ID error.
 	conn.expectClose(pb.Close_REASON_INVALID_REQUEST_ID)
-}
-
-func Test_server_sends_Close_when_client_sends_CloseResponse_after_empty_ContentHeader(t *testing.T) {
-	_, conn, client, _, done := getServerConnClientHello(t)
-	defer done()
-	request, err := client.request(testPath)
-	assert.NoError(t, err)
-	conn.readRequest()
-	conn.writeContentHeader(&pb.ContentHeader{
-		RequestId:   request.ID(),
-		ContentType: testContentType,
-		ContentSize: uint64(0),
-	})
-	conn.writeCloseResponse(&pb.CloseResponse{
-		RequestId: request.ID(),
-	})
-	conn.expectClose(pb.Close_REASON_INVALID_CLIENT_MESSAGE)
 }
 
 func Test_server_sends_Close_when_client_sends_CloseResponse_after_last_ContentChunk(t *testing.T) {
@@ -795,7 +749,7 @@ func Test_server_sends_Close_when_client_sends_ContentHeader_with_unknown_reques
 	conn.writeContentHeader(&pb.ContentHeader{
 		RequestId:   100,
 		ContentType: testContentType,
-		ContentSize: 0,
+		ContentSize: 1,
 	})
 	conn.expectClose(pb.Close_REASON_INVALID_REQUEST_ID)
 }
@@ -843,12 +797,12 @@ func Test_server_sends_Close_when_client_sends_ContentHeader_twice_for_request_I
 	conn.writeContentHeader(&pb.ContentHeader{
 		RequestId:   request.ID(),
 		ContentType: testContentType,
-		ContentSize: uint64(0),
+		ContentSize: uint64(1),
 	})
 	conn.writeContentHeader(&pb.ContentHeader{
 		RequestId:   request.ID(),
 		ContentType: testContentType,
-		ContentSize: uint64(0),
+		ContentSize: uint64(1),
 	})
 	conn.expectClose(pb.Close_REASON_INVALID_CLIENT_MESSAGE)
 }
@@ -862,7 +816,7 @@ func Test_server_sends_Close_when_client_sends_EmptyResponse_after_ContentHeader
 	conn.writeContentHeader(&pb.ContentHeader{
 		RequestId:   request.ID(),
 		ContentType: testContentType,
-		ContentSize: uint64(0),
+		ContentSize: uint64(1),
 	})
 	conn.writeEmptyResponse(&pb.EmptyResponse{
 		RequestId: request.ID(),
@@ -922,7 +876,7 @@ func Test_server_sends_Close_when_client_response_filename_is_empty(t *testing.T
 	conn.writeContentHeader(&pb.ContentHeader{
 		RequestId:   request.ID(),
 		ContentType: testContentType,
-		ContentSize: 0,
+		ContentSize: 1,
 		Filename:    strPtr(""),
 	})
 	conn.expectClose(pb.Close_REASON_INVALID_FILENAME)
@@ -937,7 +891,7 @@ func Test_server_sends_Close_when_client_response_content_type_is_not_in_constra
 	conn.writeContentHeader(&pb.ContentHeader{
 		RequestId:   request.ID(),
 		ContentType: "invalid/type",
-		ContentSize: 0,
+		ContentSize: 1,
 	})
 	conn.expectClose(pb.Close_REASON_FORBIDDEN_CONTENT_TYPE)
 }
@@ -1125,16 +1079,7 @@ func Test_server_does_not_send_RequestClosed_when_client_response_is_completed_a
 	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
-	conn.writeContentHeader(&pb.ContentHeader{
-		RequestId:   request.ID(),
-		ContentType: testContentType,
-		ContentSize: 1,
-	})
-	conn.writeContentChunk(&pb.ContentChunk{
-		RequestId: request.ID(),
-		Sequence:  0,
-		Data:      []byte("_"),
-	})
+	conn.sendCompletedResponse(request.ID())
 	// Wait long enough that a Close message may have been sent.
 	// The deferred done() above will check that there are no more messages.
 	time.Sleep(2 * server.intervals.ClientTimeout)
@@ -1184,11 +1129,7 @@ func Test_Request_Success_returns_error_when_called_twice(t *testing.T) {
 	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
-	conn.writeContentHeader(&pb.ContentHeader{
-		RequestId:   request.ID(),
-		ContentType: testContentType,
-		ContentSize: 0,
-	})
+	conn.sendCompletedResponse(request.ID())
 	waitForChanValue(t, request.Response(), nil)
 	err = request.Success()
 	assert.NoError(t, err)
@@ -1229,18 +1170,14 @@ func Test_Request_Close_returns_error_after_request_is_completed(t *testing.T) {
 	request, err := client.request(testPath)
 	assert.NoError(t, err)
 	conn.readRequest()
-	conn.writeContentHeader(&pb.ContentHeader{
-		RequestId:   request.ID(),
-		ContentType: testContentType,
-		ContentSize: 0,
-	})
+	conn.sendCompletedResponse(request.ID())
 	waitForChanValue(t, request.Response(), nil)
 	waitForChanClose(t, request.Completed(), nil)
 	err = request.Close("")
 	assert.ErrorIs(t, err, ErrRequestCompleted)
 }
 
-func Test_server_does_not_send_Close_when_client_sends_empty_ContentHeader_after_request_is_closed(t *testing.T) {
+func Test_server_does_not_send_Close_when_client_sends_response_after_request_is_closed(t *testing.T) {
 	server, conn, client, _, done := getServerConnClientHello(t)
 	defer done()
 	request, err := client.request(testPath)
@@ -1248,11 +1185,7 @@ func Test_server_does_not_send_Close_when_client_sends_empty_ContentHeader_after
 	conn.readRequest()
 	request.Close("")
 	conn.readRequestClosed()
-	conn.writeContentHeader(&pb.ContentHeader{
-		RequestId:   request.ID(),
-		ContentType: testContentType,
-		ContentSize: uint64(0),
-	})
+	conn.sendCompletedResponse(request.ID())
 	time.Sleep(2 * server.intervals.ClientTimeout)
 	client.expectActiveRequests(0)
 }
@@ -1622,6 +1555,22 @@ func (c *websocketConn) writeCloseResponse(message *pb.CloseResponse) {
 	})
 }
 
+// Helper for sending a ContentHeader followed by a single-byte ContentChunk
+// which aims to enter the "completed response" request state easily.
+func (c *websocketConn) sendCompletedResponse(requestId uint64) {
+	data := []byte("!")
+	c.writeContentHeader(&pb.ContentHeader{
+		RequestId:   requestId,
+		ContentType: testContentType,
+		ContentSize: uint64(len(data)),
+	})
+	c.writeContentChunk(&pb.ContentChunk{
+		RequestId: requestId,
+		Sequence:  0,
+		Data:      data,
+	})
+}
+
 func (c *websocketConn) close() {
 	c.conn.Close()
 }
@@ -1637,7 +1586,7 @@ func (c *websocketConn) done() {
 	select {
 	case message, ok := <-c.incoming:
 		if ok {
-			assert.FailNowf(c.t, "Did not expected another server message",
+			assert.FailNowf(c.t, "Did not expect another server message",
 				"%v", message)
 		}
 	default:

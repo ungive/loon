@@ -377,13 +377,11 @@ or a `CloseResponse` message in response to a `Request` message.
 #### Completed responses
 
 A response is completed by either an `EmptyResponse`
-or by the last `ContentChunk` after a `ContentHeader`
-(unless the content size is zero,
-in which case `ContentHeader` completes the response).
+or by the last `ContentChunk` after a `ContentHeader`.
 A request is NOT completed,
 if it is closed with a `CloseResponse` message.
 Only when all data has been sent to the server,
-a response is completed
+a response is considered completed.
 
 #### Sending content
 
@@ -404,8 +402,12 @@ Parameters must be ignored by the implementation.
 
 The `content_size` indicates the number of bytes in the content.
 The content size must be less than or equal
-to the allowed size in the `Constraints`,
-but greater than or equal to zero.
+to the allowed size in the `Constraints`
+and have a size of at least one.
+Empty content is not allowed.
+Empty content might not be cached by some cache implementations
+and really indicates that no content is available.
+If there is no content, an `EmptyResponse` message must be sent.
 
 The `max_cache_duration` indicates the maximum duration in seconds
 for which the response data may be cached on the server.
@@ -501,8 +503,9 @@ the server should acknowledge this by sending a `Success` message
 with the respective request ID in the `request_id` field.
 This message is optional.
 
-The `Success` message should only be sent for `ContentHeader` responses.
-`EmptyResponse` messages should not be acknowledged.
+The `Success` message should only be sent for a `ContentHeader` message
+followed by all required `ContentChunk` messages that complete the response.
+`EmptyResponse` messages must not be acknowledged.
 
 ### Disconnect
 

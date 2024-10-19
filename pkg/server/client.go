@@ -959,6 +959,12 @@ func (c *clientImpl) onContentHeader(header *pb.ContentHeader) {
 			request.id)
 		return
 	}
+	if header.ContentSize == 0 {
+		c.close(pb.Close_REASON_INVALID_CONTENT_SIZE,
+			"Content size cannot be zero [#%d]",
+			request.id)
+		return
+	}
 	if header.Filename != nil && len(*header.Filename) == 0 {
 		c.close(pb.Close_REASON_INVALID_FILENAME,
 			"The filename length may not be zero [#%d]", request.id)

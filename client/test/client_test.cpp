@@ -140,7 +140,7 @@ static Content example_content(std::string const& path,
     return create_content(path, "text/plain", "test", max_cache_duration);
 }
 
-static Content example_content_large(size_t n_bytes,
+static Content example_content_n(size_t n_bytes,
     std::string const& path = "example.txt",
     std::optional<uint32_t> max_cache_duration = std::nullopt)
 {
@@ -407,7 +407,7 @@ TEST(Client, NoActiveRequestsWhenHandleUrlRequestIsCanceled)
     auto client = create_client();
     auto hello = client->wait_for_hello();
     auto chunk_size = hello.constraints().chunk_size();
-    auto content = example_content_large(3 * chunk_size);
+    auto content = example_content_n(3 * chunk_size);
     client->chunk_sleep(chunk_sleep);
     auto handle = client->register_content(content.source, content.info);
     CurlOptions options{};
@@ -868,4 +868,20 @@ TEST(Client, ReconnectsWhenIdleDisconnectedAndStartIsCalled)
     // Instead sleep for a small duration.
     std::this_thread::sleep_for(25ms);
     EXPECT_TRUE(client->connected());
+}
+
+TEST(Client, RegisteringContentThrowsWhenContentSizeIsZero)
+{
+    auto client = create_client();
+    auto content = example_content_n(0);
+    EXPECT_THROW(client->register_content(content.source, content.info),
+        MalformedContentException);
+}
+
+TEST(Client, RegisteringContentThrowsWhenContentHandleIsNull)
+{
+    auto client = create_client();
+    auto content = example_content_n(0);
+    EXPECT_THROW(client->register_content(nullptr, content.info),
+        MalformedContentException);
 }
