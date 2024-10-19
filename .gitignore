@@ -14,3 +14,4 @@ CMakePresets.json
 /client/build
 /out
 /client/out
+vcpkg_installed
