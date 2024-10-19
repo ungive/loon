@@ -1,8 +1,0 @@
-/build
-/out
-/.vscode/*
-!/.vscode/extensions.json
-
-notes.txt
-
-/vcpkg_installed

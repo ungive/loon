@@ -1,10 +1,16 @@
-/.vscode
+**/.vscode/*
+!/.vscode/extensions.json
 *.env
 *.exe
 *.out
 cover.html
 
 /_notes
-/todo.txt
+todo.txt
+notes.txt
 
 CMakePresets.json
+/build
+/client/build
+/out
+/client/out
