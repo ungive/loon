@@ -228,6 +228,8 @@ public:
      * @throws PathAlreadyRegisteredException
      * if content has already been registered under the path
      * that was specified in the info parameter.
+     * @throws MalformedContentException
+     * if the content has a size of zero bytes.
      * @throws UnacceptableContentException
      * if the server's constraints do not allow this content.
      */
@@ -254,7 +256,8 @@ public:
      *
      * @param handle The handle for which the content should be unregistered.
      *
-     * @throws MalformedContentException if the content is invalid.
+     * @throws MalformedContentException
+     * if the content is null or has the wrong type.
      */
     virtual void unregister_content(std::shared_ptr<ContentHandle> handle) = 0;
 
@@ -279,7 +282,8 @@ public:
      *
      * @returns Whether the content handle is still registered with this client.
      *
-     * @throws MalformedContentException if the content is invalid.
+     * @throws MalformedContentException
+     * if the content is null or has the wrong type.
      */
     virtual bool is_registered(std::shared_ptr<ContentHandle> handle) = 0;
 };
