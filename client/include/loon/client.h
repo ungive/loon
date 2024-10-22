@@ -202,7 +202,7 @@ public:
      *
      * The content is registered for the lifetime of the websocket connection
      * or until it is unregistered with unregister_content().
-     * If it is necessary to re-register the content again after a disconnect.
+     * It is necessary to re-register the content again after a disconnect.
      *
      * Calls to any of the methods of the source are synchronized.
      * The source's data() method is only called once per request
