@@ -697,32 +697,6 @@ TEST(Client, DisconnectsWhenDisconnectAfterIdleIsSetAndContentRegistrationFails)
         false, options.disconnect_after_idle.value(), 25ms);
 }
 
-/*
-
-    std::mutex mutex;
-    std::condition_variable cv;
-    std::unique_lock lock(mutex);
-    bool done;
-    client->on_disconnect([&] {
-        std::lock_guard lock(mutex);
-        callback();
-        cv.notify_one();
-        done = true;
-    });
-    {
-        lock.unlock();
-        client->start();
-        EXPECT_NO_THROW(client->wait_until_ready());
-        client->stop();
-        lock.lock();
-    }
-    cv.wait_for(lock, 10s, [&] {
-        return done;
-    });
-    EXPECT_TRUE(done);
-
- */
-
 TEST(Client, CanBeStartedAgainWhenStoppedByFailure)
 {
     ClientOptions options;
@@ -884,4 +858,19 @@ TEST(Client, RegisteringContentThrowsWhenContentHandleIsNull)
     auto content = example_content_n(0);
     EXPECT_THROW(client->register_content(nullptr, content.info),
         MalformedContentException);
+}
+
+TEST(Client, StartingTheClientAgainDisablesIdling)
+{
+    ClientOptions options;
+    options.automatic_idling = false;
+    options.disconnect_after_idle = 250ms;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    client->idle();
+    std::this_thread::sleep_for(options.disconnect_after_idle.value() - 25ms);
+    client->start();
+    EXPECT_TRUE(client->connected());
+    std::this_thread::sleep_for(2 * 25ms);
+    EXPECT_TRUE(client->connected()); // not idling anymore
 }

@@ -81,6 +81,7 @@ public:
      * Attempts to reconnect on connection failure or disconnect,
      * until stop() is called.
      * Returns immediately and does nothing, if already starting or started.
+     * Disables idling, if the client is in idle state.
      */
     virtual void start() = 0;
 
@@ -89,6 +90,7 @@ public:
      *
      * Returns immediately and does nothing, if already disconnected.
      * Notifies all handles that registered content is not available anymore.
+     * Also disables idling, if it has been enabled before.
      */
     virtual void stop() = 0;
 
@@ -100,23 +102,32 @@ public:
     virtual bool started() = 0;
 
     /**
-     * @brief Enables or disables the client's idling state.
+     * @brief Puts the client into idle.
      *
-     * If called with true, the client will disconnect after the idle timeout,
-     * even when content is currently registered.
-     * If no idle timeout is set, this method has no effect.
+     * Enable idling when the client is not in active use right now
+     * and registered content is not required to be available online,
+     * but the client might be put to use again in the very near future,
+     * where disconnecting immediately might be considered inefficient.
+     *
+     * Once idling, the client disconnects from the server after the timeout
+     * that was configured with ClientOptions::disconnect_after_idle.
+     * To put it out of idle again, either call register_content()
+     * or call start() again, if content is already registered.
+     * Calling stop() also puts the client out of idling.
+     *
+     * If no timeout period was configured, this method has no effect.
+     * If the client is currently stopped, this method has no effect.
+     * If the client is disconnected and in the process of reconnecting,
+     * the client will be put into idle at the point of reconnecting,
+     * if automatic idling has been enabled in the client options.
+     *
+     * Note that the client might be put into idle automatically,
+     * depending on the value of ClientOptions::automatic_idling.
+     *
      * @see ClientOptions::disconnect_after_idle
-     *
-     * Whenever new content is registered,
-     * the idle state will be reset to false,
-     * since it is expected that newly registered content remains available.
-     *
-     * This method is useful if the client should disconnect soon
-     * without unregistering any content immediately
-     * (which would be the only other option to put the client into idle).
-     * Content remains registered and is only unregistered upon idle timeout.
+     * @see ClientOptions::automatic_idling
      */
-    virtual void idle(bool state = true) = 0;
+    virtual void idle() = 0;
 
     /**
      * @brief Wait until the client is ready.
@@ -211,6 +222,8 @@ public:
      * If the source reads from a file e.g.,
      * the data() method can safely seek to the beginning of the file
      * without having to worry about corrupting other ongoing requests.
+     *
+     * If the client is idling, the client is put out of idle.
      *
      * @param source The source for the content.
      * @param info Information about how to provide the content.
@@ -439,8 +452,25 @@ struct ClientOptions
      * Should content be registered while being disconnected due to idling,
      * then the client will reconnect to the server
      * and then register the content, if the client is in started state.
+     *
+     * @see automatic_idling
+     * @see IClient::idle()
      */
     std::optional<std::chrono::milliseconds> disconnect_after_idle{};
+
+    /**
+     * @brief Enables automatic idling whenever no content is registered.
+     *
+     * The client is put into idle automatically when:
+     * - The client connects and is ready, but no content is registered yet
+     * - Content was unregistered and there is no registered content anymore
+     *
+     * This value is ignored when disconnect_after_idle is not set.
+     *
+     * @see disconnect_after_idle
+     * @see IClient::idle()
+     */
+    bool automatic_idling{ true };
 
     // TODO: not yet implemented
     /**
@@ -475,7 +505,7 @@ public:
 
     inline bool started() override { return m_impl->started(); }
 
-    inline void idle(bool state = true) override { return m_impl->idle(state); }
+    inline void idle() override { return m_impl->idle(); }
 
     inline void wait_until_ready() override
     {

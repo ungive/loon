@@ -39,10 +39,10 @@ public:
         return m_started;
     }
 
-    inline void idle(bool state = true) override
+    inline void idle() override
     {
         const std::lock_guard<std::mutex> lock(m_mutex);
-        set_idle(state);
+        set_idle(true);
     }
 
     inline void wait_until_ready() override
@@ -313,8 +313,6 @@ private:
         m_track_idling = state;
         m_cv_manager.notify_one();
     }
-
-    inline void reset_idle() { set_idle(false); }
 
     inline std::chrono::milliseconds connect_timeout() const
     {

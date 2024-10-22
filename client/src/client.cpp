@@ -94,6 +94,7 @@ ClientImpl::~ClientImpl()
 void ClientImpl::start()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
+    set_idle(false);
     if (m_started) {
         ensure_started();
         return;
@@ -266,7 +267,7 @@ void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
 
     // Idling if no content is registered when execution ends.
     std::shared_ptr<void> scope_guard(nullptr, std::bind([this] {
-        if (m_content.empty()) {
+        if (m_content.empty() && m_options.automatic_idling) {
             log(Debug) << "ClientImpl::unregister_content: scope_guard: "
                           "set_idle(true)";
             set_idle(true);
@@ -350,7 +351,7 @@ void ClientImpl::on_hello(Hello const& hello)
     }
 
     // The connection is idling if no content was registered yet.
-    if (m_content.empty()) {
+    if (m_content.empty() && m_options.automatic_idling) {
         log(Debug) << "ClientImpl::on_hello: set_idle(true)";
         set_idle(true);
     }
@@ -690,8 +691,8 @@ void ClientImpl::internal_stop(std::unique_lock<std::mutex>& lock)
     // Unregister all content and stop all request handlers.
     reset_connection_state();
     // Not idling anymore.
-    log(Debug) << "ClientImpl::internal_stop: reset_idle()";
-    reset_idle();
+    log(Debug) << "ClientImpl::internal_stop: set_idle(false)";
+    set_idle(false);
     // Notify any client methods that are waiting for state changes.
     update_connected(false);
     // Reset any manager state by removing pending actions.
@@ -772,40 +773,38 @@ void ClientImpl::manager_loop()
             return;
         }
         // It's important to check if idling should not be tracked anymore
-        // before checking if the idle timeout expired,
-        // in case idling is being cancelled.
+        // before checking if the idle timeout expired, in case idling
+        // is being cancelled.
         if (m_track_idling.has_value()) {
             bool do_track = m_track_idling.value();
-            m_track_idling = std::nullopt; // Make sure this is reset.
-            if (!do_track) {
-                // Make sure everything is reset, if idle tracking is stopped.
+            m_track_idling = std::nullopt;
+            if (!do_track || !m_started || !m_connected) {
+                // No need to idle when:
+                // - Idling is being disabled
+                // - The client is not started
+                // - The client is started, but in the process of reconnecting
+                //   and will be put into idle as soon as it has reconnected,
+                //   if automatic idling is enabled, see on_hello()
                 idle_time_point = steady_clock::time_point::max();
                 m_idle_waiting = false;
-                log(Debug)
-                    << "ClientImpl::manager_loop: m_idle_waiting = false";
+                log(Debug) << "ClientImpl::manager_loop: "
+                           << var("m_idle_waiting", m_idle_waiting)
+                           << var("m_started", m_started)
+                           << var("m_connected", m_connected);
                 continue;
             }
-            if (!m_started) {
-                // The client is not started.
+            if (m_idle_waiting) {
+                // Already idling.
                 continue;
             }
-            // If the client is not connected, we still start the idle timeout
-            // because while it might not be connect, it might attempt to
-            // reconnect in the background, which needs to be cancelled after
-            // the idle timeout by calling the websocket client's stop method.
-            if (do_track) {
-                if (m_idle_waiting) {
-                    // Already idling.
-                    continue;
-                }
-                if (m_options.disconnect_after_idle.has_value()) {
-                    auto duration = m_options.disconnect_after_idle.value();
-                    idle_time_point = steady_clock::now() + duration;
-                    m_idle_waiting = true;
-                    log(Debug) << "ClientImpl::manager_loop: m_idle_waiting = "
-                                  "true; duration = "
-                               << duration.count() << "ms";
-                }
+            if (m_options.disconnect_after_idle.has_value()) {
+                // Only idle if an idle timeout is configured.
+                auto duration = m_options.disconnect_after_idle.value();
+                idle_time_point = steady_clock::now() + duration;
+                m_idle_waiting = true;
+                log(Debug) << "ClientImpl::manager_loop: "
+                           << var("m_idle_waiting", m_idle_waiting)
+                           << var("duration_ms", duration.count());
             }
             continue;
         }
