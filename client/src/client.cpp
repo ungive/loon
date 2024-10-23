@@ -61,6 +61,35 @@ ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
     if (m_options.max_upload_speed.has_value()) {
         throw std::runtime_error("max_upload_speed is not yet implemented");
     }
+    if (options.websocket.connect_timeout.has_value() &&
+        options.websocket.connect_timeout.value() <=
+            std::chrono::milliseconds::zero()) {
+        throw std::runtime_error(
+            "the connect timeout must be greater than zero");
+    }
+    if (options.websocket.ping_interval.has_value() &&
+        options.websocket.ping_interval.value() <=
+            std::chrono::milliseconds::zero()) {
+        throw std::runtime_error("the ping interval must be greater than zero");
+    }
+    if (options.websocket.reconnect_delay.has_value() &&
+        options.websocket.reconnect_delay.value() <=
+            std::chrono::milliseconds::zero()) {
+        throw std::runtime_error(
+            "the reconnect delay must be greater than zero");
+    }
+    if (options.websocket.max_reconnect_delay.has_value() &&
+        !options.websocket.reconnect_delay.has_value()) {
+        throw std::runtime_error("the maximum reconnect delay may only be set"
+                                 "when a reconnect delay is set");
+    }
+    if (options.websocket.max_reconnect_delay.has_value() &&
+        options.websocket.reconnect_delay.has_value() &&
+        options.websocket.max_reconnect_delay.value() <=
+            options.websocket.reconnect_delay.value()) {
+        throw std::runtime_error("the maximum reconnect delay must be greater "
+                                 "than the reconnect delay");
+    }
     // Event handlers
     m_conn->on_open(std::bind(&ClientImpl::on_websocket_open, this));
     m_conn->on_close(std::bind(&ClientImpl::on_websocket_close, this));
