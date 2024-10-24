@@ -364,6 +364,10 @@ struct WebsocketOptions
     /**
      * @brief The interval in which ping messages are sent.
      *
+     * The client closes the connection and attempts to reconnect,
+     * if a ping message does not receive a pong response in time.
+     * The ping interval is used as the pong timeout.
+     *
      * If not set, a sane default value is used.
      */
     std::optional<std::chrono::milliseconds> ping_interval{};
