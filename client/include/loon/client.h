@@ -95,9 +95,12 @@ public:
     virtual void stop() = 0;
 
     /**
-     * @brief Whether the client is started and ready for content.
+     * @brief Whether the client is started.
      *
-     * @returns If the client is ready for registering content.
+     * Call wait_until_ready() to wait until the client is ready
+     * for registering content with register_content().
+     *
+     * @returns If the client is started.
      */
     virtual bool started() = 0;
 
