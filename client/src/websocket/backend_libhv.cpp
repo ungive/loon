@@ -24,6 +24,9 @@ using WebsocketOptions = loon::WebsocketOptions;
 std::chrono::milliseconds loon::websocket::default_connect_timeout =
     std::chrono::milliseconds{ HIO_DEFAULT_CONNECT_TIMEOUT };
 
+std::chrono::milliseconds loon::websocket::default_ping_interval =
+    std::chrono::milliseconds{ 20000 };
+
 class ClientImpl : public BaseClient
 {
 public:
@@ -97,9 +100,10 @@ std::unique_ptr<hv::WebSocketClient> ClientImpl::create_conn()
     } else {
         conn->setConnectTimeout(default_connect_timeout.count());
     }
-    if (options().ping_interval.has_value()) {
-        conn->setPingInterval(options().ping_interval.value().count());
-    }
+    // Note: libhv uses the ping interval as the ping timeout, see
+    // https://github.com/ithewei/libhv/blob/0cfc3c16/http/server/HttpHandler.cpp#L203-L215
+    conn->setPingInterval(
+        options().ping_interval.value_or(default_ping_interval).count());
     return conn;
 }
 

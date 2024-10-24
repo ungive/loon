@@ -36,6 +36,9 @@ static loon::log_handler_t _handler{ loon::default_log_handler };
 std::chrono::milliseconds loon::websocket::default_connect_timeout =
     std::chrono::milliseconds{ 10000 /* same as libhv */ };
 
+std::chrono::milliseconds loon::websocket::default_ping_interval =
+    std::chrono::milliseconds{ 20000 };
+
 Client::Client(std::string const& address, WebsocketOptions const& options)
     : m_impl{ std::make_unique<ClientImpl>(address, options) }
 {
