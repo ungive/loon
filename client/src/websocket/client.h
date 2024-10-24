@@ -61,12 +61,6 @@ public:
      * @brief Sends binary data to the websocket peer.
      *
      * The data is sent with OP code binary.
-     */
-
-    /**
-     * @brief Sends binary data to the websocket peer.
-     *
-     * The data is sent with OP code binary.
      *
      * @param data The data to send.
      * @param length The length of the data.
