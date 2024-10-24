@@ -722,10 +722,13 @@ TEST(Client, CanBeStartedAgainWhenStoppedByFailure)
         // Increase the cache duration, so it won't fail again.
         hello.mutable_constraints()->set_cache_duration(30);
     });
-    std::unique_lock lock(mutex);
-    cv.wait_for(lock, 2s, [&] {
-        return done;
-    });
+    {
+        std::unique_lock lock(mutex);
+        cv.wait_for(lock, 2s, [&] {
+            return done;
+        });
+    }
+    client->on_failed([] {});
     auto content = example_content();
     EXPECT_ANY_THROW(client->register_content(content.source, content.info));
     // Start the client again after failure.
