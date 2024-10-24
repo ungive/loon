@@ -532,10 +532,15 @@ void ClientImpl::on_close(Close const& close)
     restart();
 }
 
-void ClientImpl::wait_until_ready(
+bool ClientImpl::wait_until_ready(
     std::unique_lock<std::mutex>& lock, std::chrono::milliseconds timeout)
 {
     using namespace std::chrono;
+
+    // Return if the client is already ready and we don't need to wait.
+    if (m_started && m_connected && m_hello.has_value()) {
+        return false;
+    }
 
     // Wait until the connection is opened.
     auto start = high_resolution_clock::now();
@@ -556,6 +561,7 @@ void ClientImpl::wait_until_ready(
         throw TimeoutException(
             "did not receive initial server message in time");
     }
+    return true;
 }
 
 void ClientImpl::on_websocket_open()

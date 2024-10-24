@@ -143,23 +143,29 @@ public:
      *
      * @param timeout The timeout period.
      *
+     * @returns if the client was already ready
+     * and the method returned immediately.
+     *
      * @throws TimeoutException
      * if an operation timed out.
      * @throws ClientNotConnectedException
      * if the client is not started, connected or
      * if the client disconnected while waiting for the connection to be ready.
      */
-    virtual void wait_until_ready(std::chrono::milliseconds timeout) = 0;
+    virtual bool wait_until_ready(std::chrono::milliseconds timeout) = 0;
 
     /**
      * @brief Wait until the client is ready.
      *
      * Uses the connect timeout or a sane default value for the timeout.
      *
+     * @returns if the client was already ready
+     * and the method returned immediately.
+     *
      * @see IClient::wait_until_ready(timeout)
      * @see WebsocketOptions::connect_timeout
      */
-    virtual void wait_until_ready() = 0;
+    virtual bool wait_until_ready() = 0;
 
     /**
      * @brief Sets a callback for when the client is connected and ready.
@@ -507,12 +513,12 @@ public:
 
     inline void idle() override { return m_impl->idle(); }
 
-    inline void wait_until_ready() override
+    inline bool wait_until_ready() override
     {
         return m_impl->wait_until_ready();
     }
 
-    inline void wait_until_ready(std::chrono::milliseconds timeout) override
+    inline bool wait_until_ready(std::chrono::milliseconds timeout) override
     {
         return m_impl->wait_until_ready(timeout);
     }

@@ -65,9 +65,9 @@ public:
 
     inline bool connected() { return ClientImpl::connected(); }
 
-    inline void wait_until_ready() { return ClientImpl::wait_until_ready(); }
+    inline bool wait_until_ready() { return ClientImpl::wait_until_ready(); }
 
-    inline void wait_until_ready(std::chrono::milliseconds timeout)
+    inline bool wait_until_ready(std::chrono::milliseconds timeout)
     {
         return ClientImpl::wait_until_ready(timeout);
     }
@@ -793,7 +793,7 @@ TEST(Client, ReconnectsWhenIdleDisconnectedAndWaitUntilConnectedIsCalled)
     client->start_and_wait_until_connected();
     EXPECT_CONNECTION_STATE_SWAP_AFTER(
         false, options.disconnect_after_idle.value(), 25ms);
-    client->wait_until_ready();
+    EXPECT_TRUE(client->wait_until_ready());
     EXPECT_TRUE(client->connected());
 }
 

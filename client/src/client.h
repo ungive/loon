@@ -45,16 +45,16 @@ public:
         set_idle(true);
     }
 
-    inline void wait_until_ready() override
+    inline bool wait_until_ready() override
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        wait_until_ready(lock, connect_timeout());
+        return wait_until_ready(lock, connect_timeout());
     }
 
-    inline void wait_until_ready(std::chrono::milliseconds timeout) override
+    inline bool wait_until_ready(std::chrono::milliseconds timeout) override
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        wait_until_ready(lock, timeout);
+        return wait_until_ready(lock, timeout);
     }
 
     inline void on_ready(std::function<void()> callback) override
@@ -270,7 +270,7 @@ private:
     bool update_connected(bool state);
     bool wait_until_connected(
         std::unique_lock<std::mutex>& lock, std::chrono::milliseconds timeout);
-    void wait_until_ready(
+    bool wait_until_ready(
         std::unique_lock<std::mutex>& lock, std::chrono::milliseconds timeout);
     void check_content_constraints(std::shared_ptr<loon::ContentSource> source,
         loon::ContentInfo const& info);
