@@ -42,11 +42,6 @@ std::chrono::milliseconds loon::websocket::default_ping_interval =
 Client::Client(std::string const& address, WebsocketOptions const& options)
     : m_impl{ std::make_unique<ClientImpl>(address, options) }
 {
-    if (options.ping_interval) {
-        log_message(LogLevel::Warning,
-            "ignoring ping interval: "
-            "this is handled internally by the QT websocket backend");
-    }
 }
 
 Client::~Client() {}
@@ -59,14 +54,16 @@ ClientImpl::ClientImpl(
       // The following members may not be have "this" as parent,
       // as they are moved to another thread.
       // Useful reference: https://stackoverflow.com/a/25230470/6748004
-      m_conn(), m_reconnect_timer()
+      m_conn(), m_reconnect_timer(), m_heartbeat_timer()
 {
     m_reconnect_timer.setSingleShot(true);
     this->moveToThread(&m_thread);
     m_conn.moveToThread(&m_thread);
     m_reconnect_timer.moveToThread(&m_thread);
+    m_heartbeat_timer.moveToThread(&m_thread);
     connect_conn(&m_conn);
     connect_reconnect_timer(&m_reconnect_timer);
+    connect_heartbeat_timer(&m_heartbeat_timer);
     m_thread.start();
 }
 
@@ -88,11 +85,17 @@ inline void ClientImpl::connect_conn(qt::WebSocket* conn)
         conn, &qt::WebSocket::stateChanged, this, &ClientImpl::on_state);
     QObject::connect(
         conn, &qt::WebSocket::sslErrors, this, &ClientImpl::on_ssl_errors);
+    QObject::connect(conn, &qt::WebSocket::pong, this, &ClientImpl::on_pong);
 }
 
 inline void ClientImpl::connect_reconnect_timer(QTimer* timer)
 {
     QObject::connect(timer, &QTimer::timeout, this, &ClientImpl::reconnect);
+}
+
+inline void ClientImpl::connect_heartbeat_timer(QTimer* timer)
+{
+    QObject::connect(timer, &QTimer::timeout, this, &ClientImpl::send_ping);
 }
 
 inline Qt::ConnectionType ClientImpl::blocking_connection_type()
@@ -257,20 +260,55 @@ int64_t ClientImpl::send_text(const char* data, size_t length)
     return n;
 }
 
+void ClientImpl::start_heartbeat()
+{
+    // Note that the ping and pong time are initialized to the same value here
+    // which prevents send_ping() from attempting to reconnect on first call.
+    m_last_ping_time = {};
+    m_last_pong_time = {};
+    m_heartbeat_timer.start(
+        options().ping_interval.value_or(default_ping_interval));
+}
+
+inline void ClientImpl::stop_heartbeat() { m_heartbeat_timer.stop(); }
+
+void ClientImpl::send_ping()
+{
+    // Reopen the connection if no pong was received in time.
+    if (m_last_pong_time < m_last_ping_time) {
+        log(Warning) //
+            << "server did not respond, attempting to reconnect"
+            << var("last_pong_time", m_last_pong_time.time_since_epoch())
+            << var("last_ping_time", m_last_ping_time.time_since_epoch());
+        return internal_open();
+    }
+    // Making this check for the same reason as in send_binary().
+    if (connected()) {
+        m_last_ping_time = std::chrono::steady_clock::now();
+        m_conn.ping();
+    }
+}
+
+void ClientImpl::on_pong(quint64 elapsed_time, const QByteArray& payload)
+{
+    m_last_pong_time = std::chrono::steady_clock::now();
+}
+
 void ClientImpl::on_connected()
 {
-    on_websocket_open();
+    start_heartbeat();
     reset_reconnect_delay();
+    on_websocket_open();
     log(Info) << "connected";
 }
 
 void ClientImpl::on_disconnected()
 {
+    stop_heartbeat();
     on_websocket_close();
     log(Info) << "disconnected";
     if (options().reconnect_delay.has_value() && active()) {
-        m_reconnect_timer.start(
-            static_cast<int>(next_reconnect_delay().count()));
+        m_reconnect_timer.start(next_reconnect_delay().count());
     }
 }
 

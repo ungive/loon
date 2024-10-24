@@ -88,6 +88,9 @@ static std::shared_ptr<TestClient> create_client(
     if (!options.websocket.basic_authorization.has_value()) {
         options.websocket.basic_authorization = TEST_AUTH;
     }
+    if (!options.websocket.ping_interval.has_value()) {
+        options.websocket.ping_interval = 20ms;
+    }
     auto client = std::make_shared<TestClient>(TEST_ADDRESS, options);
     if (started) {
         client->start();

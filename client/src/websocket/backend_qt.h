@@ -86,6 +86,7 @@ protected:
     void internal_stop() override;
 
 private Q_SLOTS:
+    void send_ping();
     void reconnect();
     void internal_open();
     void on_connected();
@@ -95,19 +96,26 @@ private Q_SLOTS:
     void on_error(QAbstractSocket::SocketError error);
     void on_state(QAbstractSocket::SocketState state);
     void on_ssl_errors(const QList<QSslError>& errors);
+    void on_pong(quint64 elapsed_time, const QByteArray& payload);
 
 private:
     void connect_conn(qt::WebSocket* conn);
     void connect_reconnect_timer(QTimer* timer);
+    void connect_heartbeat_timer(QTimer* timer);
     Qt::ConnectionType blocking_connection_type();
     std::chrono::milliseconds next_reconnect_delay();
     void reset_reconnect_delay();
+    void start_heartbeat();
+    void stop_heartbeat();
 
 private:
     qt::WebSocket m_conn;
     qt::Timer m_reconnect_timer;
+    qt::Timer m_heartbeat_timer;
     std::chrono::milliseconds m_reconnect_delay;
     size_t m_reconnect_count{ 0 };
+    std::chrono::steady_clock::time_point m_last_ping_time{};
+    std::chrono::steady_clock::time_point m_last_pong_time{};
 
     // The thread should be destroyed first, so define it last.
     // The websocket object above lives in this thread and may not be
