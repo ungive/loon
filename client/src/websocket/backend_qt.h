@@ -86,17 +86,8 @@ protected:
     void internal_stop() override;
 
 private Q_SLOTS:
-    /**
-     * @brief Attempts to open a connection to the server.
-     *
-     * This method may only be called internally,
-     * from the internal thread m_thread,
-     * by using QMetaObject::invokeMethod() or by connecting a signal.
-     *
-     * If the connection attempt fails, on_disconnected is triggered.
-     */
-    void open_connection();
-
+    void reconnect();
+    void internal_open();
     void on_connected();
     void on_disconnected();
     void on_text_message_received(QString const& message);
@@ -106,10 +97,9 @@ private Q_SLOTS:
     void on_ssl_errors(const QList<QSslError>& errors);
 
 private:
-    void internal_open();
     void connect_conn(qt::WebSocket* conn);
     void connect_reconnect_timer(QTimer* timer);
-    Qt::ConnectionType connection_type();
+    Qt::ConnectionType blocking_connection_type();
     std::chrono::milliseconds next_reconnect_delay();
     void reset_reconnect_delay();
 

@@ -87,17 +87,16 @@ inline void ClientImpl::connect_conn(qt::WebSocket* conn)
         conn, &qt::WebSocket::sslErrors, this, &ClientImpl::on_ssl_errors);
 }
 
-void ClientImpl::connect_reconnect_timer(QTimer* timer)
+inline void ClientImpl::connect_reconnect_timer(QTimer* timer)
 {
-    QObject::connect(
-        timer, &QTimer::timeout, this, &ClientImpl::open_connection);
+    QObject::connect(timer, &QTimer::timeout, this, &ClientImpl::reconnect);
 }
 
-inline Qt::ConnectionType ClientImpl::connection_type()
+inline Qt::ConnectionType ClientImpl::blocking_connection_type()
 {
     return QThread::currentThread() != m_thread.thread()
         ? Qt::BlockingQueuedConnection
-        : Qt::AutoConnection;
+        : Qt::DirectConnection;
 }
 
 std::chrono::milliseconds ClientImpl::next_reconnect_delay()
@@ -133,15 +132,8 @@ inline void ClientImpl::reset_reconnect_delay()
     m_reconnect_count = 0;
 }
 
-void ClientImpl::open_connection()
+void ClientImpl::reconnect()
 {
-    // This method is only called by the internal timer's signal,
-    // which lives on the internal thread. Therefore the lock must be acquired,
-    // since this can run concurrently with a call to the
-    // internal_start() or internal_stop() methods.
-
-    auto lock = acquire_lock();
-
     if (!active()) {
         // Cancel if the websocket became inactive.
         return;
@@ -159,31 +151,29 @@ void ClientImpl::open_connection()
 
 void ClientImpl::internal_start()
 {
-    // This method is only called from the user
-    // via the public start() method, which is synchronized with lock().
+    // This method can be called by the user via the public start() method.
+    // Using Qt::AutoConnection to make sure that this method does not block,
+    // since opening the connection can trigger websocket events which would
+    // in turn could call into callbacks of the caller of this method,
+    // therefore resulting in a possible deadlock.
 
-    internal_open();
+    QMetaObject::invokeMethod(
+        this, &ClientImpl::internal_open, Qt::AutoConnection);
 }
 
 void ClientImpl::internal_stop()
 {
-    // This method is only called from the destructor or from the user
-    // via the public stop() method, which are both synchronized with lock().
+    // This method can be called by the user via the public stop() method.
+    // Using Qt::AutoConnection for the same reason as in internal_start().
 
-    QMetaObject::invokeMethod(&m_reconnect_timer, "stop", connection_type());
+    QMetaObject::invokeMethod(&m_reconnect_timer, "stop", Qt::AutoConnection);
     QMetaObject::invokeMethod(&m_conn, "close", Qt::AutoConnection);
 }
 
 void ClientImpl::internal_open()
 {
     // Abort any existing connection first, before opening a new one.
-    // NOTE abort(), close() and open() should ideally not be called
-    // with a blocking connection, as these are state-changing methods
-    // which might invoke connected/disconnected callbacks
-    // (abort definitely does and will cause a deadlock in some cases).
-    // Instead we are directly executing them on this thread
-    // or queueing them in the background (decided by auto-connection).
-    QMetaObject::invokeMethod(&m_conn, "abort", Qt::AutoConnection);
+    m_conn.abort();
     // URL
     QUrl url(QString::fromStdString(address()));
     if (!url.isValid() || (url.scheme() != "ws" && url.scheme() != "wss")) {
@@ -233,7 +223,7 @@ void ClientImpl::internal_open()
     } else {
         request.setTransferTimeout(default_connect_timeout.count());
     }
-    QMetaObject::invokeMethod(&m_conn, "open", Qt::AutoConnection, request);
+    m_conn.open(request);
 }
 
 int64_t ClientImpl::send_binary(const char* data, size_t length)
@@ -243,12 +233,12 @@ int64_t ClientImpl::send_binary(const char* data, size_t length)
     // calling sendBinaryMessage can freeze if the connection isn't established
     // (for whatever bizarre reason).
     // This behaviour can be confirmed by commenting out this line:
-    // QMetaObject::invokeMethod(&m_conn, "close", Qt::AutoConnection);
+    // QMetaObject::invokeMethod(&m_conn, "close", blocking_connection_type());
     // That will freeze some of the tests.
     // Commenting "sendBinaryMessage" will then unfreeze them again.
     if (connected()) {
         QMetaObject::invokeMethod(&m_conn, "sendBinaryMessage",
-            connection_type(), QByteArray(data, length), &n);
+            blocking_connection_type(), QByteArray(data, length), &n);
     }
     return n;
 }
@@ -258,8 +248,8 @@ int64_t ClientImpl::send_text(const char* data, size_t length)
     qint64 n = 0;
     // Making this check for the same reason as in send_binary().
     if (connected()) {
-        QMetaObject::invokeMethod(&m_conn, "sendTextMessage", connection_type(),
-            QByteArray(data, length), &n);
+        QMetaObject::invokeMethod(&m_conn, "sendTextMessage",
+            blocking_connection_type(), QByteArray(data, length), &n);
     }
     return n;
 }
@@ -275,25 +265,9 @@ void ClientImpl::on_disconnected()
 {
     on_websocket_close();
     log(Info) << "disconnected";
-    if (options().reconnect_delay.has_value()) {
-        // Only start the timer if the websocket is active.
-        if (active()) {
-            // Note that on_disconnected() is called during
-            // QWebSocket::stop's execution, which could cause a deadlock.
-            // In this case it is safe though because active() always
-            // returns false (which would lead to this code not being executed)
-            // if the lock is held while the connection is stopped:
-            // - QWebSocket::stop is only called in internal_stop()
-            // - internal_stop() is called in BaseClient::stop()
-            // - internal_stop() is called in BaseClient::fail()
-            // => Both of these last two methods always set active to false
-            // before calling internal_stop(), so if they are holding a lock
-            // then the lock will not be reacquired here.
-            auto lock = acquire_lock();
-            auto delay = next_reconnect_delay();
-            QMetaObject::invokeMethod(&m_reconnect_timer, "start",
-                connection_type(), static_cast<int>(delay.count()));
-        }
+    if (options().reconnect_delay.has_value() && active()) {
+        m_reconnect_timer.start(
+            static_cast<int>(next_reconnect_delay().count()));
     }
 }
 

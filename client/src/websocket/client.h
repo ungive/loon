@@ -4,7 +4,6 @@
 #include <chrono>
 #include <functional>
 #include <memory>
-#include <mutex>
 #include <string>
 
 #include "logging.h"
@@ -89,7 +88,7 @@ public:
      * This method is guaranteed to return immediately,
      * it will not block until any of the event handlers
      * have been called and returned.
-     * If a mutex is held while start() is called,
+     * If a mutex is held while this method is called,
      * it can safely be locked from any of the event handlers.
      */
     virtual void start() = 0;
@@ -99,10 +98,11 @@ public:
      *
      * Does nothing, if the client is not started or already stopped.
      *
-     * Blocks until the client is fully stopped
-     * and until all resources have been deallocated.
-     * If a mutex is locked in any of the event handlers,
-     * no lock should be held for it when calling this method.
+     * This method is guaranteed to return immediately,
+     * it will not block until any of the event handlers
+     * have been called and returned.
+     * If a mutex is held while this method is called,
+     * it can safely be locked from any of the event handlers.
      */
     virtual void stop() = 0;
 };
@@ -186,9 +186,6 @@ protected:
     inline void on_websocket_open()
     {
         m_connected.store(true);
-        // Note: No mutex used for performance reasons
-        // and since it is prohibited in the client code
-        // that the callback can be overwritten while the client is started.
         if (m_open_callback) {
             m_open_callback();
         }
@@ -200,7 +197,6 @@ protected:
     inline void on_websocket_close()
     {
         m_connected.store(false);
-        // Note: No mutex, for the same reason as in on_websocket_open.
         if (m_close_callback) {
             m_close_callback();
         }
@@ -211,7 +207,6 @@ protected:
      */
     inline void on_websocket_message(std::string const& message)
     {
-        // Note: No mutex, for the same reason as in on_websocket_open.
         if (m_message_callback) {
             m_message_callback(message);
         }
@@ -231,19 +226,6 @@ protected:
         internal_stop();
     }
 
-    /**
-     * @brief Acquires the lock for the websocket client.
-     *
-     * All public methods, except send_binary() and send_text()
-     * are synchronized with the underlying mutex of this lock.
-     *
-     * @returns The acquired lock.
-     */
-    inline std::unique_lock<std::mutex> acquire_lock()
-    {
-        return std::unique_lock<std::mutex>(m_mutex);
-    }
-
     inline WebsocketOptions const& options() const { return m_options; }
 
     inline bool active() const { return m_active.load(); }
@@ -256,7 +238,6 @@ private:
     const std::string m_address{};
     const WebsocketOptions m_options{};
 
-    std::mutex m_mutex{};
     std::atomic<bool> m_active{ false };
     std::atomic<bool> m_connected{ false };
     std::function<void()> m_open_callback{};
