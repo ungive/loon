@@ -23,6 +23,7 @@
     to handle simultaneous requests concurrently.
 - [ ] Add versioning to the server and client libraries.
     Perhaps make releases on GitHub.
+- [ ] Fix not notifying handler thread when calling RequestHandler::destroy().
 
 ## Normal
 

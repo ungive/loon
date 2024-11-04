@@ -296,5 +296,6 @@ void RequestHandler::destroy()
     if (m_stop) {
         throw std::runtime_error("request handle is already destroyed");
     }
+    // FIXME don't we need to notify the handler thread?
     m_stop = true;
 }
