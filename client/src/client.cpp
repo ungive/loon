@@ -216,9 +216,9 @@ bool loon::ClientImpl::wait_until_connected(
     }
     // Ensure that the underlying connection is started.
     ensure_started();
-    // Wait until the connected signal arrives.
+    // Wait until we are connected or not connecting anymore.
     return m_cv_connection_ready.wait_for(lock, timeout, [this] {
-        return m_connected;
+        return !m_connecting || m_connected;
     });
 }
 
