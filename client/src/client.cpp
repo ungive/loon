@@ -146,12 +146,15 @@ void ClientImpl::stop()
 
 void ClientImpl::terminate()
 {
-    std::unique_lock<std::mutex> lock(m_mutex);
-    if (m_started) {
-        m_started = false;
-        internal_stop(lock, true); // terminate
-        return;
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        if (m_started) {
+            m_started = false;
+            internal_stop(lock, true); // terminate
+            return;
+        }
     }
+    // Don't hold a lock while calling this method, since it blocks.
     m_conn->terminate();
 }
 
