@@ -109,7 +109,7 @@ ClientImpl::~ClientImpl()
     // Stop the client
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        internal_stop(lock);
+        internal_stop(lock, true); // terminate
     }
     // Stop the manager loop thread
     {
