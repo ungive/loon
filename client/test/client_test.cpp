@@ -880,3 +880,77 @@ TEST(Client, StartingTheClientAgainDisablesIdling)
     std::this_thread::sleep_for(2 * 25ms);
     EXPECT_TRUE(client->connected()); // not idling anymore
 }
+
+enum CallbackOrderFlag
+{
+    FLAG_CALLBACK,
+    FLAG_AFTER_CALL
+};
+
+TEST(Client, StoppingTheClientMustNotWaitForCallbacks)
+{
+    using namespace std::chrono_literals;
+    auto client = create_client();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    ExpectCalled callback;
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::vector<CallbackOrderFlag> flags;
+    client->on_disconnect([&] {
+        std::lock_guard lock(mutex);
+        std::this_thread::sleep_for(100ms);
+        callback();
+        flags.push_back(FLAG_CALLBACK);
+        cv.notify_one();
+    });
+    client->stop();
+    flags.push_back(FLAG_AFTER_CALL);
+    {
+        std::unique_lock lock(mutex);
+        cv.wait_for(lock, 2s, [&] {
+            return std::find(flags.begin(), flags.end(), FLAG_CALLBACK) !=
+                flags.end();
+        });
+    }
+    client->on_disconnect([] {});
+    EXPECT_EQ(1, callback.count());
+    ASSERT_EQ(2, flags.size());
+    EXPECT_TRUE(
+        std::find(flags.begin(), flags.end(), FLAG_CALLBACK) != flags.end());
+    EXPECT_TRUE(
+        std::find(flags.begin(), flags.end(), FLAG_AFTER_CALL) != flags.end());
+}
+
+TEST(Client, TerminatingTheClientWaitsForCallbacks)
+{
+    using namespace std::chrono_literals;
+    auto client = create_client();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    ExpectCalled callback;
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::vector<CallbackOrderFlag> flags;
+    client->on_disconnect([&] {
+        std::lock_guard lock(mutex);
+        std::this_thread::sleep_for(100ms);
+        callback();
+        flags.push_back(FLAG_CALLBACK);
+        cv.notify_one();
+    });
+    client->terminate();
+    flags.push_back(FLAG_AFTER_CALL);
+    {
+        std::unique_lock lock(mutex);
+        cv.wait_for(lock, 2s, [&] {
+            return std::find(flags.begin(), flags.end(), FLAG_CALLBACK) !=
+                flags.end();
+        });
+    }
+    client->on_disconnect([] {});
+    EXPECT_EQ(1, callback.count());
+    ASSERT_EQ(2, flags.size());
+    EXPECT_EQ(FLAG_CALLBACK, flags[0]);
+    EXPECT_EQ(FLAG_AFTER_CALL, flags[1]);
+}

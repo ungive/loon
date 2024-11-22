@@ -176,6 +176,15 @@ void ClientImpl::internal_stop()
     QMetaObject::invokeMethod(&m_conn, "close", Qt::AutoConnection);
 }
 
+void ClientImpl::internal_terminate()
+{
+    // Blocks until the connection is fully terminated.
+
+    QMetaObject::invokeMethod(
+        &m_reconnect_timer, "stop", blocking_connection_type());
+    QMetaObject::invokeMethod(&m_conn, "abort", blocking_connection_type());
+}
+
 void ClientImpl::internal_open()
 {
     // Abort any existing connection first, before opening a new one.

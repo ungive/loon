@@ -84,6 +84,7 @@ public:
 protected:
     void internal_start() override;
     void internal_stop() override;
+    void internal_terminate() override;
 
 private Q_SLOTS:
     void send_ping();

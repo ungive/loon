@@ -39,6 +39,7 @@ public:
 protected:
     void internal_start() override;
     void internal_stop() override;
+    void internal_terminate() override;
 
 private:
     std::unique_ptr<hv::WebSocketClient> create_conn();
@@ -85,7 +86,7 @@ ClientImpl::~ClientImpl()
     // TODO: the destructor should not allocate a new object,
     //   which is what internal_stop() does.
     //   move construction/reconstruction into internal_start().
-    internal_stop();
+    internal_terminate();
 }
 
 std::unique_ptr<hv::WebSocketClient> ClientImpl::create_conn()
@@ -150,6 +151,14 @@ void ClientImpl::internal_stop()
     m_conn->stop();
     m_conn.reset();
     m_conn = create_conn();
+}
+
+void ClientImpl::internal_terminate()
+{
+    if (m_conn != nullptr) {
+        m_conn->stop();
+        m_conn = nullptr;
+    }
 }
 
 int64_t ClientImpl::send_binary(const char* data, size_t length)

@@ -75,3 +75,11 @@ void BaseClient::stop()
     }
     internal_stop();
 }
+
+void BaseClient::terminate()
+{
+    if (!m_active.exchange(false)) {
+        return;
+    }
+    internal_terminate();
+}

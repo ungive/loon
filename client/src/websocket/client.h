@@ -20,7 +20,7 @@ extern std::chrono::milliseconds default_ping_interval;
 class IClient
 {
 public:
-    virtual ~IClient() {};
+    virtual ~IClient(){};
 
     /**
      * @brief The websocket server address the client connects to.
@@ -106,6 +106,15 @@ public:
      * it can safely be locked from any of the event handlers.
      */
     virtual void stop() = 0;
+
+    /**
+     * @brief Terminates the websocket client and aborts any pending operations.
+     *
+     * This method blocks until the connection has been closed and all
+     * background threads have been terminated. This method may leave the client
+     * in an incomplete or unusable state and should not be used anymore.
+     */
+    virtual void terminate() = 0;
 };
 
 class Client : public IClient
@@ -149,6 +158,8 @@ public:
 
     inline void stop() override { return m_impl->stop(); }
 
+    inline void terminate() override { return m_impl->terminate(); }
+
 private:
     std::unique_ptr<IClient> m_impl;
 };
@@ -177,9 +188,12 @@ public:
 
     void stop() override;
 
+    void terminate() override;
+
 protected:
     virtual void internal_start() = 0;
     virtual void internal_stop() = 0;
+    virtual void internal_terminate() = 0;
 
     /**
      * @brief Call this method when the websocket connection is opened.

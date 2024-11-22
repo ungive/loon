@@ -73,7 +73,7 @@ public:
 class IClient
 {
 public:
-    virtual ~IClient() {};
+    virtual ~IClient(){};
 
     /**
      * @brief Connects to the server and maintains a connection.
@@ -86,13 +86,30 @@ public:
     virtual void start() = 0;
 
     /**
-     * @brief Stops the client and disconnects from the server.
+     * @brief Stops the client and disconnects in the background.
      *
-     * Returns immediately and does nothing, if already disconnected.
-     * Notifies all handles that registered content is not available anymore.
-     * Also disables idling, if it has been enabled before.
+     * This method has a similar effect as terminate() but returns immediately.
+     * The start() method may still be called again after calling this method.
+     * Callbacks may still be called after this method returns.
      */
     virtual void stop() = 0;
+
+    /**
+     * @brief Aborts any connection and waits until all threads terminated.
+     *
+     * Terminates the client and closes the connection to the server.
+     * Notifies all handles that registered content is not available anymore.
+     * Also disables idling, if it has been enabled before.
+     * Does nothing, if already disconnected or stopped.
+     *
+     * Returns once all connections and threads have been terminated. It is
+     * guaranteed that no registered callbacks will be called after this method
+     * returns. Callbacks may still be called before this method returns.
+     *
+     * This method may leave the client in an incomplete or unusable state.
+     * The start() method may not be called again after calling this method.
+     */
+    virtual void terminate() = 0;
 
     /**
      * @brief Whether the client is started.
@@ -515,6 +532,8 @@ public:
     inline void start() override { return m_impl->start(); }
 
     inline void stop() override { return m_impl->stop(); }
+
+    inline void terminate() override { return m_impl->terminate(); }
 
     inline bool started() override { return m_impl->started(); }
 
