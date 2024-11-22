@@ -78,8 +78,6 @@ void BaseClient::stop()
 
 void BaseClient::terminate()
 {
-    if (!m_active.exchange(false)) {
-        return;
-    }
+    // Always call terminate, without any checks.
     internal_terminate();
 }
