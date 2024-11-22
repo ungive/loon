@@ -307,14 +307,32 @@ void ClientImpl::on_connected()
 {
     start_heartbeat();
     reset_reconnect_delay();
-    on_websocket_open();
+    try {
+        on_websocket_open();
+    }
+    catch (std::exception const& e) {
+        log(Error) << "uncaught exception in on_connected callback: "
+                   << e.what();
+    }
+    catch (...) {
+        log(Error) << "unknown uncaught exception in on_connected callback";
+    }
     log(Info) << "connected";
 }
 
 void ClientImpl::on_disconnected()
 {
     stop_heartbeat();
-    on_websocket_close();
+    try {
+        on_websocket_close();
+    }
+    catch (std::exception const& e) {
+        log(Error) << "uncaught exception in on_disconnected callback: "
+                   << e.what();
+    }
+    catch (...) {
+        log(Error) << "unknown uncaught exception in on_disconnected callback";
+    }
     log(Info) << "disconnected";
     if (options().reconnect_delay.has_value() && active()) {
         m_reconnect_timer.start(next_reconnect_delay().count());
@@ -323,12 +341,34 @@ void ClientImpl::on_disconnected()
 
 void ClientImpl::on_text_message_received(QString const& message)
 {
-    on_websocket_message(message.toStdString());
+    try {
+        on_websocket_message(message.toStdString());
+    }
+    catch (std::exception const& e) {
+        log(Error)
+            << "uncaught exception in on_text_message_received callback: "
+            << e.what();
+    }
+    catch (...) {
+        log(Error) << "unknown uncaught exception in on_text_message_received "
+                      "callback";
+    }
 }
 
 void ClientImpl::on_binary_message_received(QByteArray const& message)
 {
-    on_websocket_message(message.toStdString());
+    try {
+        on_websocket_message(message.toStdString());
+    }
+    catch (std::exception const& e) {
+        log(Error)
+            << "uncaught exception in on_binary_message_received callback: "
+            << e.what();
+    }
+    catch (...) {
+        log(Error) << "unknown uncaught exception in "
+                      "on_binary_message_received callback";
+    }
 }
 
 static std::string flatten_qt_enum_value(
