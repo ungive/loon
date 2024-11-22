@@ -75,6 +75,27 @@ public:
         m_failed_callback = callback;
     }
 
+    inline void ping() override
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        // TODO define the default somewhere
+        return internal_ping(m_options.websocket.ping_interval.value_or(
+            std::chrono::milliseconds{ 30000 }));
+    }
+
+    inline void ping(std::chrono::milliseconds timeout) override
+    {
+        // std::lock_guard<std::mutex> lock(m_mutex);
+        // return internal_ping(timeout);
+
+        // TODO this requires sending a ping message on the protocol layer
+        // because it uses a different timeout than the actual pings.
+        // websocket libraries (like libhv) perform the heartbeat internally
+        // and messing with that would be too invasive and complex.
+
+        throw std::runtime_error("not yet implemented");
+    }
+
     std::shared_ptr<ContentHandle> register_content(
         std::shared_ptr<loon::ContentSource> source,
         loon::ContentInfo const& info,
@@ -303,6 +324,7 @@ private:
     void internal_stop(std::unique_lock<std::mutex>& lock);
     void internal_stop_and_reset(std::unique_lock<std::mutex>& lock);
     void internal_restart(std::unique_lock<std::mutex>& lock);
+    void internal_ping(std::chrono::milliseconds timeout);
 
     bool m_idle_waiting{ false };
     void idle_stop(std::unique_lock<std::mutex>& lock);

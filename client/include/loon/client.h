@@ -218,6 +218,42 @@ public:
     virtual void on_failed(std::function<void()> callback) = 0;
 
     /**
+     * @brief Explicitly pings the server to check connection health.
+     *
+     * This method can be used to ensure that the connection is healthy
+     * at a specific point in time, when availability is critical.
+     *
+     * It sends a websocket ping message to the server in the background
+     * and expects that a pong is sent in return within the configured
+     * timeout period, see Websocket::ping_interval.
+     * If no response is received in time, the connection is closed.
+     *
+     * This method returns immediately.
+     * Does nothing if the client is not started or connected.
+     *
+     * @see ping(timeout)
+     * @see Websocket::ping_interval
+     */
+    virtual void ping() = 0;
+
+    /**
+     * @brief Explicitly pings the server with a custom timeout.
+     *
+     * Behaves exactly like ping() but overrides the pong response timeout.
+     * The timeout value must be greater than zero and less than or equal
+     * to the configured ping interval, see Websocket::ping_interval.
+     *
+     * This method is useful when availability is critical at specific times
+     * and the ping interval needs to be smaller than the configured one.
+     *
+     * @see ping()
+     * @see Websocket::ping_interval
+     *
+     * @param timeout The time after which a pong must have been received.
+     */
+    virtual void ping(std::chrono::milliseconds timeout) = 0;
+
+    /**
      * @brief Registers content with this client and returns a handle for it.
      *
      * The content is registered for the lifetime of the websocket connection
@@ -232,12 +268,17 @@ public:
      * the data() method can safely seek to the beginning of the file
      * without having to worry about corrupting other ongoing requests.
      *
-     * If the client is idling, the client is put out of idle.
+     * This method either waits until the client is connected,
+     * using the given timeout duration or, if it is already connected,
+     * sends a ping message to the server in the background
+     * by calling the ping(timeout) method using the given timeout duration.
+     *
+     * If the client is idling, the client is put out of idle automatically.
      *
      * @param source The source for the content.
      * @param info Information about how to provide the content.
-     * @param timeout How long to wait until the connection is ready,
-     * if it isn't yet.
+     * @param timeout How long to wait until the connection is ready
+     * or until a pong response has been received by the server.
      *
      * @returns A handle to the content.
      * For use with unregister_content() to unregister this content again.
@@ -261,6 +302,12 @@ public:
 
     /**
      * @brief Registers content with this client and returns a handle for it.
+     *
+     * The timeout is set to the following default value, depending on it use:
+     * - If the client is not connected yet, the configured connect timeout
+     *   is used or a sane default value
+     * - If the client is already connected and a ping is sent,
+     *   the ping timeout is used, if that is not configured
      *
      * Uses the connect timeout or a sane default value for the timeout.
      *
@@ -543,6 +590,13 @@ public:
     inline void on_failed(std::function<void()> callback) override
     {
         return m_impl->on_failed(callback);
+    }
+
+    inline void ping() override { return m_impl->ping(); }
+
+    inline void ping(std::chrono::milliseconds timeout) override
+    {
+        return m_impl->ping(timeout);
     }
 
     inline std::shared_ptr<ContentHandle> register_content(

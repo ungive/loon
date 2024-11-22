@@ -741,6 +741,11 @@ void ClientImpl::internal_restart(std::unique_lock<std::mutex>& lock)
     internal_start();
 }
 
+void loon::ClientImpl::internal_ping(std::chrono::milliseconds timeout)
+{
+    //
+}
+
 void loon::ClientImpl::idle_stop(std::unique_lock<std::mutex>& lock)
 {
     log(Info) << "disconnecting after idle"
