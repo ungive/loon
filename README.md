@@ -17,6 +17,11 @@ It acts like a **tunnel for HTTP traffic**,
 but with a very minimal and lightweight implementation behind it,
 ideal to keep your client small and lean.
 
+The Go server and C++ client implementation are battle-tested
+and actively used with [**Music Presence**](https://musicpresence.app),
+a desktop application to show what you are listening to
+in your Discord status!
+
 ## Architecture overview
 
 There are three main actors with loon:
