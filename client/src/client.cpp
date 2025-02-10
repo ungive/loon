@@ -740,8 +740,6 @@ void ClientImpl::internal_stop(
     reset_connection_state();
     // Not idling anymore.
     set_idle(false);
-    // Notify any client methods that are waiting for state changes.
-    update_connected(false);
     // Reset any manager state by removing pending actions.
     // We do not want to carry those into a fresh connection.
     m_manager_action = ManagerAction::Nothing{};
