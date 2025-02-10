@@ -82,6 +82,7 @@ public:
     int64_t send_text(const char* data, size_t length) override;
 
 protected:
+    // This method should only be called when the websocket is not connected.
     void internal_start() override;
     void internal_stop() override;
     void internal_terminate() override;

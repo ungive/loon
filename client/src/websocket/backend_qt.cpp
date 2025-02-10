@@ -398,6 +398,14 @@ void ClientImpl::on_error(QAbstractSocket::SocketError error)
 
 void ClientImpl::on_state(QAbstractSocket::SocketState state)
 {
+    if (state == QAbstractSocket::SocketState::ConnectingState && connected()) {
+        // This state indicates that the internal_open() method has been called
+        // again while the client is still connected. This should not happen.
+        assert(false);
+        // In production making the user think the client disconnected
+        // should be sufficient to recover from this bug.
+        disconnect_handler(false);
+    }
     log(Debug) << "socket state: "
                << flatten_qt_enum_value(qt_enum_key(state), true)
                << var("value", qt_enum_key(state));
