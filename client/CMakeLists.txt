@@ -131,6 +131,15 @@ if(LOON_BUILD_TESTS)
                     $<TARGET_RUNTIME_DLLS:loon_test>
                     $<TARGET_FILE_DIR:loon_test>
                 COMMAND_EXPAND_LISTS)
+            include(windeployqt)
+            windeployqt(loon_test)
+            add_custom_command(
+                TARGET loon_test
+                POST_BUILD
+                COMMAND
+                    ${CMAKE_COMMAND} -E copy_directory_if_different
+                    ${CMAKE_CURRENT_BINARY_DIR}/windeployqt/
+                    $<TARGET_FILE_DIR:loon_test>)
         endif()
     endif()
 
