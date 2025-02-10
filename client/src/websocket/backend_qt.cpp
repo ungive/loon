@@ -291,7 +291,11 @@ void ClientImpl::send_ping()
             << "server did not respond, attempting to reconnect"
             << var("last_pong_time", m_last_pong_time.time_since_epoch())
             << var("last_ping_time", m_last_ping_time.time_since_epoch());
-        return internal_open();
+        // Make sure the connection is properly closed before opening it again.
+        QMetaObject::invokeMethod(&m_conn, "close", blocking_connection_type());
+        QMetaObject::invokeMethod(
+            this, &ClientImpl::internal_open, blocking_connection_type());
+        return;
     }
     // Making this check for the same reason as in send_binary().
     if (connected()) {
