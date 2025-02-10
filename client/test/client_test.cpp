@@ -735,7 +735,7 @@ TEST(Client, CanBeStartedAgainWhenStoppedByFailure)
     auto content = example_content();
     EXPECT_ANY_THROW(client->register_content(content.source, content.info));
     // Start the client again after failure.
-    client->start_and_wait_until_connected();
+    EXPECT_NO_THROW(client->start_and_wait_until_connected());
     EXPECT_TRUE(client->connected());
 }
 
