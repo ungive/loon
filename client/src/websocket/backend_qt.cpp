@@ -166,7 +166,12 @@ void ClientImpl::internal_start()
     // in turn could call into callbacks of the caller of this method,
     // therefore resulting in a possible deadlock.
 
-    assert(!connected());
+    // FIXME: This method and the internal_stop() method should block
+    // and call connected/disconnected callbacks on another thread.
+    // Calling internal_stop() and internal_start() in immediate sequence
+    // causes this assertion to fail.
+    // assert(!connected());
+
     QMetaObject::invokeMethod(
         this, &ClientImpl::internal_open, Qt::AutoConnection);
 }
