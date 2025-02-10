@@ -187,8 +187,6 @@ void ClientImpl::internal_terminate()
 
 void ClientImpl::internal_open()
 {
-    // Abort any existing connection first, before opening a new one.
-    m_conn.abort();
     // URL
     QUrl url(QString::fromStdString(address()));
     if (!url.isValid() || (url.scheme() != "ws" && url.scheme() != "wss")) {
