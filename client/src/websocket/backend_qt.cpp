@@ -140,6 +140,8 @@ inline void ClientImpl::reset_reconnect_delay()
 
 void ClientImpl::reconnect()
 {
+    // This method is only called while the websocket connection is closed.
+
     if (!active()) {
         // Cancel if the websocket became inactive.
         return;
@@ -152,6 +154,7 @@ void ClientImpl::reconnect()
     log(Info) << "automatic reconnect" << var("count", m_reconnect_count)
               << var("delay", m_reconnect_delay.count());
 
+    assert(!connected());
     internal_open();
 }
 
@@ -163,6 +166,7 @@ void ClientImpl::internal_start()
     // in turn could call into callbacks of the caller of this method,
     // therefore resulting in a possible deadlock.
 
+    assert(!connected());
     QMetaObject::invokeMethod(
         this, &ClientImpl::internal_open, Qt::AutoConnection);
 }
