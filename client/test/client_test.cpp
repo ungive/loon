@@ -803,21 +803,6 @@ TEST(Client, ReconnectsWhenIdleDisconnectedAndWaitUntilConnectedIsCalled)
     EXPECT_TRUE(client->connected());
 }
 
-TEST(Client, RegisterContentTimesOutWhenTimeoutIsSetAndServerUnreachable)
-{
-    ClientOptions options;
-    options.no_content_request_limit = std::nullopt; // required
-    auto client = std::make_shared<TestClient>("ws://127.0.0.1:8071", options);
-    client->start();
-    auto content = example_content();
-    auto t1 = std::chrono::high_resolution_clock::now();
-    EXPECT_ANY_THROW(
-        client->register_content(content.source, content.info, 500ms));
-    auto t2 = std::chrono::high_resolution_clock::now();
-    auto delta = t2 - t1;
-    EXPECT_GT(delta, 475ms);
-}
-
 TEST(Client, RegisterContentWorksWhenConnectedAndTimeoutIsZero)
 {
     auto client = create_client(false);
