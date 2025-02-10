@@ -108,6 +108,9 @@ private:
     void reset_reconnect_delay();
     void start_heartbeat();
     void stop_heartbeat();
+    void disconnect_handler(bool disconnected = true);
+    void on_websocket_open_safe();
+    void on_websocket_close_safe();
 
 private:
     qt::WebSocket m_conn;

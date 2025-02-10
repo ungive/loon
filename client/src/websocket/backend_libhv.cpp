@@ -92,9 +92,11 @@ ClientImpl::~ClientImpl()
 std::unique_ptr<hv::WebSocketClient> ClientImpl::create_conn()
 {
     auto conn = std::make_unique<hv::WebSocketClient>();
+    // FIXME catch exceptions in on_websocket_open
     conn->onopen = std::bind(&ClientImpl::on_websocket_open, this);
     conn->onmessage = std::bind(
         &ClientImpl::on_websocket_message, this, std::placeholders::_1);
+    // FIXME catch exceptions in on_websocket_close
     conn->onclose = std::bind(&ClientImpl::on_websocket_close, this);
     if (options().connect_timeout.has_value()) {
         conn->setConnectTimeout(options().connect_timeout.value().count());

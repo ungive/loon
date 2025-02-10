@@ -307,35 +307,21 @@ void ClientImpl::on_connected()
 {
     start_heartbeat();
     reset_reconnect_delay();
-    try {
-        on_websocket_open();
-    }
-    catch (std::exception const& e) {
-        log(Error) << "uncaught exception in on_connected callback: "
-                   << e.what();
-    }
-    catch (...) {
-        log(Error) << "unknown uncaught exception in on_connected callback";
-    }
+    on_websocket_open_safe();
     log(Info) << "connected";
 }
 
-void ClientImpl::on_disconnected()
+void ClientImpl::on_disconnected() { disconnect_handler(true); }
+
+void ClientImpl::disconnect_handler(bool disconnected)
 {
     stop_heartbeat();
-    try {
-        on_websocket_close();
-    }
-    catch (std::exception const& e) {
-        log(Error) << "uncaught exception in on_disconnected callback: "
-                   << e.what();
-    }
-    catch (...) {
-        log(Error) << "unknown uncaught exception in on_disconnected callback";
-    }
-    log(Info) << "disconnected";
-    if (options().reconnect_delay.has_value() && active()) {
-        m_reconnect_timer.start(next_reconnect_delay().count());
+    on_websocket_close_safe();
+    if (disconnected) {
+        log(Info) << "disconnected";
+        if (options().reconnect_delay.has_value() && active()) {
+            m_reconnect_timer.start(next_reconnect_delay().count());
+        }
     }
 }
 
@@ -415,6 +401,34 @@ void ClientImpl::on_ssl_errors(const QList<QSslError>& errors)
 {
     for (auto const& error : errors) {
         log(Error) << "ssl error: " << error.errorString().toStdString();
+    }
+}
+
+void ClientImpl::on_websocket_open_safe()
+{
+    try {
+        on_websocket_open();
+    }
+    catch (std::exception const& e) {
+        log(Error) << "uncaught exception in on_connected callback: "
+                   << e.what();
+    }
+    catch (...) {
+        log(Error) << "unknown uncaught exception in on_connected callback";
+    }
+}
+
+void ClientImpl::on_websocket_close_safe()
+{
+    try {
+        on_websocket_close();
+    }
+    catch (std::exception const& e) {
+        log(Error) << "uncaught exception in on_disconnected callback: "
+                   << e.what();
+    }
+    catch (...) {
+        log(Error) << "unknown uncaught exception in on_disconnected callback";
     }
 }
 
