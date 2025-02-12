@@ -953,3 +953,475 @@ TEST(Client, StartCanBeCalledAgainAfterTerminate)
     auto response = http_get(h2->url());
     EXPECT_EQ(content.data, response.body);
 }
+
+#include "loon/shared_client.h"
+#include "shared_client.h"
+
+TEST(SharedReferenceCounter, AnyMethodThrowsWithNullPointer)
+{
+    loon::SharedReferenceCounter m;
+    EXPECT_ANY_THROW(m.add(nullptr));
+    EXPECT_ANY_THROW(m.remove(nullptr));
+    EXPECT_ANY_THROW(m.count(nullptr));
+}
+
+TEST(SharedReferenceCounter, AddReturnsConsecutiveUniqueValues)
+{
+    loon::SharedReferenceCounter m;
+    auto client = create_client(false);
+    EXPECT_EQ(0, m.add(client));
+    EXPECT_EQ(1, m.add(client));
+    EXPECT_EQ(2, m.add(client));
+    EXPECT_EQ(3, m.add(client));
+    EXPECT_EQ(4, m.add(client));
+}
+
+TEST(SharedReferenceCounter, AddAfterRemoveContinuesToReturnConsecutiveValues)
+{
+    loon::SharedReferenceCounter m;
+    auto client = create_client(false);
+    EXPECT_EQ(0, m.add(client));
+    EXPECT_EQ(1, m.add(client));
+    EXPECT_EQ(2, m.add(client));
+    m.remove(client);
+    EXPECT_EQ(3, m.add(client));
+    m.remove(client);
+    EXPECT_EQ(4, m.add(client));
+}
+
+TEST(SharedReferenceCounter, CountReflectsTheCurrentReferenceCount)
+{
+    loon::SharedReferenceCounter m;
+    auto client = create_client(false);
+    for (size_t i = 0; i < 16; i++) {
+        EXPECT_EQ(i, m.count(client));
+        EXPECT_EQ(i, m.add(client));
+        EXPECT_EQ(i + 1, m.count(client));
+    }
+}
+
+TEST(SharedReferenceCounter, EqualAmountOfRemoveCallsResetsCountToZero)
+{
+    loon::SharedReferenceCounter m;
+    for (size_t i = 1; i < 16; i++) {
+        auto client = create_client(false);
+        for (size_t j = 0; j < i; j++) {
+            EXPECT_EQ(j, m.add(client));
+        }
+        for (size_t j = 0; j < i; j++) {
+            m.remove(client);
+            EXPECT_EQ(i - j - 1, m.count(client));
+        }
+    }
+}
+
+TEST(SharedReferenceCounter, RemovingNonExistentClientCausesDeath)
+{
+    {
+        loon::SharedReferenceCounter m;
+        auto client = create_client(false);
+        EXPECT_DEATH(m.remove(client), "");
+    }
+    {
+        loon::SharedReferenceCounter m;
+        auto client = create_client(false);
+        m.add(client);
+        m.remove(client);
+        EXPECT_DEATH(m.remove(client), "");
+    }
+}
+
+TEST(SharedReferenceCounter, CountWithRequiredCausesDeathWhenThereIsNoClient)
+{
+    {
+        loon::SharedReferenceCounter m;
+        auto client = create_client(false);
+        EXPECT_DEATH(m.count(client, true), "");
+    }
+    {
+        loon::SharedReferenceCounter m;
+        auto client = create_client(false);
+        // This should not fail.
+        m.count(client, false);
+    }
+}
+
+TEST(SharedReferenceCounter, SingleReturnsTrueWhenThereIsOneReferenceOnly)
+{
+    loon::SharedReferenceCounter m;
+    auto client = create_client(false);
+    EXPECT_DEATH(m.single(client, true), "");
+    EXPECT_FALSE(m.single(client, false));
+    m.add(client);
+    EXPECT_TRUE(m.single(client, true));
+    EXPECT_TRUE(m.single(client, false));
+    m.add(client);
+    EXPECT_FALSE(m.single(client, true));
+    EXPECT_FALSE(m.single(client, false));
+}
+
+class ClientCallCheck : public loon::IClient
+{
+public:
+    ClientCallCheck(std::shared_ptr<IClient> client) : m_client{ client } {}
+
+    inline size_t n_start() const { return m_n_start; }
+
+    inline size_t n_stop() const { return m_n_stop; }
+
+    inline size_t n_started() const { return m_n_started; }
+
+    inline size_t n_idle() const { return m_n_idle; }
+
+    inline size_t n_wait_until_ready() const { return m_n_wait_until_ready; }
+
+    inline size_t n_wait_until_ready_timeout() const
+    {
+        return m_n_wait_until_ready_timeout;
+    }
+
+    // Overrides
+
+    inline void start() override
+    {
+        m_n_start++;
+        return m_client->start();
+    }
+
+    inline void stop() override
+    {
+        m_n_stop++;
+        return m_client->stop();
+    }
+
+    inline void terminate() override { return m_client->terminate(); }
+
+    inline bool started() override
+    {
+        m_n_started++;
+        return m_client->started();
+    }
+
+    inline void idle() override
+    {
+        m_n_idle++;
+        return m_client->idle();
+    }
+
+    inline bool wait_until_ready() override
+    {
+        m_n_wait_until_ready++;
+        return m_client->wait_until_ready();
+    }
+
+    inline bool wait_until_ready(std::chrono::milliseconds timeout) override
+    {
+        m_n_wait_until_ready_timeout++;
+        return m_client->wait_until_ready(timeout);
+    }
+
+    inline void on_ready(std::function<void()> callback) override
+    {
+        return m_client->on_ready(callback);
+    }
+
+    inline void on_disconnect(std::function<void()> callback) override
+    {
+        return m_client->on_disconnect(callback);
+    }
+
+    inline void on_failed(std::function<void()> callback) override
+    {
+        return m_client->on_failed(callback);
+    }
+
+    inline void unregister_content(
+        std::shared_ptr<ContentHandle> handle) override
+    {
+        return m_client->unregister_content(handle);
+    }
+
+    inline std::vector<std::shared_ptr<ContentHandle>> content() override
+    {
+        return m_client->content();
+    }
+
+    inline bool is_registered(std::shared_ptr<ContentHandle> handle) override
+    {
+        return m_client->is_registered(handle);
+    }
+
+    inline std::shared_ptr<ContentHandle> register_content(
+        std::shared_ptr<loon::ContentSource> source,
+        loon::ContentInfo const& info,
+        std::chrono::milliseconds timeout) override
+    {
+        return m_client->register_content(source, info, timeout);
+    }
+
+    inline std::shared_ptr<ContentHandle> register_content(
+        std::shared_ptr<loon::ContentSource> source,
+        loon::ContentInfo const& info) override
+    {
+        return m_client->register_content(source, info);
+    }
+
+private:
+    std::shared_ptr<IClient> m_client;
+
+    size_t m_n_start{ 0 };
+    size_t m_n_stop{ 0 };
+    size_t m_n_started{ 0 };
+    size_t m_n_idle{ 0 };
+    size_t m_n_wait_until_ready{ 0 };
+    size_t m_n_wait_until_ready_timeout{ 0 };
+};
+
+TEST(SharedClient, ConstructorThrowsWithSharedClientAsArgument)
+{
+    auto client = create_client(false);
+    auto s = std::make_shared<SharedClient>(client);
+    EXPECT_ANY_THROW(SharedClient(std::dynamic_pointer_cast<IClient>(s)));
+}
+
+TEST(SharedClient, CallingTerminateIsNotPossible)
+{
+    auto client = create_client(false);
+    auto s = std::make_shared<SharedClient>(client);
+    auto is = std::dynamic_pointer_cast<ISharedClient>(s);
+    EXPECT_DEATH(is->terminate(), "");
+}
+
+TEST(SharedClient, StartedNotDelegatedWhenNotStarted)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s = std::make_shared<SharedClient>(check);
+    EXPECT_FALSE(s->started());
+    EXPECT_EQ(0, check->n_started());
+}
+
+TEST(SharedClient, MustBeStartedToBeStopped)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s = std::make_shared<SharedClient>(check);
+    s->stop();
+    // The stop call wasn't actually delegated.
+    EXPECT_EQ(0, check->n_stop());
+    EXPECT_EQ(0, check->n_start());
+    s->start();
+    EXPECT_EQ(1, check->n_start()); // delegated(start)
+    EXPECT_EQ(0, check->n_started());
+    EXPECT_TRUE(s->started());
+    EXPECT_EQ(1, check->n_started()); // delegated(started)
+    s->wait_until_ready();
+    s->stop();
+    // After starting it is delegated.
+    EXPECT_EQ(1, check->n_stop()); // delegated(stop)
+}
+
+TEST(SharedClient, WaitUntilReadyThrowsClientNotStartedExceptionWhenNotStarted)
+{
+    auto c1 = create_client(false);
+    auto c2 = create_client(false);
+    auto check1 = std::make_shared<ClientCallCheck>(c1);
+    auto check2 = std::make_shared<ClientCallCheck>(c2);
+    auto s1 = std::make_shared<SharedClient>(check1);
+    auto s2 = std::make_shared<SharedClient>(check2);
+    EXPECT_THROW(s1->wait_until_ready(), loon::ClientNotStartedException);
+    EXPECT_THROW(s2->wait_until_ready(100ms), loon::ClientNotStartedException);
+    EXPECT_EQ(0, check1->n_wait_until_ready());
+    EXPECT_EQ(0, check2->n_wait_until_ready_timeout());
+    s1->start();
+    s2->start();
+    EXPECT_NO_THROW(s1->wait_until_ready());
+    EXPECT_NO_THROW(s2->wait_until_ready(250ms));
+    EXPECT_EQ(1, check1->n_wait_until_ready());
+    EXPECT_EQ(1, check2->n_wait_until_ready_timeout());
+}
+
+TEST(SharedClient, SharedClientIsNotStartedWhenWrappedClientIsAlreadyStarted)
+{
+    auto client = create_client(true);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s = std::make_shared<SharedClient>(check);
+    EXPECT_FALSE(s->started());
+    EXPECT_EQ(0, check->n_started());
+}
+
+TEST(SharedClient, LastStopCallOfTwoSharedClientsDelegatesStop)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s1 = std::make_shared<SharedClient>(check);
+    auto s2 = std::make_shared<SharedClient>(check);
+    s1->start();
+    s2->start();
+    s1->wait_until_ready();
+    s2->wait_until_ready();
+    EXPECT_EQ(0, check->n_stop());
+    s1->stop();
+    EXPECT_EQ(0, check->n_stop());
+    s2->stop();
+    EXPECT_EQ(1, check->n_stop());
+    // The underlying client is not started anymore.
+    EXPECT_FALSE(client->started());
+}
+
+TEST(SharedClient, WhenLastStartedClientIsDestructedTheClientIsStopped)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    {
+        auto s1 = std::make_shared<SharedClient>(check);
+        s1->start();
+        s1->wait_until_ready();
+        EXPECT_TRUE(client->started());
+        {
+            auto s2 = std::make_shared<SharedClient>(check);
+            s2->start();
+            s2->wait_until_ready();
+        }
+        EXPECT_TRUE(client->started());
+    }
+    // Client is stopped after all shared clients are destructed.
+    EXPECT_FALSE(client->started());
+}
+
+TEST(SharedClient, IdleIsDelegatedWhenAllSharedClientsIdle)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s1 = std::make_shared<SharedClient>(check);
+    auto s2 = std::make_shared<SharedClient>(check);
+    s1->start();
+    s2->start();
+    s1->wait_until_ready();
+    s2->wait_until_ready();
+    EXPECT_EQ(0, check->n_idle());
+    s1->idle();
+    EXPECT_EQ(0, check->n_idle());
+    s2->idle();
+    EXPECT_EQ(1, check->n_idle());
+}
+
+TEST(SharedClient, AClientThatIsStartedAgainDoesNotIdleAnymore)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s1 = std::make_shared<SharedClient>(check);
+    auto s2 = std::make_shared<SharedClient>(check);
+    s1->start();
+    s2->start();
+    s1->wait_until_ready();
+    s2->wait_until_ready();
+    EXPECT_EQ(0, check->n_idle());
+    s1->idle();
+    s1->start();
+    // At this point the first client should not be idling anymore.
+    EXPECT_EQ(0, check->n_idle());
+    s2->idle();
+    // Therefore idle is never delegated.
+    EXPECT_EQ(0, check->n_idle());
+}
+
+TEST(SharedClient, ExternallyStoppedClientCanBeStartedAgain)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s = std::make_shared<SharedClient>(check);
+    s->start();
+    EXPECT_EQ(1, check->n_start());
+    s->wait_until_ready();
+    client->stop(); // externally stopped
+    s->start();
+    EXPECT_EQ(2, check->n_start());
+}
+
+TEST(SharedClient, ExternallyStoppedClientCanBeStopped)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s = std::make_shared<SharedClient>(check);
+    s->start();
+    s->wait_until_ready();
+    client->stop(); // externally stopped
+    s->stop();
+    EXPECT_EQ(1, check->n_stop());
+}
+
+TEST(SharedClient, RegisteredContentPathIsPrefixed)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s = std::make_shared<SharedClient>(check);
+    s->start();
+    s->wait_until_ready();
+    auto c = example_content("file.txt");
+    auto h = s->register_content(c.source, c.info);
+    EXPECT_THAT(h->url(), EndsWith(s->path_prefix() + c.path));
+}
+
+TEST(SharedClient, RegisteredContentIsSeparateBetweenSharedClients)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s1 = std::make_shared<SharedClient>(check);
+    auto s2 = std::make_shared<SharedClient>(check);
+    s1->start();
+    s2->start();
+    s1->wait_until_ready();
+    s2->wait_until_ready();
+    auto c1 = example_content("1.txt");
+    auto c2 = example_content("2.txt");
+    auto c3 = example_content("3.txt");
+    auto h1 = s1->register_content(c1.source, c1.info);
+    auto h2 = s2->register_content(c2.source, c2.info);
+    auto h3 = s2->register_content(c3.source, c3.info);
+    EXPECT_THAT(s1->content(), UnorderedElementsAre(h1));
+    EXPECT_THAT(s2->content(), UnorderedElementsAre(h2, h3));
+    EXPECT_TRUE(s1->is_registered(h1));
+    EXPECT_FALSE(s1->is_registered(h2));
+    EXPECT_FALSE(s1->is_registered(h3));
+    EXPECT_FALSE(s2->is_registered(h1));
+    EXPECT_TRUE(s2->is_registered(h2));
+    EXPECT_TRUE(s2->is_registered(h3));
+}
+
+TEST(SharedClient, UnregisteringContentFromAnotherSharedClientThrows)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s1 = std::make_shared<SharedClient>(check);
+    auto s2 = std::make_shared<SharedClient>(check);
+    s1->start();
+    s2->start();
+    s1->wait_until_ready();
+    s2->wait_until_ready();
+    auto c1 = example_content("1.txt");
+    auto c2 = example_content("2.txt");
+    auto h1 = s1->register_content(c1.source, c1.info);
+    auto h2 = s2->register_content(c2.source, c2.info);
+    EXPECT_THROW(s1->unregister_content(h2), loon::MalformedContentException);
+    EXPECT_THROW(s2->unregister_content(h1), loon::MalformedContentException);
+}
+
+TEST(SharedClient, UnregisterContentWithNullPointerThrows)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s = std::make_shared<SharedClient>(check);
+    EXPECT_THROW(
+        s->unregister_content(nullptr), loon::MalformedContentException);
+}
+
+TEST(SharedClient, IsRegisteredWithNullPointerThrows)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s = std::make_shared<SharedClient>(check);
+    EXPECT_THROW(s->is_registered(nullptr), loon::MalformedContentException);
+}
+
+// TODO tests for callbacks

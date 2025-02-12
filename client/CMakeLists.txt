@@ -8,8 +8,8 @@ option(LOON_BUILD_TESTS "Build loon tests" ON)
 set(LOON_WEBSOCKET_BACKEND "LIBHV" CACHE STRING "Websocket backend")
 set_property(CACHE LOON_WEBSOCKET_BACKEND PROPERTY STRINGS "LIBHV" "QT")
 
-set(LIB_SOURCES src/client.cpp src/request_handler.cpp src/util.cpp
-                src/logging.cpp src/websocket/client.cpp)
+set(LIB_SOURCES src/client.cpp src/shared_client.cpp src/request_handler.cpp
+                src/util.cpp src/logging.cpp src/websocket/client.cpp)
 if(LOON_WEBSOCKET_BACKEND STREQUAL "LIBHV")
     message("Using libhv as websocket backend")
     list(APPEND LIB_SOURCES src/websocket/backend_libhv.cpp)
