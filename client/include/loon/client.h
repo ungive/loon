@@ -106,8 +106,7 @@ public:
      * guaranteed that no registered callbacks will be called after this method
      * returns. Callbacks may still be called before this method returns.
      *
-     * This method may leave the client in an incomplete or unusable state.
-     * The start() method may not be called again after calling this method.
+     * The start() method may still be called again after calling this method.
      */
     virtual void terminate() = 0;
 

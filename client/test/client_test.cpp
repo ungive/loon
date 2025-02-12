@@ -939,3 +939,17 @@ TEST(Client, TerminatingTheClientWaitsForCallbacks)
     EXPECT_EQ(FLAG_CALLBACK, flags[0]);
     EXPECT_EQ(FLAG_AFTER_CALL, flags[1]);
 }
+
+TEST(Client, StartCanBeCalledAgainAfterTerminate)
+{
+    auto client = create_client();
+    auto content = example_content();
+    auto h1 = client->register_content(content.source, content.info);
+    client->terminate();
+    EXPECT_NO_THROW(client->start());
+    EXPECT_NO_THROW(client->wait_until_ready());
+    EXPECT_TRUE(client->started());
+    auto h2 = client->register_content(content.source, content.info);
+    auto response = http_get(h2->url());
+    EXPECT_EQ(content.data, response.body);
+}
