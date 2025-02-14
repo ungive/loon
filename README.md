@@ -92,7 +92,9 @@ A deployment example can be found in [**deployments**](./deployments).
 - A ready to use server Docker image:
   **[build/package/Dockerfile](./build/package/Dockerfile)**
 - A server deployment example with Docker Compose and Caddy:
-  **[deployments](./deployments)**
+  **[deployments](./deployments)**  
+  For a more production-ready example have a look at
+  **[music-presence/client-proxy](https://github.com/music-presence/client-proxy)**
 - An example server configuration to quickly get started:
   **[examples/server/config.yaml](./examples/server/config.yaml)**
 
