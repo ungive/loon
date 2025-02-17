@@ -63,8 +63,8 @@ private:
     std::shared_ptr<IClient> m_client{};
     size_t m_index{};
 
-    bool m_started{ false };
-    bool m_idling{ false };
+    std::atomic<bool> m_started{ false };
+    std::atomic<bool> m_idling{ false };
     std::unordered_set<std::shared_ptr<loon::ContentHandle>> m_registered{};
 };
 

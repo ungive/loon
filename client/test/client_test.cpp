@@ -1479,6 +1479,20 @@ TEST(SharedClient, OnReadyIsOnlyCalledOnStartedSharedClients)
     EXPECT_EQ(0, c2.count()); // not started
 }
 
+TEST(SharedClient, OnReadyIsOnlyCalledForStartedClients)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s1 = std::make_shared<SharedClient>(check);
+    auto s2 = std::make_shared<SharedClient>(check);
+    ExpectCalled c1(1), c2(0);
+    s1->on_ready(c1.get());
+    s2->on_ready(c2.get());
+    s1->start();
+    s1->wait_until_ready();
+    EXPECT_EQ(0, c2.count()); // not started
+}
+
 TEST(SharedClient, OnReadyCalledOnStartWhenClientIsAlreadyConnected)
 {
     auto client = create_client(false);

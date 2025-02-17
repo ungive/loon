@@ -57,11 +57,13 @@ std::string const& loon::SharedClientImpl::path_prefix() const
     return prefix;
 }
 
+#include <iostream>
+
 void loon::SharedClientImpl::start()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     internal_reset_idling();
-    if (m_started) {
+    if (m_started.load()) {
         if (!m_client->started()) {
             // If the client is not started, it needs to be started again.
             // Everything else is already set the way it needs to be.
@@ -79,7 +81,7 @@ void loon::SharedClientImpl::stop()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     internal_reset_idling();
-    if (!m_started) {
+    if (!m_started.load()) {
         return;
     }
     // Note: Executing this is okay, if the client is not actually started.
@@ -88,7 +90,7 @@ void loon::SharedClientImpl::stop()
     if (previous_count == 1) {
         m_client->stop(); // delegate
     }
-    m_started = false;
+    m_started.store(false);
 }
 
 bool loon::SharedClientImpl::started()
@@ -99,15 +101,15 @@ bool loon::SharedClientImpl::started()
 
 bool loon::SharedClientImpl::internal_started()
 {
-    return m_started && m_client->started(); // delegate
+    return m_started.load() && m_client->started(); // delegate
 }
 
 void loon::SharedClientImpl::internal_reset_idling()
 {
-    if (m_idling) {
+    if (m_idling.load()) {
         auto previous_count = g_state.idling.remove(m_client);
         assert(previous_count > 0);
-        m_idling = false;
+        m_idling.store(false);
     }
 }
 
@@ -117,7 +119,7 @@ void loon::SharedClientImpl::idle()
     if (!internal_started()) {
         return;
     }
-    if (m_idling) {
+    if (m_idling.load()) {
         return;
     }
     g_state.idling.add(m_client); // this shared client is idling
@@ -129,13 +131,13 @@ void loon::SharedClientImpl::idle()
     if (all_idling) {
         m_client->idle(); // delegate
     }
-    m_idling = true;
+    m_idling.store(true);
 }
 
 bool loon::SharedClientImpl::wait_until_ready()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
-    if (!m_started) {
+    if (!m_started.load()) {
         throw loon::ClientNotStartedException(
             "the shared client must be started");
     }
@@ -145,7 +147,7 @@ bool loon::SharedClientImpl::wait_until_ready()
 bool loon::SharedClientImpl::wait_until_ready(std::chrono::milliseconds timeout)
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
-    if (!m_started) {
+    if (!m_started.load()) {
         throw loon::ClientNotStartedException(
             "the shared client must be started");
     }
@@ -155,7 +157,13 @@ bool loon::SharedClientImpl::wait_until_ready(std::chrono::milliseconds timeout)
 void loon::SharedClientImpl::on_ready(std::function<void()> callback)
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
-    g_state.on_ready.get(m_client)->set(m_index, callback);
+    g_state.on_ready.get(m_client)->set(m_index, [this, callback] {
+        // Note: Do not lock the shared client's mutex within the callback.
+        if (m_started.load()) {
+            // Only call the callback when the client is actually started.
+            callback();
+        }
+    });
 }
 
 void loon::SharedClientImpl::on_disconnect(std::function<void()> callback)
