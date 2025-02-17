@@ -50,6 +50,13 @@ loon::SharedClientImpl::SharedClientImpl(std::shared_ptr<IClient> client)
 
 loon::SharedClientImpl::~SharedClientImpl()
 {
+    // Unregister all content that was registered through this shared client.
+    for (auto it = m_registered.begin(); it != m_registered.end();) {
+        m_client->unregister_content(*it);
+        it = m_registered.erase(it);
+    }
+    assert(m_registered.empty());
+
     // Ensure the underlying client is stopped,
     // once all shared clients are destructed.
     stop();

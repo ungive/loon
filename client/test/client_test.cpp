@@ -1411,6 +1411,32 @@ TEST(SharedClient, RegisteredContentIsSeparateBetweenSharedClients)
     EXPECT_TRUE(s2->is_registered(h3));
 }
 
+TEST(SharedClient, RegisteredContentIsUnregisteredForSharedClientOnDestruction)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    {
+        auto s1 = std::make_shared<SharedClient>(check);
+        s1->start();
+        s1->wait_until_ready();
+        auto c1 = example_content("1.txt");
+        auto h1 = s1->register_content(c1.source, c1.info);
+        {
+            auto s2 = std::make_shared<SharedClient>(check);
+            s2->start();
+            s2->wait_until_ready();
+            auto c2 = example_content("2.txt");
+            auto h2 = s2->register_content(c2.source, c2.info);
+            EXPECT_THAT(s1->content(), UnorderedElementsAre(h1));
+            EXPECT_THAT(s2->content(), UnorderedElementsAre(h2));
+            EXPECT_THAT(client->content(), UnorderedElementsAre(h1, h2));
+        }
+        EXPECT_THAT(s1->content(), UnorderedElementsAre(h1));
+        EXPECT_THAT(client->content(), UnorderedElementsAre(h1));
+    }
+    EXPECT_THAT(client->content(), UnorderedElementsAre());
+}
+
 TEST(SharedClient, UnregisteringContentFromAnotherSharedClientThrows)
 {
     auto client = create_client(false);
