@@ -73,7 +73,7 @@ public:
 class IClient
 {
 public:
-    virtual ~IClient(){};
+    virtual ~IClient() {};
 
     /**
      * @brief Connects to the server and maintains a connection.
@@ -189,6 +189,9 @@ public:
     /**
      * @brief Sets a callback for when the client is connected and ready.
      *
+     * This method is called during or after start() has been called
+     * and it indicates that the client is ready to serve registered content.
+     *
      * The registered callback is guaranteed to be executed
      * before any call to wait_until_ready() returns.
      *
@@ -202,6 +205,9 @@ public:
 
     /**
      * @brief Sets a callback for when the client disconnected.
+     *
+     * This method is only called after start() has been called and only after
+     * the client was connected and the on_ready() callback was called.
      *
      * This callback is guaranteed to be called, even when the client fails.
      *
