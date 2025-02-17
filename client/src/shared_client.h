@@ -68,7 +68,25 @@ private:
     std::unordered_set<std::shared_ptr<loon::ContentHandle>> m_registered{};
 };
 
+template <typename R>
+class IReferenceErasable
+{
+public:
+    /**
+     * @brief Erases all references for the given reference value.
+     *
+     * After this method returns it is guaranted that the class
+     * holds no references to the passed reference anymore.
+     * Returns whether any references were removed.
+     *
+     * @param ref The reference to erase.
+     * @returns Whether any references were removed.
+     */
+    virtual bool erase_references(R const& ref) = 0;
+};
+
 class SharedReferenceCounter
+    : public IReferenceErasable<std::shared_ptr<IClient>>
 {
 public:
     /**
@@ -78,6 +96,8 @@ public:
      * that is unique from all other reference counts.
      * Counting starts at 0 and is reset when all clients were removed.
      *
+     * This method is atomic and thread-safe.
+     *
      * @param client The client to add a reference count for.
      * @returns Returns a unique reference count index.
      */
@@ -86,12 +106,19 @@ public:
     /**
      * @brief Removes a reference count for the given client.
      *
-     * Does not throw when there is no reference count for this client,
-     * instead triggers an assertion error.
+     * Returns the number of references before removing this reference.
+     * The remaining reference count after calling this method is the
+     * returned value minus one.
+     *
+     * The required parameter causes an assertion error when there
+     * are zero references for the given client.
+     * This method is atomic and thread-safe.
      *
      * @param client The client to remove a reference count for.
+     * @param required Whether there needs to be one or more references.
+     * @returns The number of referenced clients after removing this reference.
      */
-    void remove(std::shared_ptr<IClient> client);
+    size_t remove(std::shared_ptr<IClient> client, bool required = true);
 
     /**
      * @brief Returns the number of reference counts for the given client.
@@ -99,30 +126,20 @@ public:
      * Returns 0 if there are no reference counts for this client.
      *
      * The required parameter causes an assertion error when there
-     * are zero reference for the given client.
+     * are zero references for the given client.
+     * This method is atomic and thread-safe.
      *
      * @param client The client for which to return the reference counts.
-     * @param required Whether there need to be one or more references.
+     * @param required Whether there needs to be one or more references.
      * @returns The number of reference counts for this client.
      */
     size_t count(std::shared_ptr<IClient> client, bool required = false);
 
-    /**
-     * @brief Returns whether there is only a single reference for the client.
-     *
-     * With the required parameter set (which is the default), the method
-     * operates on the assumption that the caller expects there to be any
-     * amount of references greater or equal to 1.
-     *
-     * The required parameter acts the same as in the count() method.
-     *
-     * @param client The client to check.
-     * @param required Whether there need to be one or more references.
-     * @returns Whether there is exactly one reference for the given client.
-     */
-    inline bool single(std::shared_ptr<IClient> client, bool required = true)
+    inline bool erase_references(std::shared_ptr<IClient> const& ref) override
     {
-        return count(client, required) == 1;
+        // With this call it's not required that there are any references.
+        // We don't want to trigger any assertion errors here.
+        return remove(ref, false) == 1;
     }
 
 private:
@@ -132,9 +149,158 @@ private:
         size_t next_index{ 0 };
     };
 
+    std::mutex m_mutex;
+
     // It's okay to keep a shared_ptr reference to the client here, even though
     // it increases the pointer's internal reference count, since it will be
     // removed here when no shared client instances exist anymore.
     std::unordered_map<std::shared_ptr<IClient>, ReferenceCounter> m_refs;
 };
+
+template <typename F>
+class CallbackMap
+{
+public:
+    /**
+     * @brief Sets the callback for a particular key.
+     *
+     * Unsets the callback for the key when a null pointer is passed.
+     * This method is thread-safe.
+     *
+     * @param key The key to which this callback is assigned.
+     * @param callback The callback.
+     */
+    void set(size_t key, std::function<F> callback)
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        if (callback == nullptr) {
+            m_callbacks.erase(key);
+            return;
+        }
+        m_callbacks.insert({ key, callback });
+    }
+
+    /**
+     * @brief Executes all registered callbacks.
+     *
+     * Callbacks are executed ordered by their key.
+     * This method is thread-safe.
+     */
+    void execute()
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        for (auto const& [_, callback] : m_callbacks) {
+            assert(callback != nullptr);
+            callback();
+        }
+    }
+
+private:
+    std::mutex m_mutex;
+    std::map<size_t, std::function<F>> m_callbacks;
+};
+
+template <typename F>
+class ClientCallbackMap : public IReferenceErasable<std::shared_ptr<IClient>>
+{
+public:
+    /**
+     * @brief Gets the callback map for a particular client.
+     *
+     * If the client does not exist, the callback map is created
+     * and then returned on consecutive calls to this method.
+     * This method is atomic and thread-safe.
+     *
+     * @param client The client for which to return the callback map.
+     * @returns The callback map for the given client.
+     */
+    std::shared_ptr<CallbackMap<F>> get(std::shared_ptr<IClient> client)
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        if (m_callbacks.find(client) == m_callbacks.end()) {
+            m_callbacks.insert({ client, std::make_shared<CallbackMap<F>>() });
+        }
+        assert(m_callbacks.find(client) != m_callbacks.end());
+        auto result = m_callbacks.at(client);
+        assert(result != nullptr);
+        return result;
+    }
+
+    /**
+     * @brief Erases the callback map for a particular client.
+     *
+     * This method is atomic and thread-safe.
+     *
+     * @param client The client for which to erase the callback map.
+     * @returns Whether the client had a callback map and it was removed.
+     */
+    bool erase(std::shared_ptr<IClient> client)
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        return m_callbacks.erase(client) == 1;
+    }
+
+    inline bool erase_references(std::shared_ptr<IClient> const& ref) override
+    {
+        return erase(ref);
+    }
+
+private:
+    std::mutex m_mutex;
+    std::unordered_map<std::shared_ptr<IClient>,
+        std::shared_ptr<CallbackMap<F>>>
+        m_callbacks;
+};
+
+struct SharedClientState : public IReferenceErasable<std::shared_ptr<IClient>>
+{
+private:
+    SharedReferenceCounter refs;
+
+public:
+    SharedReferenceCounter started;
+    SharedReferenceCounter idling;
+    ClientCallbackMap<void()> on_ready;
+    ClientCallbackMap<void()> on_disconnect;
+    ClientCallbackMap<void()> on_failed;
+
+    SharedClientState();
+
+    /**
+     * @brief Adds a client reference.
+     *
+     * Sets callbacks for the client so that any shared client callbacks
+     * that are registered for this client are properly called.
+     * Returns a unique index for the client reference.
+     *
+     * @see SharedReferenceCounter::add
+     *
+     * @param client The client to add a reference for.
+     * @returns A unique index for the client reference.
+     */
+    size_t add(std::shared_ptr<IClient> client);
+
+    /**
+     * @brief Removes a reference for the given client.
+     *
+     * Triggers an assertion error when there is no reference for the client.
+     *
+     * @param client The client for which to remove a reference.
+     */
+    void remove(std::shared_ptr<IClient> client);
+
+    bool erase_references(std::shared_ptr<IClient> const& ref) override;
+
+private:
+    template <typename T>
+    inline void init(T& value_ref)
+    {
+        static_assert(
+            std::is_base_of_v<IReferenceErasable<std::shared_ptr<IClient>>, T>);
+        m_erasers.push_back(&value_ref);
+    }
+
+    std::vector<IReferenceErasable<std::shared_ptr<IClient>>*> m_erasers;
+};
+
 } // namespace loon

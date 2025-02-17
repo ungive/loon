@@ -1046,18 +1046,22 @@ TEST(SharedReferenceCounter, CountWithRequiredCausesDeathWhenThereIsNoClient)
     }
 }
 
-TEST(SharedReferenceCounter, SingleReturnsTrueWhenThereIsOneReferenceOnly)
+TEST(SharedReferenceCounter, RemoveReturnsReferenceCountBeforeRemoveCall)
 {
     loon::SharedReferenceCounter m;
-    auto client = create_client(false);
-    EXPECT_DEATH(m.single(client, true), "");
-    EXPECT_FALSE(m.single(client, false));
-    m.add(client);
-    EXPECT_TRUE(m.single(client, true));
-    EXPECT_TRUE(m.single(client, false));
-    m.add(client);
-    EXPECT_FALSE(m.single(client, true));
-    EXPECT_FALSE(m.single(client, false));
+    for (size_t i = 1; i < 16; i++) {
+        auto client = create_client(false);
+        for (size_t j = 0; j < i; j++) {
+            EXPECT_EQ(j, m.add(client));
+        }
+        for (size_t j = 0; j < i; j++) {
+            auto a = m.count(client);
+            auto b = m.remove(client);
+            auto c = m.count(client);
+            EXPECT_EQ(a, b);
+            EXPECT_EQ(a - 1, c);
+        }
+    }
 }
 
 class ClientCallCheck : public loon::IClient
@@ -1423,5 +1427,104 @@ TEST(SharedClient, IsRegisteredWithNullPointerThrows)
     auto s = std::make_shared<SharedClient>(check);
     EXPECT_THROW(s->is_registered(nullptr), loon::MalformedContentException);
 }
+
+TEST(SharedClient, MultipleSharedClientsReturnConsecutiveUniqueIndices)
+{
+    auto client = create_client(false);
+    auto s1 = std::make_shared<SharedClient>(client);
+    auto s2 = std::make_shared<SharedClient>(client);
+    auto s3 = std::make_shared<SharedClient>(client);
+    EXPECT_EQ(0, s1->index());
+    EXPECT_EQ(1, s2->index());
+    EXPECT_EQ(2, s3->index());
+    {
+        auto s4 = std::make_shared<SharedClient>(client);
+        EXPECT_EQ(3, s4->index());
+    }
+    auto s5 = std::make_shared<SharedClient>(client);
+    EXPECT_EQ(4, s5->index());
+}
+
+TEST(SharedClient, IndexResetsToZeroAfterAllSharedClientsWereDestructed)
+{
+    auto client = create_client(false);
+    {
+        auto s1 = std::make_shared<SharedClient>(client);
+        auto s2 = std::make_shared<SharedClient>(client);
+        auto s3 = std::make_shared<SharedClient>(client);
+        EXPECT_EQ(0, s1->index());
+        EXPECT_EQ(1, s2->index());
+        EXPECT_EQ(2, s3->index());
+    }
+    {
+        auto s1 = std::make_shared<SharedClient>(client);
+        EXPECT_EQ(0, s1->index());
+    }
+}
+
+TEST(SharedClient, OnReadyIsOnlyCalledOnStartedSharedClients)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s1 = std::make_shared<SharedClient>(check);
+    auto s2 = std::make_shared<SharedClient>(check);
+    ExpectCalled c1(1), c2(0);
+    s1->on_ready(c1.get());
+    s2->on_ready(c2.get());
+    EXPECT_EQ(0, c1.count());
+    EXPECT_EQ(0, c2.count());
+    s1->start();
+    s1->wait_until_ready();
+    EXPECT_EQ(1, c1.count());
+    EXPECT_EQ(0, c2.count()); // not started
+}
+
+TEST(SharedClient, OnReadyCalledOnStartWhenClientIsAlreadyConnected)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s1 = std::make_shared<SharedClient>(check);
+    auto s2 = std::make_shared<SharedClient>(check);
+    ExpectCalled c;
+    s2->on_ready(c.get());
+    s1->start();
+    s1->wait_until_ready();
+    EXPECT_EQ(0, c.count()); // not started
+    // the ready callback should be called during the start() method call.
+    s2->start();
+    EXPECT_EQ(1, c.count()); // already called during start()
+    s2->wait_until_ready();
+    EXPECT_EQ(1, c.count());
+}
+
+TEST(SharedClient, OnReadyCalledOnBothSharedClientsAfterBothAreStarted)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s1 = std::make_shared<SharedClient>(check);
+    auto s2 = std::make_shared<SharedClient>(check);
+    ExpectCalled c1, c2;
+    s1->on_ready(c1.get());
+    s2->on_ready(c2.get());
+    EXPECT_EQ(0, c1.count());
+    s1->start();
+    EXPECT_EQ(0, c2.count());
+    s2->start();
+    s1->wait_until_ready();
+    EXPECT_EQ(1, c1.count());
+    s2->wait_until_ready();
+    EXPECT_EQ(1, c2.count());
+}
+
+// TEST(SharedClient, OnReadyCallbackIsCalledInOrderOfSharedClientCreation)
+// {
+//     auto client = create_client(false);
+//     auto check = std::make_shared<ClientCallCheck>(client);
+//     auto s1 = std::make_shared<SharedClient>(check);
+//     auto s2 = std::make_shared<SharedClient>(check);
+//     auto s3 = std::make_shared<SharedClient>(check);
+//     auto s4 = std::make_shared<SharedClient>(check);
+//     auto s5 = std::make_shared<SharedClient>(check);
+// }
 
 // TODO tests for callbacks

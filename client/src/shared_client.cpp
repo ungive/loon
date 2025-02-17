@@ -2,9 +2,13 @@
 
 #include <algorithm>
 #include <cassert>
+#include <functional>
 #include <limits>
+#include <map>
 #include <mutex>
 #include <stdexcept>
+#include <type_traits>
+#include <unordered_map>
 
 #include "shared_client.h"
 
@@ -15,18 +19,20 @@ loon::SharedClient::SharedClient(std::shared_ptr<IClient> client)
 {
 }
 
-static std::mutex g_mutex;
-static SharedReferenceCounter g_started;
-static SharedReferenceCounter g_idling;
+static SharedClientState g_state;
 
 loon::SharedClientImpl::SharedClientImpl(std::shared_ptr<IClient> client)
     : m_client{ client }
 {
+    // Ensure the client is not a shared client instance.
     auto casted = std::dynamic_pointer_cast<ISharedClient>(m_client);
     if (casted != nullptr) {
         throw std::invalid_argument(
             "the wrapped client may not be a shared client");
     }
+
+    // Add a global reference for this client and set the index.
+    m_index = g_state.add(m_client);
 }
 
 loon::SharedClientImpl::~SharedClientImpl()
@@ -34,6 +40,9 @@ loon::SharedClientImpl::~SharedClientImpl()
     // Ensure the underlying client is stopped,
     // once all shared clients are destructed.
     stop();
+
+    // Remove one client reference from the global shared client state.
+    g_state.remove(m_client);
 }
 
 size_t loon::SharedClientImpl::index() const { return m_index; }
@@ -61,10 +70,7 @@ void loon::SharedClientImpl::start()
         return;
     }
     // Note: Executing this is okay, if the client is already started.
-    {
-        const std::lock_guard<std::mutex> global_lock(g_mutex);
-        g_started.add(m_client);
-    }
+    g_state.started.add(m_client);
     m_client->start(); // delegate
     m_started = true;
 }
@@ -77,14 +83,9 @@ void loon::SharedClientImpl::stop()
         return;
     }
     // Note: Executing this is okay, if the client is not actually started.
-    bool last_started = false;
-    {
-        const std::lock_guard<std::mutex> global_lock(g_mutex);
-        last_started = g_started.single(m_client);
-        g_started.remove(m_client);
-    }
+    auto previous_count = g_state.started.remove(m_client);
     // Stop the client when this was the last started shared client.
-    if (last_started) {
+    if (previous_count == 1) {
         m_client->stop(); // delegate
     }
     m_started = false;
@@ -104,9 +105,8 @@ bool loon::SharedClientImpl::internal_started()
 void loon::SharedClientImpl::internal_reset_idling()
 {
     if (m_idling) {
-        const std::lock_guard<std::mutex> global_lock(g_mutex);
-        assert(g_idling.count(m_client) > 0);
-        g_idling.remove(m_client);
+        auto previous_count = g_state.idling.remove(m_client);
+        assert(previous_count > 0);
         m_idling = false;
     }
 }
@@ -120,15 +120,11 @@ void loon::SharedClientImpl::idle()
     if (m_idling) {
         return;
     }
-    bool all_idling = false;
-    {
-        const std::lock_guard<std::mutex> global_lock(g_mutex);
-        g_idling.add(m_client); // this shared client is idling
-        auto started = g_started.count(m_client, true);
-        auto idling = g_idling.count(m_client, true);
-        assert(idling <= started);
-        all_idling = started == idling;
-    }
+    g_state.idling.add(m_client); // this shared client is idling
+    auto started = g_state.started.count(m_client, true);
+    auto idling = g_state.idling.count(m_client, true);
+    assert(idling <= started);
+    bool all_idling = started == idling;
     // Put the client into idle when all shared clients are idling.
     if (all_idling) {
         m_client->idle(); // delegate
@@ -158,17 +154,20 @@ bool loon::SharedClientImpl::wait_until_ready(std::chrono::milliseconds timeout)
 
 void loon::SharedClientImpl::on_ready(std::function<void()> callback)
 {
-    // TODO
+    const std::lock_guard<std::mutex> lock(m_mutex);
+    g_state.on_ready.get(m_client)->set(m_index, callback);
 }
 
 void loon::SharedClientImpl::on_disconnect(std::function<void()> callback)
 {
-    // TODO
+    const std::lock_guard<std::mutex> lock(m_mutex);
+    g_state.on_disconnect.get(m_client)->set(m_index, callback);
 }
 
 void loon::SharedClientImpl::on_failed(std::function<void()> callback)
 {
-    // TODO
+    const std::lock_guard<std::mutex> lock(m_mutex);
+    g_state.on_failed.get(m_client)->set(m_index, callback);
 }
 
 loon::ContentInfo loon::SharedClientImpl::internal_modified_content_info(
@@ -250,12 +249,13 @@ bool loon::SharedClientImpl::is_registered(
     return result;
 }
 
-// Shared reference counter implementation
+// Helper class implementations
 
 size_t loon::SharedReferenceCounter::add(std::shared_ptr<IClient> client)
 {
     if (client == nullptr)
         throw std::invalid_argument("client cannot be a null pointer");
+    const std::lock_guard<std::mutex> lock(m_mutex);
     auto it = m_refs.find(client);
     if (it == m_refs.end()) {
         auto result = m_refs.insert({ client, ReferenceCounter{} });
@@ -271,26 +271,32 @@ size_t loon::SharedReferenceCounter::add(std::shared_ptr<IClient> client)
     return index;
 }
 
-void loon::SharedReferenceCounter::remove(std::shared_ptr<IClient> client)
+size_t loon::SharedReferenceCounter::remove(
+    std::shared_ptr<IClient> client, bool required)
 {
     if (client == nullptr)
         throw std::invalid_argument("client cannot be a null pointer");
+    const std::lock_guard<std::mutex> lock(m_mutex);
     auto it = m_refs.find(client);
     if (it == m_refs.end()) {
-        assert(false);
-        return;
+        assert(!required);
+        return 0;
     }
     auto& counter = it->second;
     if (counter.references == 0) {
-        assert(false);
+        assert(!required);
         m_refs.erase(client);
-        return;
+        return 0;
     }
+    auto old_value = counter.references;
     counter.references -= 1;
     if (counter.references == 0) {
+        assert(old_value == 1);
         m_refs.erase(client);
-        return;
+        return old_value;
     }
+    assert(old_value > 1);
+    return old_value;
 }
 
 size_t loon::SharedReferenceCounter::count(
@@ -298,6 +304,7 @@ size_t loon::SharedReferenceCounter::count(
 {
     if (client == nullptr)
         throw std::invalid_argument("client cannot be a null pointer");
+    const std::lock_guard<std::mutex> lock(m_mutex);
     auto it = m_refs.find(client);
     if (it == m_refs.end()) {
         assert(!required);
@@ -306,4 +313,77 @@ size_t loon::SharedReferenceCounter::count(
     auto& counter = it->second;
     assert(counter.references != 0);
     return counter.references;
+}
+
+loon::SharedClientState::SharedClientState()
+{
+    m_erasers.reserve(6);
+    init(refs);
+    init(started);
+    init(idling);
+    init(on_ready);
+    init(on_disconnect);
+    init(on_failed);
+    assert(!m_erasers.empty());
+}
+
+size_t loon::SharedClientState::add(std::shared_ptr<IClient> client)
+{
+    auto index = refs.add(client);
+
+    // Ensure the callbacks are set for the wrapped client.
+    client->on_ready(
+        std::bind(&CallbackMap<void()>::execute, on_ready.get(client)));
+    client->on_disconnect(
+        std::bind(&CallbackMap<void()>::execute, on_disconnect.get(client)));
+    client->on_failed(
+        std::bind(&CallbackMap<void()>::execute, on_failed.get(client)));
+
+    return index;
+}
+
+void loon::SharedClientState::remove(std::shared_ptr<IClient> client)
+{
+    refs.remove(client);
+
+    // There should be no more started or idling clients than
+    // there are number of clients after removing the passed one.
+    assert(started.count(client) <= refs.count(client));
+    assert(idling.count(client) <= refs.count(client));
+
+    if (refs.count(client) == 0) {
+        // Unset all callbacks for the given client, when there are
+        // no more shared clients that make use of the callbacks.
+        client->on_ready(nullptr);
+        client->on_disconnect(nullptr);
+        client->on_failed(nullptr);
+
+        // Likewise erase all callbacks for the given client.
+        on_ready.erase(client);
+        on_disconnect.erase(client);
+        on_failed.erase(client);
+
+        // The caller should have already have made sure that
+        // there are no more started or idling shared clients anymore.
+        assert(started.count(client) == 0);
+        assert(idling.count(client) == 0);
+
+        // For good measure, erase references from every state member
+        // and trigger an assertion error when there are references left.
+        if (erase_references(client)) {
+            assert(false);
+        }
+    }
+}
+
+bool loon::SharedClientState::erase_references(
+    std::shared_ptr<IClient> const& ref)
+{
+    auto removed = false;
+    for (auto& eraser : m_erasers) {
+        if (eraser->erase_references(ref)) {
+            removed = true;
+        }
+    }
+    return removed;
 }
