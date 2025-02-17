@@ -192,11 +192,10 @@ public:
     void set(size_t key, std::function<F> callback)
     {
         const std::lock_guard<std::mutex> lock(m_mutex);
-        if (callback == nullptr) {
-            m_callbacks.erase(key);
-            return;
+        m_callbacks.erase(key);
+        if (callback != nullptr) {
+            m_callbacks.insert({ key, callback });
         }
-        m_callbacks.insert({ key, callback });
     }
 
     /**
