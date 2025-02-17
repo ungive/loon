@@ -165,11 +165,13 @@ public:
      * @returns if the client was already ready
      * and the method returned immediately.
      *
-     * @throws TimeoutException
-     * if an operation timed out.
+     * @throws ClientNotStartedException
+     * if the client was not started.
      * @throws ClientNotConnectedException
-     * if the client is not started, connected or
+     * if the client is not connected or
      * if the client disconnected while waiting for the connection to be ready.
+     * @throws TimeoutException
+     * if the operation timed out.
      */
     virtual bool wait_until_ready(std::chrono::milliseconds timeout) = 0;
 
