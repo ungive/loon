@@ -34,6 +34,18 @@ loon::SharedClientImpl::SharedClientImpl(std::shared_ptr<IClient> client)
 
     // Add a global reference for this client and set the index.
     m_index = g_state.add(m_client);
+
+    // Default callback which sets the ready flag.
+    g_state.on_ready.get(m_client)->set(m_index, [this] {
+        if (m_started.load()) {
+            m_on_ready_called.store(true);
+        }
+    });
+
+    // Default callback which resets the ready flag.
+    g_state.on_disconnect.get(m_client)->set(m_index, [this] {
+        m_on_ready_called.store(false);
+    });
 }
 
 loon::SharedClientImpl::~SharedClientImpl()
@@ -79,6 +91,7 @@ void loon::SharedClientImpl::start()
     g_state.started.add(m_client);
     m_client->start(); // delegate
     m_started.store(true);
+    m_on_ready_called.store(false);
 
 #ifdef LOON_TEST
     std::this_thread::sleep_for(m_before_manual_start_callback_sleep_duration);
@@ -120,7 +133,6 @@ void loon::SharedClientImpl::stop()
         m_client->stop(); // delegate
     }
     m_started.store(false);
-    m_ready.store(false);
 }
 
 bool loon::SharedClientImpl::started()
@@ -191,7 +203,7 @@ void loon::SharedClientImpl::on_ready(std::function<void()> callback)
         // Note: Do not lock the shared client's mutex within the callback.
         if (m_started.load()) {
             // Only call the callback when the client is actually started.
-            if (!m_ready.exchange(true)) {
+            if (!m_on_ready_called.exchange(true)) {
                 // And only call it when it wasn't already called before.
                 callback();
             }
@@ -204,7 +216,7 @@ void loon::SharedClientImpl::on_disconnect(std::function<void()> callback)
     const std::lock_guard<std::mutex> lock(m_mutex);
     g_state.on_disconnect.get(m_client)->set(m_index, [this, callback] {
         // Note: Do not lock the shared client's mutex within the callback.
-        if (m_ready.exchange(false)) {
+        if (m_on_ready_called.exchange(false)) {
             // Only call the callback when the client was ready before.
             // The client is also not ready anymore.
             callback();

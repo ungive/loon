@@ -1578,15 +1578,56 @@ TEST(SharedClient, OnReadyCalledOnBothSharedClientsAfterBothAreStarted)
     EXPECT_EQ(1, c2.count());
 }
 
-// TEST(SharedClient, OnReadyCallbackIsCalledInOrderOfSharedClientCreation)
-// {
-//     auto client = create_client(false);
-//     auto check = std::make_shared<ClientCallCheck>(client);
-//     auto s1 = std::make_shared<SharedClient>(check);
-//     auto s2 = std::make_shared<SharedClient>(check);
-//     auto s3 = std::make_shared<SharedClient>(check);
-//     auto s4 = std::make_shared<SharedClient>(check);
-//     auto s5 = std::make_shared<SharedClient>(check);
-// }
+TEST(SharedClient, CallbacksAreCalledInOrderOfSharedClientCreation)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s1 = std::make_shared<SharedClient>(check);
+    auto s2 = std::make_shared<SharedClient>(check);
+    auto s3 = std::make_shared<SharedClient>(check);
+    auto s4 = std::make_shared<SharedClient>(check);
+    auto s5 = std::make_shared<SharedClient>(check);
+    size_t order = 1;
+    auto callback_for = [&](std::shared_ptr<SharedClient> client) {
+        return [client, &order] {
+            EXPECT_EQ(1 << client->index(), order);
+            order <<= 1;
+        };
+    };
+    s1->on_ready(callback_for(s1));
+    s2->on_ready(callback_for(s2));
+    s3->on_ready(callback_for(s3));
+    s4->on_ready(callback_for(s4));
+    s5->on_ready(callback_for(s5));
+}
+
+TEST(SharedClient, OnDisconnectIsCalledWhenClientDisconnects)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s = std::make_shared<SharedClient>(check);
+    ExpectCalled callback;
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool done;
+    s->on_disconnect([&] {
+        std::lock_guard lock(mutex);
+        callback();
+        cv.notify_one();
+        done = true;
+    });
+    s->start();
+    s->wait_until_ready();
+    s->stop();
+    std::unique_lock lock(mutex);
+    cv.wait_for(lock, 2s, [&] {
+        return done;
+    });
+    EXPECT_TRUE(done);
+}
+
+// TODO repeated ready callback calls still work?
+// TODO repeated disconnect callback calls still work?
+// TODO failed callback?
 
 // TODO tests for callbacks

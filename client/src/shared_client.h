@@ -83,7 +83,7 @@ private:
 
     std::atomic<bool> m_started{ false };
     std::atomic<bool> m_idling{ false };
-    std::atomic<bool> m_ready{ false };
+    std::atomic<bool> m_on_ready_called{ false };
     std::unordered_set<std::shared_ptr<loon::ContentHandle>> m_registered{};
 };
 
