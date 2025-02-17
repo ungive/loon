@@ -13,6 +13,7 @@
 #include "shared_client.h"
 
 using namespace loon;
+using namespace std::chrono_literals;
 
 loon::SharedClient::SharedClient(std::shared_ptr<IClient> client)
     : m_impl{ std::make_unique<SharedClientImpl>(client) }
@@ -57,8 +58,6 @@ std::string const& loon::SharedClientImpl::path_prefix() const
     return prefix;
 }
 
-#include <iostream>
-
 void loon::SharedClientImpl::start()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
@@ -71,10 +70,40 @@ void loon::SharedClientImpl::start()
         }
         return;
     }
+
+    // Remember whether the client has already been started before.
+    bool was_started = m_client->started();
+
+    // Start the client.
     // Note: Executing this is okay, if the client is already started.
     g_state.started.add(m_client);
     m_client->start(); // delegate
-    m_started = true;
+    m_started.store(true);
+
+#ifdef LOON_TEST
+    std::this_thread::sleep_for(m_before_manual_start_callback_sleep_duration);
+#endif
+
+    // If the client was already started before having called start() now,
+    // then ensure that the ready callback is called when the client is ready.
+    // Note: m_started must have been set to true before calling the callback,
+    // otherwise the callback will not properly execute, see on_ready() below.
+    if (was_started) {
+        try {
+            // Call the callback for this shared client, if there is any and
+            // if the client is already ready (no waiting done).
+            if (!m_client->wait_until_ready(0s)) {
+                g_state.on_ready.call(m_client, m_index);
+            }
+        }
+        catch (loon::TimeoutException const&) {
+        }
+        catch (loon::ClientNotConnectedException const&) {
+        }
+        catch (loon::ClientNotStartedException const&) {
+            assert(false);
+        }
+    }
 }
 
 void loon::SharedClientImpl::stop()
@@ -91,6 +120,7 @@ void loon::SharedClientImpl::stop()
         m_client->stop(); // delegate
     }
     m_started.store(false);
+    m_ready.store(false);
 }
 
 bool loon::SharedClientImpl::started()
@@ -161,7 +191,10 @@ void loon::SharedClientImpl::on_ready(std::function<void()> callback)
         // Note: Do not lock the shared client's mutex within the callback.
         if (m_started.load()) {
             // Only call the callback when the client is actually started.
-            callback();
+            if (!m_ready.exchange(true)) {
+                // And only call it when it wasn't already called before.
+                callback();
+            }
         }
     });
 }
@@ -169,7 +202,14 @@ void loon::SharedClientImpl::on_ready(std::function<void()> callback)
 void loon::SharedClientImpl::on_disconnect(std::function<void()> callback)
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
-    g_state.on_disconnect.get(m_client)->set(m_index, callback);
+    g_state.on_disconnect.get(m_client)->set(m_index, [this, callback] {
+        // Note: Do not lock the shared client's mutex within the callback.
+        if (m_ready.exchange(false)) {
+            // Only call the callback when the client was ready before.
+            // The client is also not ready anymore.
+            callback();
+        }
+    });
 }
 
 void loon::SharedClientImpl::on_failed(std::function<void()> callback)

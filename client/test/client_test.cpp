@@ -47,6 +47,12 @@ public:
         ClientImpl::inject_send_error(trigger_error);
     }
 
+    inline void incoming_sleep(
+        std::chrono::milliseconds duration = std::chrono::milliseconds::zero())
+    {
+        ClientImpl::incoming_sleep(duration);
+    }
+
     inline void chunk_sleep(
         std::chrono::milliseconds duration = std::chrono::milliseconds::zero())
     {
@@ -1064,6 +1070,18 @@ TEST(SharedReferenceCounter, RemoveReturnsReferenceCountBeforeRemoveCall)
     }
 }
 
+class TestSharedClient : public loon::SharedClientImpl
+{
+public:
+    using SharedClientImpl::SharedClientImpl;
+
+    inline void before_manual_start_callback_sleep(
+        std::chrono::milliseconds duration = std::chrono::milliseconds::zero())
+    {
+        SharedClientImpl::before_manual_start_callback_sleep(duration);
+    }
+};
+
 class ClientCallCheck : public loon::IClient
 {
 public:
@@ -1216,9 +1234,9 @@ TEST(SharedClient, MustBeStartedToBeStopped)
     EXPECT_EQ(0, check->n_start());
     s->start();
     EXPECT_EQ(1, check->n_start()); // delegated(start)
-    EXPECT_EQ(0, check->n_started());
+    auto prev_n_started = check->n_started();
     EXPECT_TRUE(s->started());
-    EXPECT_EQ(1, check->n_started()); // delegated(started)
+    EXPECT_EQ(prev_n_started + 1, check->n_started()); // delegated(started)
     s->wait_until_ready();
     s->stop();
     // After starting it is delegated.
@@ -1507,7 +1525,37 @@ TEST(SharedClient, OnReadyCalledOnStartWhenClientIsAlreadyConnected)
     // the ready callback should be called during the start() method call.
     s2->start();
     EXPECT_EQ(1, c.count()); // already called during start()
-    s2->wait_until_ready();
+    EXPECT_FALSE(s2->wait_until_ready());
+    EXPECT_EQ(1, c.count());
+}
+
+TEST(SharedClient, OnReadyCallbackIsNotCalledTwiceByStartForAConnectedClient)
+{
+    // This test handles a race-condition where the shared client's
+    // start method believes that it needs to call the ready callback again,
+    // even though it has already been called by the client implementation.
+
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s = std::make_shared<TestSharedClient>(check);
+    // Ensure that the connection is only ready after at least 50 milliseconds,
+    // so that there is sufficent time for time-critical operations.
+    client->incoming_sleep(50ms);
+    // Ensure that there is enough time for the connection to be ready
+    // before the ready callback is called manually by the start() method.
+    s->before_manual_start_callback_sleep(100ms);
+    // Register the ready callback.
+    ExpectCalled c(1);
+    s->on_ready(c.get());
+    // Make sure the client is already started before calling
+    // the shared client's start() method, so that it attempts
+    // to call the registered ready callback manually.
+    client->start();
+    // Now the start method should attempt to call the ready callback manually.
+    s->start();
+    EXPECT_FALSE(s->wait_until_ready());
+    // The start method should detect that the ready callback has
+    // already been called and not call it again.
     EXPECT_EQ(1, c.count());
 }
 

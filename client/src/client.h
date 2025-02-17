@@ -192,6 +192,18 @@ protected:
     }
 
     /**
+     * @brief How long to sleep before processing incoming messages.
+     *
+     * A zero value indicates no sleeping, the default.
+     */
+    inline void incoming_sleep(
+        std::chrono::milliseconds duration = std::chrono::milliseconds::zero())
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_incoming_sleep_duration = duration;
+    }
+
+    /**
      * @brief Triggers a restart and returns once the client is restarted.
      */
     inline void restart_and_wait()
@@ -221,6 +233,9 @@ private:
     std::function<void(Hello&)> m_injected_hello_modifer{};
     bool m_inject_send_error{ false };
     std::chrono::milliseconds m_chunk_sleep_duration{
+        std::chrono::milliseconds::zero()
+    };
+    std::chrono::milliseconds m_incoming_sleep_duration{
         std::chrono::milliseconds::zero()
     };
 #endif

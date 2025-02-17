@@ -600,6 +600,10 @@ void ClientImpl::on_websocket_close()
         m_was_explicitly_stopped = false;
         log(Info) << "client stopped";
     }
+    // FIXME: disconnect can be called before ready is called!
+    // e.g. when the server disconnects before it sent a hello
+    // disconnect should only be called when the connection was ready,
+    // i.e. when m_hello is/was set to a value.
     if (m_disconnect_callback) {
         m_disconnect_callback();
     }
@@ -607,6 +611,10 @@ void ClientImpl::on_websocket_close()
 
 void ClientImpl::on_websocket_message(std::string const& message)
 {
+#ifdef LOON_TEST
+    std::this_thread::sleep_for(m_incoming_sleep_duration);
+#endif
+
     const std::lock_guard<std::mutex> lock(m_mutex);
 
     ServerMessage server_message;

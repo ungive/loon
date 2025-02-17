@@ -52,6 +52,24 @@ public:
 
     bool is_registered(std::shared_ptr<ContentHandle> handle) override;
 
+#ifdef LOON_TEST
+protected:
+    /**
+     * @brief How long to sleep before calling the ready callback in start().
+     */
+    inline void before_manual_start_callback_sleep(
+        std::chrono::milliseconds duration = std::chrono::milliseconds::zero())
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_before_manual_start_callback_sleep_duration = duration;
+    }
+
+private:
+    std::chrono::milliseconds m_before_manual_start_callback_sleep_duration{
+        std::chrono::milliseconds::zero()
+    };
+#endif // LOON_TEST
+
 private:
     bool internal_started();
     void internal_reset_idling();
@@ -65,6 +83,7 @@ private:
 
     std::atomic<bool> m_started{ false };
     std::atomic<bool> m_idling{ false };
+    std::atomic<bool> m_ready{ false };
     std::unordered_set<std::shared_ptr<loon::ContentHandle>> m_registered{};
 };
 
@@ -181,6 +200,24 @@ public:
     }
 
     /**
+     * @brief Returns the callback for a particular key.
+     *
+     * Returns a null pointer when no callback exists for the key.
+     *
+     * @param key
+     * @returns
+     */
+    std::function<F> get(size_t key)
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        auto it = m_callbacks.find(key);
+        if (it != m_callbacks.end()) {
+            return it->second;
+        }
+        return nullptr;
+    }
+
+    /**
      * @brief Executes all registered callbacks.
      *
      * Callbacks are executed ordered by their key.
@@ -212,18 +249,43 @@ public:
      * This method is atomic and thread-safe.
      *
      * @param client The client for which to return the callback map.
+     * @param insert When true, inserts a callback map when none exists.
      * @returns The callback map for the given client.
      */
-    std::shared_ptr<CallbackMap<F>> get(std::shared_ptr<IClient> client)
+    std::shared_ptr<CallbackMap<F>> get(
+        std::shared_ptr<IClient> client, bool insert = true)
     {
         const std::lock_guard<std::mutex> lock(m_mutex);
-        if (m_callbacks.find(client) == m_callbacks.end()) {
+        auto contains = m_callbacks.find(client) != m_callbacks.end();
+        if (!contains && !insert) {
+            return nullptr;
+        }
+        if (!contains && insert) {
             m_callbacks.insert({ client, std::make_shared<CallbackMap<F>>() });
         }
         assert(m_callbacks.find(client) != m_callbacks.end());
         auto result = m_callbacks.at(client);
         assert(result != nullptr);
         return result;
+    }
+
+    /**
+     * @brief Calls the registered callback for the given client and index.
+     *
+     * Does nothing when there is no callback for the client and index.
+     *
+     * @param client The client for which to retrieve the callback.
+     * @param index The index for which to retrieve the callback.
+     */
+    void call(std::shared_ptr<IClient> client, size_t index)
+    {
+        auto map = get(client, false);
+        if (map != nullptr) {
+            auto callback = map->get(index);
+            if (callback) {
+                callback();
+            }
+        }
     }
 
     /**
