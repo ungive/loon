@@ -1652,8 +1652,105 @@ TEST(SharedClient, OnDisconnectIsCalledWhenClientDisconnects)
     EXPECT_TRUE(done);
 }
 
-// TODO repeated ready callback calls still work?
-// TODO repeated disconnect callback calls still work?
-// TODO failed callback?
+TEST(SharedClient, OnDisconnectIsCalledWhenOneOfMultipleStartedClientsIsStopped)
+{
+
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s1 = std::make_shared<SharedClient>(check);
+    auto s2 = std::make_shared<SharedClient>(check);
+    // Connect with the first shared client first.
+    s1->start();
+    s1->wait_until_ready();
+    // Then connect and disconnect the second shared client.
+    ExpectCalled callback;
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool done;
+    s2->on_disconnect([&] {
+        std::lock_guard lock(mutex);
+        callback();
+        cv.notify_one();
+        done = true;
+    });
+    s2->start();
+    s2->wait_until_ready();
+    s2->stop();
+    std::unique_lock lock(mutex);
+    cv.wait_for(lock, 250s, [&] {
+        return done;
+    });
+    EXPECT_TRUE(done);
+}
+
+TEST(SharedClient, OnReadyOnDisconnectCalledConsistentlyOnRepeatedStartStop)
+{
+    enum Callback
+    {
+        Ready,
+        Disconnect
+    };
+
+    auto client = create_client(false);
+    auto s1 = std::make_shared<SharedClient>(client);
+    auto s2 = std::make_shared<SharedClient>(client);
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::deque<std::pair<size_t, Callback>> history;
+    auto expect_callback = [&](size_t client, Callback action) {
+        std::unique_lock lock(mutex);
+        auto result = cv.wait_for(lock, 250ms, [&] {
+            return !history.empty();
+        });
+        ASSERT_TRUE(result);
+        auto front = history.front();
+        history.pop_front();
+        EXPECT_EQ(client, front.first);
+        EXPECT_EQ(action, front.second);
+    };
+    s1->on_ready([&] {
+        std::lock_guard lock(mutex);
+        history.push_back(std::make_pair(1, Ready));
+        cv.notify_one();
+    });
+    s1->on_disconnect([&] {
+        std::lock_guard lock(mutex);
+        history.push_back(std::make_pair(1, Disconnect));
+        cv.notify_one();
+    });
+    s2->on_ready([&] {
+        std::lock_guard lock(mutex);
+        history.push_back(std::make_pair(2, Ready));
+        cv.notify_one();
+    });
+    s2->on_disconnect([&] {
+        std::lock_guard lock(mutex);
+        history.push_back(std::make_pair(2, Disconnect));
+        cv.notify_one();
+    });
+    // Some start and stop calls that trigger ready and disconnect calls.
+    s1->start();
+    s1->wait_until_ready();
+    expect_callback(1, Ready);
+    s1->stop();
+    expect_callback(1, Disconnect);
+    s2->start();
+    s2->wait_until_ready();
+    expect_callback(2, Ready);
+    s1->start();
+    s1->wait_until_ready();
+    expect_callback(1, Ready);
+    s2->stop();
+    expect_callback(2, Disconnect);
+    s2->start();
+    s2->wait_until_ready();
+    expect_callback(2, Ready);
+    s1->stop();
+    expect_callback(1, Disconnect);
+    s2->stop();
+    expect_callback(2, Disconnect);
+    // End assertions
+    EXPECT_TRUE(history.empty());
+}
 
 // TODO tests for callbacks

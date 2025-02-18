@@ -138,6 +138,10 @@ void loon::SharedClientImpl::stop()
     // Stop the client when this was the last started shared client.
     if (previous_count == 1) {
         m_client->stop(); // delegate
+    } else {
+        // The client is not actually stopped, but the disconnect callback
+        // that is registered for this shared client still needs to be called.
+        g_state.on_disconnect.call(m_client, m_index);
     }
     m_started.store(false);
 }
