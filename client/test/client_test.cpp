@@ -1832,4 +1832,16 @@ TEST(SharedClient, IntegrationTest)
     EXPECT_TRUE(history.empty());
 }
 
-// TODO failed callback?
+TEST(SharedClient, RegisteringIdenticalContentWithSeparateSharedClientsWorks)
+{
+    auto client = create_client(false);
+    auto s1 = std::make_shared<SharedClient>(client);
+    auto s2 = std::make_shared<SharedClient>(client);
+    s1->start();
+    s2->start();
+    s1->wait_until_ready();
+    s2->wait_until_ready();
+    auto c1 = example_content("1.txt");
+    auto h1 = s1->register_content(c1.source, c1.info);
+    EXPECT_NO_THROW(s2->register_content(c1.source, c1.info));
+}

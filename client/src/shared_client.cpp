@@ -32,8 +32,9 @@ loon::SharedClientImpl::SharedClientImpl(std::shared_ptr<IClient> client)
             "the wrapped client may not be a shared client");
     }
 
-    // Add a global reference for this client and set the index.
+    // Add a global reference for this client and set the index and path prefix.
     m_index = g_state.add(m_client);
+    m_path_prefix = internal_path_prefix();
 
     // Default callback which sets the ready flag.
     g_state.on_ready.get(m_client)->set(m_index, [this] {
@@ -58,16 +59,22 @@ loon::SharedClientImpl::~SharedClientImpl()
     g_state.remove(m_client);
 }
 
-size_t loon::SharedClientImpl::index() const { return m_index; }
+size_t loon::SharedClientImpl::index() const
+{
+    assert(m_index != size_t(-1));
+    return m_index;
+}
 
 std::string const& loon::SharedClientImpl::path_prefix() const
 {
-    static std::string prefix;
-    if (prefix.empty()) {
-        prefix = std::to_string(index()) + "/";
-        assert(!prefix.empty());
-    }
-    return prefix;
+    assert(!m_path_prefix.empty());
+    return m_path_prefix;
+}
+
+inline std::string loon::SharedClientImpl::internal_path_prefix() const
+{
+    assert(m_index != size_t(-1));
+    return std::to_string(m_index) + "/";
 }
 
 void loon::SharedClientImpl::start()

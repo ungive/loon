@@ -74,13 +74,15 @@ private:
     bool internal_started();
     void internal_reset_idling();
     void internal_unregister_content();
+    std::string internal_path_prefix() const;
     loon::ContentInfo internal_modified_content_info(
         loon::ContentInfo const& info) const;
 
     std::mutex m_mutex;
 
     std::shared_ptr<IClient> m_client{};
-    size_t m_index{};
+    size_t m_index{ size_t(-1) };
+    std::string m_path_prefix{};
 
     std::atomic<bool> m_started{ false };
     std::atomic<bool> m_idling{ false };
