@@ -359,25 +359,27 @@ bool loon::ClientImpl::is_registered(std::shared_ptr<ContentHandle> handle)
 
 void ClientImpl::on_hello(Hello const& hello)
 {
+    std::optional<Hello> hello_copy{ std::nullopt };
+
 #ifdef LOON_TEST
     if (m_injected_hello_modifer) {
         Hello modified = hello;
         m_injected_hello_modifer(modified);
-        m_hello = modified;
+        hello_copy = std::move(modified);
     } else {
-        m_hello = hello;
+        hello_copy = hello;
     }
 #else
-    m_hello = hello;
+    hello_copy = hello;
 #endif
 
-    if (!m_hello->has_constraints()) {
+    if (!hello_copy->has_constraints()) {
         log(Fatal) << "the server did not send any constraints";
         return fail();
     }
     if (m_options.min_cache_duration.has_value()) {
         auto min = m_options.min_cache_duration.value().count();
-        auto value = m_hello->constraints().cache_duration();
+        auto value = hello_copy->constraints().cache_duration();
         if (value == 0) {
             log(Fatal) << "the server does not support response caching";
             return fail();
@@ -387,6 +389,9 @@ void ClientImpl::on_hello(Hello const& hello)
             return fail();
         }
     }
+
+    // Store the received hello message once all checks have passed.
+    m_hello = std::move(hello_copy.value());
 
     // The connection is idling if no content was registered yet.
     if (m_content.empty() && m_options.automatic_idling) {
