@@ -73,6 +73,7 @@ private:
 private:
     bool internal_started();
     void internal_reset_idling();
+    void internal_unregister_content();
     loon::ContentInfo internal_modified_content_info(
         loon::ContentInfo const& info) const;
 

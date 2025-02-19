@@ -50,15 +50,8 @@ loon::SharedClientImpl::SharedClientImpl(std::shared_ptr<IClient> client)
 
 loon::SharedClientImpl::~SharedClientImpl()
 {
-    // Unregister all content that was registered through this shared client.
-    for (auto it = m_registered.begin(); it != m_registered.end();) {
-        m_client->unregister_content(*it);
-        it = m_registered.erase(it);
-    }
-    assert(m_registered.empty());
-
-    // Ensure the underlying client is stopped,
-    // once all shared clients are destructed.
+    // Ensure the underlying client is stopped, once all shared clients
+    // are destructed. This also unregisters all content of this shared client.
     stop();
 
     // Remove one client reference from the global shared client state.
@@ -130,6 +123,7 @@ void loon::SharedClientImpl::stop()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     internal_reset_idling();
+    internal_unregister_content();
     if (!m_started.load()) {
         return;
     }
@@ -164,6 +158,15 @@ void loon::SharedClientImpl::internal_reset_idling()
         assert(previous_count > 0);
         m_idling.store(false);
     }
+}
+
+void loon::SharedClientImpl::internal_unregister_content()
+{
+    for (auto it = m_registered.begin(); it != m_registered.end();) {
+        m_client->unregister_content(*it);
+        it = m_registered.erase(it);
+    }
+    assert(m_registered.empty());
 }
 
 void loon::SharedClientImpl::idle()
