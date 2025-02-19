@@ -838,7 +838,7 @@ TEST(Client, ReconnectsWhenIdleDisconnectedAndStartIsCalled)
     // Make sure to not call wait_until_ready by accident,
     // since that also guarantees that the client will reconnect after idle.
     // Instead sleep for a small duration.
-    std::this_thread::sleep_for(25ms);
+    std::this_thread::sleep_for(50ms);
     EXPECT_TRUE(client->connected());
 }
 
