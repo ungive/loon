@@ -159,12 +159,7 @@ public:
      */
     size_t count(std::shared_ptr<IClient> client, bool required = false);
 
-    inline bool erase_references(std::shared_ptr<IClient> const& ref) override
-    {
-        // With this call it's not required that there are any references.
-        // We don't want to trigger any assertion errors here.
-        return remove(ref, false) == 1;
-    }
+    bool erase_references(std::shared_ptr<IClient> const& ref) override;
 
 private:
     struct ReferenceCounter

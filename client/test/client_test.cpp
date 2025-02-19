@@ -1071,6 +1071,17 @@ TEST(SharedReferenceCounter, RemoveReturnsReferenceCountBeforeRemoveCall)
     }
 }
 
+TEST(SharedReferenceCounter, EraseReferencesRemovesAllReferences)
+{
+    loon::SharedReferenceCounter m;
+    auto client = create_client(false);
+    m.add(client);
+    m.add(client);
+    m.add(client);
+    EXPECT_TRUE(m.erase_references(client));
+    EXPECT_EQ(0, m.count(client));
+}
+
 class TestSharedClient : public loon::SharedClientImpl
 {
 public:

@@ -408,6 +408,26 @@ size_t loon::SharedReferenceCounter::count(
     return counter.references;
 }
 
+bool loon::SharedReferenceCounter::erase_references(
+    std::shared_ptr<IClient> const& ref)
+{
+    if (ref == nullptr)
+        throw std::invalid_argument("client cannot be a null pointer");
+    const std::lock_guard<std::mutex> lock(m_mutex);
+    auto it = m_refs.find(ref);
+    if (it == m_refs.end()) {
+        return false;
+    }
+    auto& counter = it->second;
+    if (counter.references == 0) {
+        assert(false);
+        m_refs.erase(ref);
+        return false;
+    }
+    m_refs.erase(ref);
+    return true;
+}
+
 loon::SharedClientState::SharedClientState()
 {
     m_erasers.reserve(6);
