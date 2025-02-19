@@ -15,6 +15,9 @@
 #include <gtest/gtest.h>
 
 #include "client.h"
+#include "loon/client.h"
+#include "loon/shared_client.h"
+#include "shared_client.h"
 
 using namespace loon;
 using namespace testing;
@@ -978,9 +981,6 @@ TEST(Client, StartCanBeCalledAgainAfterTerminate)
     auto response = http_get(h2->url());
     EXPECT_EQ(content.data, response.body);
 }
-
-#include "loon/shared_client.h"
-#include "shared_client.h"
 
 TEST(SharedReferenceCounter, AnyMethodThrowsWithNullPointer)
 {
