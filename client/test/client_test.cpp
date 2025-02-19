@@ -1714,12 +1714,14 @@ TEST(SharedClient, OnDisconnectIsCalledWhenOneOfMultipleStartedClientsIsStopped)
     EXPECT_TRUE(done);
 }
 
-TEST(SharedClient, OnReadyOnDisconnectCalledConsistentlyOnRepeatedStartStop)
+TEST(SharedClient, IntegrationTest)
 {
-    enum Callback
+    enum Action
     {
         Ready,
-        Disconnect
+        Disconnect,
+        Served,
+        Unregistered
     };
 
     auto client = create_client(false);
@@ -1727,8 +1729,8 @@ TEST(SharedClient, OnReadyOnDisconnectCalledConsistentlyOnRepeatedStartStop)
     auto s2 = std::make_shared<SharedClient>(client);
     std::mutex mutex;
     std::condition_variable cv;
-    std::deque<std::pair<size_t, Callback>> history;
-    auto expect_callback = [&](size_t client, Callback action) {
+    std::deque<std::pair<size_t, Action>> history;
+    auto expect_action = [&](size_t client, Action action) {
         std::unique_lock lock(mutex);
         auto result = cv.wait_for(lock, 250ms, [&] {
             return !history.empty();
@@ -1736,52 +1738,77 @@ TEST(SharedClient, OnReadyOnDisconnectCalledConsistentlyOnRepeatedStartStop)
         ASSERT_TRUE(result);
         auto front = history.front();
         history.pop_front();
-        EXPECT_EQ(client, front.first);
         EXPECT_EQ(action, front.second);
+        EXPECT_EQ(client, front.first);
     };
-    s1->on_ready([&] {
+    auto push_action = [&](size_t client, Action action) {
         std::lock_guard lock(mutex);
-        history.push_back(std::make_pair(1, Ready));
+        history.push_back(std::make_pair(client, action));
         cv.notify_one();
-    });
-    s1->on_disconnect([&] {
-        std::lock_guard lock(mutex);
-        history.push_back(std::make_pair(1, Disconnect));
-        cv.notify_one();
-    });
-    s2->on_ready([&] {
-        std::lock_guard lock(mutex);
-        history.push_back(std::make_pair(2, Ready));
-        cv.notify_one();
-    });
-    s2->on_disconnect([&] {
-        std::lock_guard lock(mutex);
-        history.push_back(std::make_pair(2, Disconnect));
-        cv.notify_one();
-    });
+    };
+    s1->on_ready(std::bind(push_action, 1, Ready));
+    s1->on_disconnect(std::bind(push_action, 1, Disconnect));
+    s2->on_ready(std::bind(push_action, 2, Ready));
+    s2->on_disconnect(std::bind(push_action, 2, Disconnect));
     // Some start and stop calls that trigger ready and disconnect calls.
     s1->start();
     s1->wait_until_ready();
-    expect_callback(1, Ready);
+    expect_action(1, Ready);
     s1->stop();
-    expect_callback(1, Disconnect);
+    expect_action(1, Disconnect);
     s2->start();
     s2->wait_until_ready();
-    expect_callback(2, Ready);
+    expect_action(2, Ready);
     s1->start();
     s1->wait_until_ready();
-    expect_callback(1, Ready);
+    expect_action(1, Ready);
     s2->stop();
-    expect_callback(2, Disconnect);
+    expect_action(2, Disconnect);
     s2->start();
     s2->wait_until_ready();
-    expect_callback(2, Ready);
-    s1->stop();
-    expect_callback(1, Disconnect);
+    expect_action(2, Ready);
+    // Register and request some content
+    auto c1 = create_content("1.txt", "text/plain", "hg23kj1h");
+    auto c2 = create_content("2.txt", "text/plain", "jh321g4k");
+    auto h1 = s1->register_content(c1.source, c1.info);
+    auto h2 = s2->register_content(c2.source, c2.info);
+    h1->on_served(std::bind(push_action, 1, Served));
+    h1->on_unregistered(std::bind(push_action, 1, Unregistered));
+    h2->on_served(std::bind(push_action, 2, Served));
+    h2->on_unregistered(std::bind(push_action, 2, Unregistered));
+    EXPECT_THAT(s1->content(), UnorderedElementsAre(h1));
+    EXPECT_THAT(s2->content(), UnorderedElementsAre(h2));
+    auto r1 = http_get(h1->url());
+    expect_action(1, Served);
+    EXPECT_EQ(200, r1.status);
+    EXPECT_EQ(c1.data, r1.body);
+    auto r2 = http_get(h2->url());
+    expect_action(2, Served);
+    EXPECT_EQ(200, r2.status);
+    EXPECT_EQ(c2.data, r2.body);
+    // Disconnect both
+    EXPECT_THAT(client->content(), UnorderedElementsAre(h1, h2));
     s2->stop();
-    expect_callback(2, Disconnect);
-    // End assertions
+    expect_action(2, Unregistered);
+    EXPECT_THAT(s2->content(), UnorderedElementsAre());
+    EXPECT_THAT(client->content(), UnorderedElementsAre(h1));
+    expect_action(2, Disconnect);
+    s1->unregister_content(h1);
+    expect_action(1, Unregistered);
+    EXPECT_THAT(s1->content(), UnorderedElementsAre());
+    EXPECT_THAT(client->content(), UnorderedElementsAre());
+    EXPECT_FALSE(client->wait_until_ready());
+    EXPECT_TRUE(client->started());
+    EXPECT_TRUE(s1->started());
+    EXPECT_FALSE(s2->started());
+    s1->stop();
+    expect_action(1, Disconnect);
+    EXPECT_ANY_THROW(client->wait_until_ready());
+    EXPECT_FALSE(client->started());
+    EXPECT_FALSE(s1->started());
+    EXPECT_FALSE(s2->started());
+    // Ensure there are not more actions than expected
     EXPECT_TRUE(history.empty());
 }
 
-// TODO tests for callbacks
+// TODO failed callback?
