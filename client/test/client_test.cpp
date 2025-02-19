@@ -464,7 +464,7 @@ TEST(Client, OnDisconnectWhenClientIsStopped)
     ExpectCalled callback;
     std::mutex mutex;
     std::condition_variable cv;
-    bool done;
+    bool done{ false };
     client->on_disconnect([&] {
         std::lock_guard lock(mutex);
         callback();
@@ -719,7 +719,7 @@ TEST(Client, CanBeStartedAgainWhenStoppedByFailure)
     ExpectCalled callback;
     std::mutex mutex;
     std::condition_variable cv;
-    bool done;
+    bool done{ false };
     client->on_failed([&] {
         std::lock_guard lock(mutex);
         callback();
@@ -1678,7 +1678,7 @@ TEST(SharedClient, OnDisconnectIsCalledWhenClientDisconnects)
     ExpectCalled callback;
     std::mutex mutex;
     std::condition_variable cv;
-    bool done;
+    bool done{ false };
     s->on_disconnect([&] {
         std::lock_guard lock(mutex);
         callback();
@@ -1709,7 +1709,7 @@ TEST(SharedClient, OnDisconnectIsCalledWhenOneOfMultipleStartedClientsIsStopped)
     ExpectCalled callback;
     std::mutex mutex;
     std::condition_variable cv;
-    bool done;
+    bool done{ false };
     s2->on_disconnect([&] {
         std::lock_guard lock(mutex);
         callback();
