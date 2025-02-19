@@ -101,6 +101,7 @@ static std::shared_ptr<TestClient> create_client(
     if (started) {
         client->start();
         client->wait_until_ready();
+        EXPECT_TRUE(client->connected());
     }
     return client;
 }
