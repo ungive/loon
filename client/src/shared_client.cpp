@@ -377,7 +377,7 @@ size_t loon::SharedReferenceCounter::remove(
     }
     auto& counter = it->second;
     if (counter.references == 0) {
-        assert(!required);
+        assert(false);
         m_refs.erase(client);
         return 0;
     }
