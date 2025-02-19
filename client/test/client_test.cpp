@@ -441,12 +441,27 @@ TEST(Client, FailsWhenMinCacheDurationIsSetAndServerDoesNotCacheResponses)
         hello.mutable_constraints()->set_cache_duration(0);
     });
     ExpectCalled callback;
-    client->on_failed(callback.get());
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool done{ false };
+    client->on_failed([&] {
+        std::lock_guard lock(mutex);
+        callback();
+        cv.notify_one();
+        done = true;
+    });
     client->start();
+    {
+        std::unique_lock lock(mutex);
+        cv.wait_for(lock, 250ms, [&] {
+            return done;
+        });
+        ASSERT_TRUE(done);
+    }
     // Wait for the Hello message to have been handled.
     // It's expected that the client is not connected anymore,
     // since the client should be in a failed state.
-    EXPECT_THROW(client->wait_for_hello(), ClientNotConnectedException);
+    EXPECT_THROW(client->wait_for_hello(), ClientNotStartedException);
 }
 
 TEST(Client, ReadyWhenClientIsStarted)
@@ -727,18 +742,21 @@ TEST(Client, CanBeStartedAgainWhenStoppedByFailure)
         done = true;
     });
     client->start();
-    EXPECT_THROW(client->wait_for_hello(), ClientNotConnectedException);
-    client->inject_hello_modifier([](Hello& hello) {
-        // Increase the cache duration, so it won't fail again.
-        hello.mutable_constraints()->set_cache_duration(30);
-    });
     {
         std::unique_lock lock(mutex);
         cv.wait_for(lock, 2s, [&] {
             return done;
         });
+        ASSERT_TRUE(done);
     }
+    EXPECT_THROW(client->wait_for_hello(), ClientNotStartedException);
+    client->inject_hello_modifier([](Hello& hello) {
+        // Increase the cache duration, so it won't fail again.
+        hello.mutable_constraints()->set_cache_duration(30);
+    });
     client->on_failed([] {});
+    // Wait for the client to be properly disconnected.
+    std::this_thread::sleep_for(25ms);
     auto content = example_content();
     EXPECT_ANY_THROW(client->register_content(content.source, content.info));
     // Start the client again after failure.
@@ -1739,13 +1757,34 @@ TEST(SharedClient, OnFailedIsCalledWhenWrappedClientFails)
     auto s1 = std::make_shared<SharedClient>(client);
     auto s2 = std::make_shared<SharedClient>(client);
     ExpectCalled c1, c2;
-    s1->on_failed(c1.get());
-    s2->on_failed(c2.get());
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool d1{ false }, d2{ false };
+    s1->on_failed([&] {
+        std::lock_guard lock(mutex);
+        c1();
+        cv.notify_one();
+        d1 = true;
+    });
+    s2->on_failed([&] {
+        std::lock_guard lock(mutex);
+        c2();
+        cv.notify_one();
+        d2 = true;
+    });
     s1->start();
+    {
+        std::unique_lock lock(mutex);
+        cv.wait_for(lock, 250ms, [&] {
+            return d1 && d2;
+        });
+        ASSERT_TRUE(d1);
+        ASSERT_TRUE(d2);
+    }
     // Wait for the Hello message to have been handled.
     // It's expected that the client is not connected anymore,
     // since the client should be in a failed state.
-    EXPECT_THROW(client->wait_for_hello(), ClientNotConnectedException);
+    EXPECT_THROW(client->wait_for_hello(), ClientNotStartedException);
 }
 
 TEST(SharedClient, IntegrationTest)
