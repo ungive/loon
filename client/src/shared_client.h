@@ -87,6 +87,8 @@ private:
     std::atomic<bool> m_started{ false };
     std::atomic<bool> m_idling{ false };
     std::atomic<bool> m_on_ready_called{ false };
+    // This does not necessarily contain handles that are still registered.
+    // These might have been unregistered by the wrapped client without notice.
     std::unordered_set<std::shared_ptr<loon::ContentHandle>> m_registered{};
 };
 

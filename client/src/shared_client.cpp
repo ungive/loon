@@ -169,6 +169,8 @@ void loon::SharedClientImpl::internal_reset_idling()
 
 void loon::SharedClientImpl::internal_unregister_content()
 {
+    // It's okay to unregister content handles that are not registered anymore.
+    // No exceptions will be thrown in that case.
     for (auto it = m_registered.begin(); it != m_registered.end();) {
         m_client->unregister_content(*it);
         it = m_registered.erase(it);
@@ -300,34 +302,44 @@ std::vector<std::shared_ptr<ContentHandle>> loon::SharedClientImpl::content()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     std::vector<std::shared_ptr<ContentHandle>> result;
-    result.reserve(m_registered.size());
-    std::transform(m_registered.begin(), m_registered.end(),
-        std::back_inserter(result),
-        [](decltype(m_registered)::value_type const& handle) {
-            return handle;
-        });
-#ifndef NDEBUG
-    size_t contained = 0;
-    for (auto const& handle : m_client->content())
-        if (m_registered.find(handle) != m_registered.end())
-            contained += 1;
-    assert(result.size() == contained);
-#endif
+    auto content = m_client->content();
+    result.reserve(content.size());
+    size_t still_registered{ 0 };
+    for (auto const& handle : content) {
+        if (m_registered.find(handle) != m_registered.end()) {
+            result.push_back(handle);
+            still_registered++;
+        }
+    }
+    if (still_registered < m_registered.size()) {
+        // Erase stray content handles that are not registered anymore.
+        for (auto it = m_registered.begin(); it != m_registered.end();) {
+            if (!m_client->is_registered(*it)) {
+                it = m_registered.erase(it);
+                continue;
+            }
+            it++;
+        }
+    }
     return result;
 }
 
 bool loon::SharedClientImpl::is_registered(
     std::shared_ptr<ContentHandle> handle)
 {
-    if (handle == nullptr) {
-        throw MalformedContentException("the content handle cannot be null");
-    }
     const std::lock_guard<std::mutex> lock(m_mutex);
-    auto result = m_registered.find(handle) != m_registered.end();
-    if (!m_client->is_registered(handle)) {
-        assert(!result);
+    auto registered = m_client->is_registered(handle); // delegate
+    auto it = m_registered.find(handle);
+    auto owned = it != m_registered.end();
+    if (!registered) {
+        if (owned) {
+            // Erase stray content handle that is not registered anymore.
+            m_registered.erase(it);
+        }
     }
-    return result;
+    // Must both be registered with the underlying client and
+    // the content handle must be owned by this shared client.
+    return registered && owned;
 }
 
 // Helper class implementations

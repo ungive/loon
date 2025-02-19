@@ -1846,3 +1846,52 @@ TEST(SharedClient, RegisteringIdenticalContentWithSeparateSharedClientsWorks)
     auto h1 = s1->register_content(c1.source, c1.info);
     EXPECT_NO_THROW(s2->register_content(c1.source, c1.info));
 }
+
+TEST(SharedClient, NoContentRegisteredAfterWrappedClientRestarted)
+{
+    // This tests that the registered content that is tracked internally
+    // with the shared client is properly detected as not registered anymore
+    // when the wrapped client unregisters content and the shared client
+    // is not notified of that.
+
+    // Copied from RestartsWhenReceivingTooManyNoContentRequests
+
+    ClientOptions options;
+    options.no_content_request_limit = std::make_pair(1, 1s);
+    auto client = create_client(options, false);
+    auto s1 = std::make_shared<SharedClient>(client);
+    auto s2 = std::make_shared<SharedClient>(client);
+    s1->start();
+    s2->start();
+    s1->wait_until_ready();
+    s2->wait_until_ready();
+    auto c1 = example_content("1.txt");
+    auto c2 = example_content("2.txt");
+    auto h11 = s1->register_content(c1.source, c1.info);
+    auto h12 = s1->register_content(c2.source, c2.info);
+    auto h21 = s2->register_content(c1.source, c1.info);
+    auto h22 = s2->register_content(c2.source, c2.info);
+    EXPECT_EQ(2, s1->content().size());
+    // Unregister from the real client instead of the shared client
+    // so that the erasure of stray content in the content() method
+    // is also tested for the case that content is still left.
+    client->unregister_content(h11);
+    EXPECT_EQ(1, s1->content().size());
+    EXPECT_FALSE(s1->is_registered(h11));
+    EXPECT_TRUE(s1->is_registered(h12));
+    auto response1 = http_get(h11->url());
+    EXPECT_EQ(404, response1.status);
+    auto response2 = http_get(h11->url());
+    EXPECT_NE(200, response2.status);
+    s1->wait_until_ready();
+    // Check that the client restarted, i.e. it has no content.
+    EXPECT_EQ(0, s1->content().size());
+    EXPECT_FALSE(s2->is_registered(h21));
+    EXPECT_FALSE(s2->is_registered(h22));
+    // Also check it the other way round, since content() and is_registered()
+    // both modify the internal set of content handles
+    // when there are inconsistencies.
+    EXPECT_FALSE(s2->is_registered(h21));
+    EXPECT_FALSE(s2->is_registered(h22));
+    EXPECT_EQ(0, s1->content().size());
+}
