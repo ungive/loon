@@ -25,9 +25,9 @@ public:
 
     ~SharedClientImpl();
 
-    size_t index() const;
+    size_t index() const override;
 
-    std::string const& path_prefix() const;
+    std::string const& path_prefix() const override;
 
     void start() override;
 
