@@ -10,6 +10,10 @@
 #include <type_traits>
 #include <unordered_map>
 
+#ifdef LOON_TEST
+#include <thread>
+#endif
+
 #include "shared_client.h"
 
 using namespace loon;
