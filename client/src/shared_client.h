@@ -13,6 +13,10 @@ class SharedClientImpl : public ISharedClient
 public:
     SharedClientImpl(std::shared_ptr<IClient> client);
 
+    SharedClientImpl(SharedClientImpl const& other) = delete;
+
+    SharedClientImpl(SharedClientImpl&& other) = delete;
+
     ~SharedClientImpl();
 
     size_t index() const;

@@ -81,6 +81,11 @@ public:
      */
     SharedClient(std::shared_ptr<IClient> client);
 
+    // Shared client instantiation should be done explicitly, not implicitly.
+    SharedClient(SharedClient const& other) = delete;
+
+    SharedClient(SharedClient&& other);
+
     // Shared client methods
 
     inline size_t index() const override { return m_impl->index(); }

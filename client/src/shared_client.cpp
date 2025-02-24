@@ -20,6 +20,11 @@ loon::SharedClient::SharedClient(std::shared_ptr<IClient> client)
 {
 }
 
+loon::SharedClient::SharedClient(SharedClient&& other)
+    : m_impl{ std::move(other.m_impl) }
+{
+}
+
 static SharedClientState g_state;
 
 loon::SharedClientImpl::SharedClientImpl(std::shared_ptr<IClient> client)

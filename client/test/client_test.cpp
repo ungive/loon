@@ -1960,3 +1960,16 @@ TEST(SharedClient, NoContentRegisteredAfterWrappedClientRestarted)
     EXPECT_FALSE(s2->is_registered(h22));
     EXPECT_EQ(0, s1->content().size());
 }
+
+TEST(SharedClient, CanBeConstructedWithMoveConstructor)
+{
+    auto client = create_client(false);
+    SharedClient s1(client);
+    s1.start();
+    s1.wait_until_ready();
+    SharedClient s2(std::move(s1));
+    EXPECT_NO_THROW(EXPECT_FALSE(s2.wait_until_ready()));
+    // Test the default move-assignment operator as well.
+    SharedClient s3 = std::move(s2);
+    EXPECT_NO_THROW(EXPECT_FALSE(s3.wait_until_ready()));
+}
