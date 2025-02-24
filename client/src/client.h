@@ -27,6 +27,10 @@ class ClientImpl : public IClient
 public:
     ClientImpl(std::string const& address, ClientOptions options = {});
 
+    ClientImpl(ClientImpl const& other) = delete;
+
+    ClientImpl(ClientImpl&& other) = delete;
+
     ~ClientImpl();
 
     void start() override;
