@@ -81,6 +81,11 @@ public:
      */
     SharedClient(std::shared_ptr<IClient> client);
 
+    // Copy and move constructors mirror the interface of the real Client
+    // implementation. Even though copy-construction is easily implemented
+    // and might make sense, the shared client's interface should represent
+    // the real Client's interface as closely as possible.
+
     // Shared client instantiation should be done explicitly, not implicitly.
     SharedClient(SharedClient const& other) = delete;
 
