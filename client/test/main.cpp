@@ -11,6 +11,7 @@ int main(int argc, char* argv[])
     QCoreApplication app(qt_argc, nullptr);
     QTimer::singleShot(0, [&]() {
         ::testing::InitGoogleTest(&argc, argv);
+        GTEST_FLAG_SET(death_test_style, "threadsafe");
         auto testResult = RUN_ALL_TESTS();
         app.exit(testResult);
     });
