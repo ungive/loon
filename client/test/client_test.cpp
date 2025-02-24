@@ -989,8 +989,11 @@ TEST(Client, CanBeConstructedWithMoveConstructor)
     loon::Client client1(TEST_ADDRESS, options);
     client1.start();
     client1.wait_until_ready();
-    loon::Client client2 = std::move(client1);
+    loon::Client client2(std::move(client1));
     EXPECT_NO_THROW(EXPECT_FALSE(client2.wait_until_ready()));
+    // Test the default move-assignment operator as well.
+    loon::Client client3 = std::move(client2);
+    EXPECT_NO_THROW(EXPECT_FALSE(client3.wait_until_ready()));
 }
 
 TEST(SharedReferenceCounter, AnyMethodThrowsWithNullPointer)
