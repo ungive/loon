@@ -982,6 +982,17 @@ TEST(Client, StartCanBeCalledAgainAfterTerminate)
     EXPECT_EQ(content.data, response.body);
 }
 
+TEST(Client, CanBeConstructedWithMoveConstructor)
+{
+    loon::ClientOptions options{};
+    options.no_content_request_limit = std::make_pair(8, 1s);
+    loon::Client client1(TEST_ADDRESS, options);
+    client1.start();
+    client1.wait_until_ready();
+    loon::Client client2 = std::move(client1);
+    EXPECT_NO_THROW(EXPECT_FALSE(client2.wait_until_ready()));
+}
+
 TEST(SharedReferenceCounter, AnyMethodThrowsWithNullPointer)
 {
     loon::SharedReferenceCounter m;

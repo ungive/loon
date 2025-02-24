@@ -23,6 +23,8 @@ Client::Client(std::string const& address, ClientOptions options)
 {
 }
 
+loon::Client::Client(Client&& other) : m_impl{ std::move(other.m_impl) } {}
+
 ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
     : m_conn{ std::make_unique<websocket::Client>(address, options.websocket) },
       m_options{ options }

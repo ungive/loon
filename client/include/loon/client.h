@@ -536,6 +536,10 @@ public:
      */
     Client(std::string const& address, ClientOptions options = {});
 
+    Client(Client const& other) = delete;
+
+    Client(Client&& other);
+
     inline void start() override { return m_impl->start(); }
 
     inline void stop() override { return m_impl->stop(); }
