@@ -12,6 +12,10 @@
 
 // Declare the client class in the header so AUTOMOC works properly.
 
+#if QT_VERSION < QT_VERSION_CHECK(6, 5, 0)
+#error Qt 6.5 or newer required
+#endif // Qt < 6.5
+
 namespace loon::websocket
 {
 namespace qt
