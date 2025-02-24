@@ -542,7 +542,7 @@ TEST(Client, RestartsWhenReceivingTooManyNoContentRequests)
     EXPECT_EQ(404, response1.status);
     auto response2 = http_get(handle->url());
     EXPECT_NE(200, response2.status);
-    client->wait_until_ready();
+    EXPECT_NO_THROW(client->wait_until_ready());
     // Check that the client restarted, i.e. it has no content.
     EXPECT_EQ(0, client->content().size());
 }
