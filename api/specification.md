@@ -7,7 +7,7 @@ to make arbitrary content (usually files)
 available to the internet via an HTTP(S) endpoint.
 Clients connect to a server, which provides an HTTP base URL
 under which clients can accept HTTP GET requests.
-These requests are forwards to the client via a web socket connection,
+These requests are forwarded to the client via a web socket connection,
 upon which the client responds by sending data for the requested subpath
 to the server, which then forwards it to the party that made the HTTP request.
 
