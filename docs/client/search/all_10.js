@@ -1,6 +1,5 @@
 var searchData=
 [
-  ['unacceptablecontentexception_56',['UnacceptableContentException',['../classloon_1_1_unacceptable_content_exception.html',1,'loon']]],
-  ['unregister_5fcontent_57',['unregister_content',['../classloon_1_1_i_client.html#a10ddfe0d1c11db19153bd0e5ed36d94c',1,'loon::IClient::unregister_content()'],['../classloon_1_1_client.html#a119d5ea6cb48ee9faab2d61e24ee2c66',1,'loon::Client::unregister_content()']]],
-  ['url_58',['url',['../classloon_1_1_content_handle.html#a194f7a2bcbb41b4e77a77709224fe301',1,'loon::ContentHandle']]]
+  ['terminate_0',['terminate',['../classloon_1_1_i_client.html#a7d9c34f3e65408e39dfab3f25836b5ee',1,'loon::IClient::terminate()'],['../classloon_1_1_client.html#a0140bca410945007e65a555a5b41ab74',1,'loon::Client::terminate()'],['../classloon_1_1_i_shared_client.html#a58a183dd481e140b5f58ebf93e3821ba',1,'loon::ISharedClient::terminate()'],['../classloon_1_1_shared_client.html#a788fc6ae7fc9aad58e809213b8177a91',1,'loon::SharedClient::terminate()']]],
+  ['timeoutexception_1',['TimeoutException',['../classloon_1_1_timeout_exception.html',1,'loon']]]
 ];

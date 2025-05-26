@@ -1,5 +1,8 @@
 var searchData=
 [
-  ['unregister_5fcontent_102',['unregister_content',['../classloon_1_1_i_client.html#a10ddfe0d1c11db19153bd0e5ed36d94c',1,'loon::IClient::unregister_content()'],['../classloon_1_1_client.html#a119d5ea6cb48ee9faab2d61e24ee2c66',1,'loon::Client::unregister_content()']]],
-  ['url_103',['url',['../classloon_1_1_content_handle.html#a194f7a2bcbb41b4e77a77709224fe301',1,'loon::ContentHandle']]]
+  ['sharedclient_0',['sharedclient',['../classloon_1_1_shared_client.html#aeb1f5a5bc183604308ef4beab6010626',1,'loon::SharedClient::SharedClient(std::shared_ptr&lt; IClient &gt; client)'],['../classloon_1_1_shared_client.html#a23116dba56951453b0ea3df0d412e3b7',1,'loon::SharedClient::SharedClient(SharedClient const &amp;other)=delete'],['../classloon_1_1_shared_client.html#af8256d5805d8c756d1f5cca88b7a021d',1,'loon::SharedClient::SharedClient(SharedClient &amp;&amp;other)']]],
+  ['size_1',['size',['../classloon_1_1_content_source.html#a0eb35a72549e664679a684074f1a738d',1,'loon::ContentSource::size()'],['../classloon_1_1_buffer_content_source.html#a453672a86ae755c425591c7f79f14dde',1,'loon::BufferContentSource::size()']]],
+  ['start_2',['start',['../classloon_1_1_i_client.html#a65e4dcbc229a52f81c93d68b1eff41d2',1,'loon::IClient::start()'],['../classloon_1_1_client.html#ab956e5add223ba7a8ab6df2e4c465134',1,'loon::Client::start()'],['../classloon_1_1_shared_client.html#a13b6f93180c074ff38a4a96b6d3958fd',1,'loon::SharedClient::start()']]],
+  ['started_3',['started',['../classloon_1_1_i_client.html#a4698e2d6c1883a47f4442a5ce957543c',1,'loon::IClient::started()'],['../classloon_1_1_client.html#a9e077f78868cb742202aa520b4add5b5',1,'loon::Client::started()'],['../classloon_1_1_shared_client.html#a3e838d48c6e1212b34c28756960a31e6',1,'loon::SharedClient::started()']]],
+  ['stop_4',['stop',['../classloon_1_1_i_client.html#a45970b702e6fae206a0ae6256323b414',1,'loon::IClient::stop()'],['../classloon_1_1_client.html#a4da0243ffb3130d0e7a6f65c0a548906',1,'loon::Client::stop()'],['../classloon_1_1_shared_client.html#ac9be828a202f724f60d5ed518c3170a2',1,'loon::SharedClient::stop()']]]
 ];
