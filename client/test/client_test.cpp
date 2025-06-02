@@ -1400,7 +1400,7 @@ TEST(SharedClient, IdleIsDelegatedOnlyWhenAllSharedClientsIdle)
     EXPECT_EQ(1, check->n_idle_true());
 }
 
-TEST(SharedClient, DoesNotIdleAnymoreWhenBeingStartedAgain)
+TEST(SharedClient, DoesNotDelegateIdleWhenBeingStartedAgain)
 {
     auto client = create_client(false);
     auto check = std::make_shared<ClientCallCheck>(client);
@@ -1413,11 +1413,32 @@ TEST(SharedClient, DoesNotIdleAnymoreWhenBeingStartedAgain)
     EXPECT_EQ(0, check->n_idle_true());
     s1->idle();
     s1->start();
-    // At this point the first client should not be idling anymore.
     EXPECT_EQ(0, check->n_idle_true());
     s2->idle();
-    // Therefore idle is never delegated.
     EXPECT_EQ(0, check->n_idle_true());
+}
+
+TEST(SharedClient, DoesNotIdleAnymoreWhenBeingStartedAgain)
+{
+    ClientOptions options;
+    options.automatic_idling = false;
+    options.disconnect_after_idle = 250ms;
+    auto client = create_client(options, false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s1 = std::make_shared<SharedClient>(check);
+    s1->start();
+    s1->wait_until_ready();
+    EXPECT_EQ(0, check->n_idle_true());
+    s1->idle();
+    EXPECT_EQ(1, check->n_idle_true());
+    EXPECT_EQ(1, check->n_start());
+    s1->start();
+    EXPECT_EQ(2, check->n_start());
+    // Check that the client really is still connected.
+    std::this_thread::sleep_for(options.disconnect_after_idle.value() - 25ms);
+    EXPECT_TRUE(client->connected());
+    std::this_thread::sleep_for(2 * 25ms);
+    EXPECT_TRUE(client->connected()); // still connected
 }
 
 TEST(SharedClient, CallingIdleWithFalseDisablesIdlingWhenClientAutomaticIdles)

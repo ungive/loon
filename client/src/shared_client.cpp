@@ -91,11 +91,7 @@ void loon::SharedClientImpl::start()
     const std::lock_guard<std::mutex> lock(m_mutex);
     internal_reset_idling();
     if (m_started.load()) {
-        if (!m_client->started()) {
-            // If the client is not started, it needs to be started again.
-            // Everything else is already set the way it needs to be.
-            m_client->start(); // delegate
-        }
+        m_client->start(); // delegate
         return;
     }
 
