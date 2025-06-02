@@ -187,25 +187,51 @@ void loon::SharedClientImpl::internal_unregister_content()
     assert(m_registered.empty());
 }
 
+void loon::SharedClientImpl::idle(bool state)
+{
+    const std::lock_guard<std::mutex> lock(m_mutex);
+    internal_idle(state);
+}
+
 void loon::SharedClientImpl::idle()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
+    internal_idle(true);
+}
+
+void loon::SharedClientImpl::internal_idle(bool state)
+{
     if (!internal_started()) {
         return;
     }
-    if (m_idling.load()) {
+    if (m_idling.load() == state) {
         return;
     }
-    g_state.idling.add(m_client); // this shared client is idling
-    auto started = g_state.started.count(m_client, true);
-    auto idling = g_state.idling.count(m_client, true);
-    assert(idling <= started);
-    bool all_idling = started == idling;
-    // Put the client into idle when all shared clients are idling.
-    if (all_idling) {
-        m_client->idle(); // delegate
+    if (state) {
+        g_state.idling.add(m_client); // this shared client is idling
+        auto started = g_state.started.count(m_client, true);
+        auto idling = g_state.idling.count(m_client, true);
+        assert(idling <= started);
+        bool all_idling = started == idling;
+        // Put the client into idle when all shared clients are idling.
+        if (all_idling) {
+            m_client->idle(state); // delegate
+        }
+        m_idling.store(true);
+    } else {
+        auto previous_idling_count = g_state.idling.remove(m_client);
+        auto started = g_state.started.count(m_client, true);
+        assert(previous_idling_count > 0);
+        assert(previous_idling_count <= started);
+        assert(g_state.idling.count(m_client, false) < started);
+        bool were_all_idling = started == previous_idling_count;
+        // Put the client out of idle when all shared clients
+        // were idling before but are not anymore.
+        if (were_all_idling) {
+            m_client->idle(state); // delegate
+        }
+        m_idling.store(false);
     }
-    m_idling.store(true);
 }
 
 bool loon::SharedClientImpl::wait_until_ready()

@@ -121,7 +121,7 @@ public:
     virtual bool started() = 0;
 
     /**
-     * @brief Puts the client into idle.
+     * @brief Puts the client into or out of idle.
      *
      * Enable idling when the client is not in active use right now
      * and registered content is not required to be available online,
@@ -145,6 +145,13 @@ public:
      *
      * @see ClientOptions::disconnect_after_idle
      * @see ClientOptions::automatic_idling
+     */
+    virtual void idle(bool state) = 0;
+
+    /**
+     * @brief Puts the client into idle.
+     *
+     * @see IClient::idle(state)
      */
     virtual void idle() = 0;
 
@@ -548,7 +555,9 @@ public:
 
     inline bool started() override { return m_impl->started(); }
 
-    inline void idle() override { return m_impl->idle(); }
+    inline void idle(bool state) override { return m_impl->idle(state); }
+
+    inline void idle() override { return m_impl->idle(true); }
 
     inline bool wait_until_ready() override
     {

@@ -35,6 +35,8 @@ public:
 
     bool started() override;
 
+    void idle(bool state) override;
+
     void idle() override;
 
     bool wait_until_ready() override;
@@ -82,6 +84,7 @@ private:
 
 private:
     bool internal_started();
+    void internal_idle(bool state);
     void internal_reset_idling();
     void internal_unregister_content();
     std::string internal_path_prefix() const;

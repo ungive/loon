@@ -45,6 +45,12 @@ public:
         return m_started;
     }
 
+    inline void idle(bool state) override
+    {
+        const std::lock_guard<std::mutex> lock(m_mutex);
+        set_idle(state);
+    }
+
     inline void idle() override
     {
         const std::lock_guard<std::mutex> lock(m_mutex);

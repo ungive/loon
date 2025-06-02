@@ -113,6 +113,17 @@ public:
     inline void stop() override { return m_impl->stop(); }
 
     /**
+     * @brief Puts the shared client into or out of idle.
+     *
+     * This only puts the underlying client into idle, when all shared clients
+     * are idling and puts the underlying client out of idle, when at least one
+     * shared client is not idling anymore.
+     *
+     * @see IClient::idle
+     */
+    inline void idle(bool state) override { return m_impl->idle(state); }
+
+    /**
      * @brief Puts the shared client into idle.
      *
      * This only puts the underlying client into idle,
@@ -120,7 +131,7 @@ public:
      *
      * @see IClient::idle
      */
-    inline void idle() override { return m_impl->idle(); }
+    inline void idle() override { return m_impl->idle(true); }
 
     /**
      * @brief Registers content with this client and returns a handle for it.

@@ -894,6 +894,21 @@ TEST(Client, StartingTheClientAgainDisablesIdling)
     EXPECT_TRUE(client->connected()); // not idling anymore
 }
 
+TEST(Client, CallingIdleWithFalseDisablesIdling)
+{
+    ClientOptions options;
+    options.automatic_idling = false;
+    options.disconnect_after_idle = 250ms;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    client->idle();
+    std::this_thread::sleep_for(options.disconnect_after_idle.value() - 25ms);
+    client->idle(false);
+    EXPECT_TRUE(client->connected());
+    std::this_thread::sleep_for(2 * 25ms);
+    EXPECT_TRUE(client->connected()); // not idling anymore
+}
+
 enum CallbackOrderFlag
 {
     FLAG_CALLBACK,
@@ -1137,7 +1152,9 @@ public:
 
     inline size_t n_started() const { return m_n_started; }
 
-    inline size_t n_idle() const { return m_n_idle; }
+    inline size_t n_idle_true() const { return m_n_idle_true; }
+
+    inline size_t n_idle_false() const { return m_n_idle_false; }
 
     inline size_t n_wait_until_ready() const { return m_n_wait_until_ready; }
 
@@ -1168,9 +1185,19 @@ public:
         return m_client->started();
     }
 
+    inline void idle(bool state) override
+    {
+        if (state) {
+            m_n_idle_true++;
+        } else {
+            m_n_idle_false++;
+        }
+        return m_client->idle(state);
+    }
+
     inline void idle() override
     {
-        m_n_idle++;
+        m_n_idle_true++;
         return m_client->idle();
     }
 
@@ -1238,7 +1265,8 @@ private:
     size_t m_n_start{ 0 };
     size_t m_n_stop{ 0 };
     size_t m_n_started{ 0 };
-    size_t m_n_idle{ 0 };
+    size_t m_n_idle_true{ 0 };
+    size_t m_n_idle_false{ 0 };
     size_t m_n_wait_until_ready{ 0 };
     size_t m_n_wait_until_ready_timeout{ 0 };
 };
@@ -1355,7 +1383,7 @@ TEST(SharedClient, WhenLastStartedClientIsDestructedTheClientIsStopped)
     EXPECT_FALSE(client->started());
 }
 
-TEST(SharedClient, IdleIsDelegatedWhenAllSharedClientsIdle)
+TEST(SharedClient, IdleIsDelegatedOnlyWhenAllSharedClientsIdle)
 {
     auto client = create_client(false);
     auto check = std::make_shared<ClientCallCheck>(client);
@@ -1365,14 +1393,14 @@ TEST(SharedClient, IdleIsDelegatedWhenAllSharedClientsIdle)
     s2->start();
     s1->wait_until_ready();
     s2->wait_until_ready();
-    EXPECT_EQ(0, check->n_idle());
+    EXPECT_EQ(0, check->n_idle_true());
     s1->idle();
-    EXPECT_EQ(0, check->n_idle());
+    EXPECT_EQ(0, check->n_idle_true());
     s2->idle();
-    EXPECT_EQ(1, check->n_idle());
+    EXPECT_EQ(1, check->n_idle_true());
 }
 
-TEST(SharedClient, AClientThatIsStartedAgainDoesNotIdleAnymore)
+TEST(SharedClient, DoesNotIdleAnymoreWhenBeingStartedAgain)
 {
     auto client = create_client(false);
     auto check = std::make_shared<ClientCallCheck>(client);
@@ -1382,14 +1410,77 @@ TEST(SharedClient, AClientThatIsStartedAgainDoesNotIdleAnymore)
     s2->start();
     s1->wait_until_ready();
     s2->wait_until_ready();
-    EXPECT_EQ(0, check->n_idle());
+    EXPECT_EQ(0, check->n_idle_true());
     s1->idle();
     s1->start();
     // At this point the first client should not be idling anymore.
-    EXPECT_EQ(0, check->n_idle());
+    EXPECT_EQ(0, check->n_idle_true());
     s2->idle();
     // Therefore idle is never delegated.
-    EXPECT_EQ(0, check->n_idle());
+    EXPECT_EQ(0, check->n_idle_true());
+}
+
+TEST(SharedClient, DoesNotIdleAnymoreWhenCallingIdleWithFalse)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s1 = std::make_shared<SharedClient>(check);
+    auto s2 = std::make_shared<SharedClient>(check);
+    s1->start();
+    s2->start();
+    s1->wait_until_ready();
+    s2->wait_until_ready();
+    EXPECT_EQ(0, check->n_idle_true());
+    s1->idle();
+    s1->idle(false);
+    // At this point the first client should not be idling anymore.
+    EXPECT_EQ(0, check->n_idle_true());
+    s2->idle();
+    // Therefore idle is never delegated.
+    EXPECT_EQ(0, check->n_idle_true());
+}
+
+TEST(SharedClient, StopsIdlingOnceOneSharedClientIsNotIdlingAnymore)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s1 = std::make_shared<SharedClient>(check);
+    auto s2 = std::make_shared<SharedClient>(check);
+    s1->start();
+    s2->start();
+    s1->wait_until_ready();
+    s2->wait_until_ready();
+    s1->idle();
+    s2->idle();
+    EXPECT_EQ(1, check->n_idle_true());
+    EXPECT_EQ(0, check->n_idle_false());
+    s1->idle(false);
+    EXPECT_EQ(1, check->n_idle_false());
+    s2->idle(false);
+    EXPECT_EQ(1, check->n_idle_false());
+}
+
+TEST(SharedClient, IdlesAgainWhenAllIdlingClientsArePutOutOfAndBackIntoIdle)
+{
+    auto client = create_client(false);
+    auto check = std::make_shared<ClientCallCheck>(client);
+    auto s1 = std::make_shared<SharedClient>(check);
+    auto s2 = std::make_shared<SharedClient>(check);
+    s1->start();
+    s2->start();
+    s1->wait_until_ready();
+    s2->wait_until_ready();
+    EXPECT_EQ(0, check->n_idle_true());
+    s1->idle();
+    EXPECT_EQ(0, check->n_idle_true());
+    s2->idle();
+    EXPECT_EQ(1, check->n_idle_true());
+    s1->idle(false);
+    s2->idle(false);
+    s1->idle();
+    EXPECT_EQ(1, check->n_idle_true());
+    s2->idle();
+    EXPECT_EQ(2, check->n_idle_true());
 }
 
 TEST(SharedClient, ExternallyStoppedClientCanBeStartedAgain)
