@@ -1420,6 +1420,22 @@ TEST(SharedClient, DoesNotIdleAnymoreWhenBeingStartedAgain)
     EXPECT_EQ(0, check->n_idle_true());
 }
 
+TEST(SharedClient, CallingIdleWithFalseDisablesIdlingWhenClientAutomaticIdles)
+{
+    ClientOptions options;
+    options.automatic_idling = true;
+    options.disconnect_after_idle = 250ms;
+    auto client = create_client(options, false);
+    auto s1 = std::make_shared<SharedClient>(client);
+    s1->start();
+    s1->wait_until_ready();
+    s1->idle(false);
+    std::this_thread::sleep_for(options.disconnect_after_idle.value() - 25ms);
+    EXPECT_TRUE(client->connected());
+    std::this_thread::sleep_for(2 * 25ms);
+    EXPECT_TRUE(client->connected()); // still connected
+}
+
 TEST(SharedClient, DoesNotIdleAnymoreWhenCallingIdleWithFalse)
 {
     auto client = create_client(false);
