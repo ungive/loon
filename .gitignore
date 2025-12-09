@@ -9,7 +9,6 @@ cover.html
 todo.txt
 notes.txt
 
-CMakePresets.json
 /build
 /client/build
 /out

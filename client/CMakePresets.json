@@ -1,0 +1,267 @@
+{
+    "version": 8,
+    "configurePresets": [
+        {
+            "name": "base",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
+                "LOON_WEBSOCKET_BACKEND": "QT"
+            },
+            "environment": {
+            },
+            "hidden": true
+        },
+        {
+            "name": "linux-base",
+            "cacheVariables": {
+            },
+            "inherits": [
+                "base"
+            ],
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "hidden": true
+        },
+        {
+            "name": "windows-base",
+            "cacheVariables": {
+            },
+            "inherits": [
+                "base"
+            ],
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "hidden": true
+        },
+        {
+            "name": "mac-base",
+            "cacheVariables": {
+            },
+            "inherits": [
+                "base"
+            ],
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "hidden": true
+        },
+        {
+            "name": "linux-gcc",
+            "generator": "Unix Makefiles",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "/usr/bin/gcc",
+                "CMAKE_CXX_COMPILER": "/usr/bin/g++",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": true
+            },
+            "inherits": [
+                "linux-base"
+            ],
+            "hidden": true
+        },
+        {
+            "name": "linux-gcc-debug",
+            "displayName": "Linux: Debug (GCC)",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            },
+            "toolchainFile": "${sourceDir}/conan/out/linux-gcc-x86_64/build/Debug/generators/conan_toolchain.cmake",
+            "inherits": [
+                "linux-gcc"
+            ]
+        },
+        {
+            "name": "linux-gcc-release",
+            "displayName": "Linux: Release (GCC)",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            },
+            "toolchainFile": "${sourceDir}/conan/out/linux-gcc-x86_64/build/Release/generators/conan_toolchain.cmake",
+            "inherits": [
+                "linux-gcc"
+            ]
+        },
+        {
+            "name": "windows-msvc",
+            "generator": "Visual Studio 17 2022",
+            "architecture": "x64",
+            "cacheVariables": {
+                "CMAKE_C_FLAGS": "/MP",
+                "CMAKE_CXX_FLAGS": "/MP"
+            },
+            "toolchainFile": "${sourceDir}/conan/out/windows-msvc-visual-studio-x86_64/build/generators/conan_toolchain.cmake",
+            "inherits": [
+                "windows-base"
+            ],
+            "hidden": true
+        },
+        {
+            "name": "windows-msvc-debug",
+            "displayName": "Windows: Debug (MSVC)",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            },
+            "inherits": [
+                "windows-msvc"
+            ]
+        },
+        {
+            "name": "windows-msvc-release",
+            "displayName": "Windows: Release (MSVC)",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            },
+            "inherits": [
+                "windows-msvc"
+            ]
+        },
+        {
+            "name": "mac-clang",
+            "generator": "Unix Makefiles",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "/usr/bin/clang",
+                "CMAKE_CXX_COMPILER": "/usr/bin/clang++"
+            },
+            "inherits": [
+                "mac-base"
+            ],
+            "hidden": true
+        },
+        {
+            "name": "mac-clang-arm64",
+            "cacheVariables": {
+                "CMAKE_OSX_ARCHITECTURES": "arm64"
+            },
+            "inherits": [
+                "mac-clang"
+            ],
+            "hidden": true
+        },
+        {
+            "name": "mac-clang-x86_64",
+            "cacheVariables": {
+                "CMAKE_OSX_ARCHITECTURES": "x86_64"
+            },
+            "inherits": [
+                "mac-clang"
+            ],
+            "hidden": true
+        },
+        {
+            "name": "mac-clang-arm64-debug",
+            "displayName": "Mac: arm64 Debug (Clang)",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            },
+            "toolchainFile": "${sourceDir}/conan/out/mac-clang-armv8/build/Debug/generators/conan_toolchain.cmake",
+            "inherits": [
+                "mac-clang-arm64"
+            ]
+        },
+        {
+            "name": "mac-clang-arm64-release",
+            "displayName": "Mac: arm64 Release (Clang)",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            },
+            "toolchainFile": "${sourceDir}/conan/out/mac-clang-armv8/build/Release/generators/conan_toolchain.cmake",
+            "inherits": [
+                "mac-clang-arm64"
+            ]
+        },
+        {
+            "name": "mac-clang-x86_64-debug",
+            "displayName": "Mac: x86_64 Debug (Clang)",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            },
+            "toolchainFile": "${sourceDir}/conan/out/mac-clang-x86_64/build/Debug/generators/conan_toolchain.cmake",
+            "inherits": [
+                "mac-clang-x86_64"
+            ]
+        },
+        {
+            "name": "mac-clang-x86_64-release",
+            "displayName": "Mac: x86_64 Release (Clang)",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            },
+            "toolchainFile": "${sourceDir}/conan/out/mac-clang-x86_64/build/Release/generators/conan_toolchain.cmake",
+            "inherits": [
+                "mac-clang-x86_64"
+            ]
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "linux-gcc-debug",
+            "displayName": "Debug",
+            "configurePreset": "linux-gcc-debug",
+            "configuration": "Debug",
+            "jobs": 16
+        },
+        {
+            "name": "linux-gcc-release",
+            "displayName": "Release",
+            "configurePreset": "linux-gcc-release",
+            "configuration": "Release",
+            "jobs": 16
+        },
+        {
+            "name": "windows-msvc-debug",
+            "displayName": "Debug",
+            "configurePreset": "windows-msvc-debug",
+            "configuration": "Debug",
+            "nativeToolOptions": [
+                "/m:16",
+                "/p:CL_MPcount=12"
+            ]
+        },
+        {
+            "name": "windows-msvc-release",
+            "displayName": "Release",
+            "configurePreset": "windows-msvc-release",
+            "configuration": "Release",
+            "nativeToolOptions": [
+                "/m:16",
+                "/p:CL_MPcount=12"
+            ]
+        },
+        {
+            "name": "mac-clang-arm64-debug",
+            "displayName": "Debug",
+            "configurePreset": "mac-clang-arm64-debug",
+            "configuration": "Debug",
+            "jobs": 8
+        },
+        {
+            "name": "mac-clang-arm64-release",
+            "displayName": "Release",
+            "configurePreset": "mac-clang-arm64-release",
+            "configuration": "Release",
+            "jobs": 8
+        },
+        {
+            "name": "mac-clang-x86_64-debug",
+            "displayName": "Debug",
+            "configurePreset": "mac-clang-x86_64-debug",
+            "configuration": "Debug",
+            "jobs": 8
+        },
+        {
+            "name": "mac-clang-x86_64-release",
+            "displayName": "Release",
+            "configurePreset": "mac-clang-x86_64-release",
+            "configuration": "Release",
+            "jobs": 8
+        }
+    ]
+}
