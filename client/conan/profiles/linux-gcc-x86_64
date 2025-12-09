@@ -1,0 +1,6 @@
+include(./base)
+
+[settings]
+arch=x86_64
+compiler=gcc
+os=Linux

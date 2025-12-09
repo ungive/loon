@@ -1,0 +1,9 @@
+include(./base)
+
+# Visual Studio 17 2022
+[settings]
+arch=x86_64
+compiler=msvc
+compiler.version=194
+compiler.runtime=dynamic
+os=Windows

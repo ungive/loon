@@ -1,0 +1,6 @@
+include(./base)
+
+[settings]
+arch=armv8
+compiler=clang
+os=Macos
