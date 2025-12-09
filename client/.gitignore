@@ -1,1 +1,6 @@
 vcpkg_installed
+.cache
+out
+build
+install
+compile_commands.json
