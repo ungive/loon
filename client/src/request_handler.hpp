@@ -9,7 +9,7 @@
 #include <optional>
 #include <thread>
 
-#include "loon/client.h"
+#include "loon/client.hpp"
 #include "loon/messages.pb.h"
 
 namespace loon

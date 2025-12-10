@@ -9,7 +9,7 @@
 #include <string>
 #include <utility>
 
-#include "loon/content.h"
+#include "loon/content.hpp"
 
 namespace loon
 {

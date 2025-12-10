@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "loon/shared_client.h"
+#include "loon/shared_client.hpp"
 
 namespace loon
 {

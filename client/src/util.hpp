@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "logging.h"
+#include "logging.hpp"
 
 namespace util
 {

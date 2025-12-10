@@ -1,20 +1,17 @@
-#include "loon/shared_client.h"
+#include "loon/shared_client.hpp"
 
-#include <algorithm>
 #include <cassert>
 #include <functional>
 #include <limits>
-#include <map>
 #include <mutex>
 #include <stdexcept>
-#include <type_traits>
 #include <unordered_map>
 
 #ifdef LOON_TEST
 #include <thread>
 #endif
 
-#include "shared_client.h"
+#include "shared_client.hpp"
 
 using namespace loon;
 using namespace std::chrono_literals;

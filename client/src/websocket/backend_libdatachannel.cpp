@@ -6,8 +6,8 @@
 #include <rtc/websocket.hpp>
 
 #include "base64.hpp"
-#include "client.h"
-#include "logging.h"
+#include "client.hpp"
+#include "logging.hpp"
 
 #define BACKEND_NAME "libdatachannel"
 #define LOG_PREFIX BACKEND_NAME ": "

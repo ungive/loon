@@ -3,11 +3,10 @@
 #include <atomic>
 #include <chrono>
 #include <functional>
-#include <iostream>
 #include <memory>
 #include <string>
 
-#include "loon/client.h"
+#include "loon/client.hpp"
 
 // TODO proper version string
 #define LOON_USER_AGENT "loon-cpp-client/0.1"

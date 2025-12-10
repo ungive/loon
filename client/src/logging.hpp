@@ -4,7 +4,7 @@
 #include <sstream>
 #include <utility>
 
-#include "loon/client.h"
+#include "loon/client.hpp"
 
 namespace loon
 {

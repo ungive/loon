@@ -15,9 +15,9 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "client.h"
-#include "loon/client.h"
-#include "shared_client.h"
+#include "client.hpp"
+#include "loon/client.hpp"
+#include "shared_client.hpp"
 
 using namespace loon;
 using namespace testing;

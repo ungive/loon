@@ -11,11 +11,11 @@
 #include <thread>
 #include <variant>
 
-#include "logging.h"
-#include "loon/client.h"
+#include "logging.hpp"
+#include "loon/client.hpp"
 #include "loon/messages.pb.h"
-#include "request_handler.h"
-#include "websocket/client.h"
+#include "request_handler.hpp"
+#include "websocket/client.hpp"
 
 namespace loon
 {

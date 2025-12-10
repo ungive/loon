@@ -1,8 +1,7 @@
-#include "logging.h"
+#include "logging.hpp"
 
 #include <atomic>
 #include <chrono>
-#include <cstring>
 #include <iomanip>
 #include <iostream>
 #include <mutex>
@@ -11,8 +10,8 @@
 
 #include <google/protobuf/text_format.h>
 
-#include "loon/client.h"
-#include "websocket/client.h"
+#include "loon/client.hpp"
+#include "websocket/client.hpp"
 
 using namespace loon;
 

@@ -1,4 +1,4 @@
-#include "client.h"
+#include "client.hpp"
 
 #include <cassert>
 #include <chrono>
@@ -11,9 +11,9 @@
 #include <google/protobuf/text_format.h>
 
 #include "base64.hpp"
-#include "logging.h"
-#include "loon/client.h"
-#include "util.h"
+#include "logging.hpp"
+#include "loon/client.hpp"
+#include "util.hpp"
 
 using namespace loon;
 using namespace std::chrono_literals;

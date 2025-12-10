@@ -7,7 +7,7 @@
 #include <string>
 #include <type_traits>
 
-#include "loon/client.h"
+#include "loon/client.hpp"
 
 namespace loon
 {
