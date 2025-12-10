@@ -215,6 +215,7 @@ protected:
      */
     inline void on_websocket_close()
     {
+        m_active.store(false);
         m_connected.store(false);
         if (m_close_callback) {
             try {

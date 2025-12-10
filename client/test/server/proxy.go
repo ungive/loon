@@ -35,9 +35,12 @@ import (
 )
 
 const (
-	WsScheme  = "ws"
-	WssScheme = "wss"
-	BufSize   = 1024 * 32
+	WsScheme   = "ws"
+	WssScheme  = "wss"
+	BufSize    = 1024 * 32
+	DropNone   = 0
+	DropActive = 1
+	DropAll    = 2
 )
 
 var (
@@ -88,17 +91,17 @@ type WebsocketProxy struct {
 	// Send handshake before callback
 	beforeHandshake func(r *http.Request) error
 	// whether proxied packets should be dropped
-	drop atomic.Bool
+	drop atomic.Int32
 }
 
 type dropReader struct {
 	conn net.Conn
-	drop *atomic.Bool
+	drop func() bool
 }
 
 func (r *dropReader) Read(p []byte) (int, error) {
 	n, err := r.conn.Read(p)
-	if r.drop.Load() {
+	if r.drop() {
 		return n, nil
 	}
 	return n, err
@@ -106,11 +109,11 @@ func (r *dropReader) Read(p []byte) (int, error) {
 
 type dropWriter struct {
 	conn net.Conn
-	drop *atomic.Bool
+	drop func() bool
 }
 
 func (w *dropWriter) Write(p []byte) (int, error) {
-	if w.drop.Load() {
+	if w.drop() {
 		return len(p), nil
 	}
 	return w.conn.Write(p)
@@ -168,8 +171,11 @@ func (wp *WebsocketProxy) Proxy(writer http.ResponseWriter, request *http.Reques
 	}
 	defer conn.Close()
 
-	// Stop dropping packets on new connections
-	wp.drop.Store(false)
+	// Stop dropping packets on new connections, when only active connections
+	// were configured to drop packets. This will stop the dropping of packets
+	// for any currently active connections, but unit tests currently only test
+	// one connection at a time, so it's okay.
+	wp.drop.CompareAndSwap(DropActive, DropNone)
 
 	req := request.Clone(request.Context())
 	req.URL.Path, req.URL.RawPath, req.RequestURI = wp.defaultPath, wp.defaultPath, wp.defaultPath
@@ -203,8 +209,12 @@ func (wp *WebsocketProxy) Proxy(writer http.ResponseWriter, request *http.Reques
 	copyConn := func(a, b net.Conn) {
 		buf := ByteSliceGet(BufSize)
 		defer ByteSlicePut(buf)
-		reader := &dropReader{conn: b, drop: &wp.drop}
-		writer := &dropWriter{conn: a, drop: &wp.drop}
+		reader := &dropReader{conn: b, drop: func() bool {
+			return wp.drop.Load() != DropNone
+		}}
+		writer := &dropWriter{conn: a, drop: func() bool {
+			return wp.drop.Load() != DropNone
+		}}
 		_, err := io.CopyBuffer(writer, reader, buf)
 		errChan <- err
 	}
@@ -216,7 +226,7 @@ func (wp *WebsocketProxy) Proxy(writer http.ResponseWriter, request *http.Reques
 	}
 }
 
-func (wp *WebsocketProxy) Drop(state bool) {
+func (wp *WebsocketProxy) Drop(state int32) {
 	wp.drop.Store(state)
 }
 

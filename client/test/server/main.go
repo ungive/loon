@@ -48,12 +48,16 @@ func main() {
 		log.Fatalf("%v", err)
 	}
 	http.HandleFunc("/proxy/ws", wp.Proxy)
-	http.HandleFunc("/proxy/drop/on", func(writer http.ResponseWriter, request *http.Request) {
-		wp.Drop(true)
+	http.HandleFunc("/proxy/drop/all", func(writer http.ResponseWriter, request *http.Request) {
+		wp.Drop(DropAll)
 		writer.WriteHeader(http.StatusOK)
 	})
-	http.HandleFunc("/proxy/drop/off", func(writer http.ResponseWriter, request *http.Request) {
-		wp.Drop(false)
+	http.HandleFunc("/proxy/drop/active", func(writer http.ResponseWriter, request *http.Request) {
+		wp.Drop(DropActive)
+		writer.WriteHeader(http.StatusOK)
+	})
+	http.HandleFunc("/proxy/drop/none", func(writer http.ResponseWriter, request *http.Request) {
+		wp.Drop(DropNone)
 		writer.WriteHeader(http.StatusOK)
 	})
 	http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", ProxyPort), nil)

@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 #include <ctime>
+#include <future>
 #include <map>
 #include <memory>
 #include <stdexcept>
@@ -23,8 +24,9 @@ using namespace std::chrono_literals;
 
 #define TEST_SERVER_HOST "127.0.0.1:8072"
 #define TEST_SERVER_WS "ws://" TEST_SERVER_HOST "/proxy/ws"
-#define TEST_SERVER_DROP_ON "http://" TEST_SERVER_HOST "/proxy/drop/on"
-#define TEST_SERVER_DROP_OFF "http://" TEST_SERVER_HOST "/proxy/drop/off"
+#define TEST_SERVER_DROP_ALL "http://" TEST_SERVER_HOST "/proxy/drop/all"
+#define TEST_SERVER_DROP_ACTIVE "http://" TEST_SERVER_HOST "/proxy/drop/active"
+#define TEST_SERVER_DROP_NONE "http://" TEST_SERVER_HOST "/proxy/drop/none"
 #define TEST_AUTH std::nullopt
 
 class TestClient : public loon::ClientImpl
@@ -61,6 +63,17 @@ public:
         std::chrono::milliseconds duration = std::chrono::milliseconds::zero())
     {
         ClientImpl::chunk_sleep(duration);
+    }
+
+    inline void initial_reconnect_sleep(
+        std::chrono::milliseconds duration = std::chrono::milliseconds::zero())
+    {
+        ClientImpl::initial_reconnect_sleep(duration);
+    }
+
+    inline void before_reconnect_callback(std::function<void()> callback)
+    {
+        ClientImpl::before_reconnect_callback(std::move(callback));
     }
 
     inline void start_and_wait_until_connected()
@@ -438,13 +451,18 @@ private:
 
 // Turns dropping of websocket server packets on/off. Packets are dropped until
 // the next websocket/client connection is established.
-inline void drop_server_packets(bool state)
+inline void drop_server_packets(bool state, bool all = false)
 {
+    assert(state || !all);
     std::optional<CurlResponse> response;
     if (state) {
-        response = http_get(TEST_SERVER_DROP_ON);
+        if (all) {
+            response = http_get(TEST_SERVER_DROP_ALL);
+        } else {
+            response = http_get(TEST_SERVER_DROP_ACTIVE);
+        }
     } else {
-        response = http_get(TEST_SERVER_DROP_OFF);
+        response = http_get(TEST_SERVER_DROP_NONE);
     }
     EXPECT_EQ(200, response->status);
 }

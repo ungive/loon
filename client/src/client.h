@@ -1,13 +1,12 @@
 #pragma once
 
-#include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <thread>
 #include <variant>
@@ -214,6 +213,28 @@ protected:
     }
 
     /**
+     * @brief How long to sleep before doing the initial reconnect attempt.
+     */
+    inline void initial_reconnect_sleep(
+        std::optional<std::chrono::milliseconds> duration)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_initial_reconnect_sleep_duration = duration;
+        assert(!m_initial_reconnect_sleep_duration.has_value() ||
+            *m_initial_reconnect_sleep_duration >=
+                std::chrono::milliseconds::zero());
+    }
+
+    /**
+     * @brief Function that is called before a reconnect is performed.
+     */
+    inline void before_reconnect_callback(std::function<void()> callback)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_reconnect_callback = std::move(callback);
+    }
+
+    /**
      * @brief Triggers a restart and returns once the client is restarted.
      */
     inline void restart_and_wait()
@@ -248,11 +269,18 @@ private:
     std::chrono::milliseconds m_incoming_sleep_duration{
         std::chrono::milliseconds::zero()
     };
+    std::optional<std::chrono::milliseconds> m_initial_reconnect_sleep_duration;
+    std::function<void()> m_reconnect_callback;
 #endif
 
 private:
     using request_id_t = uint64_t;
     using request_path_t = std::string;
+
+    /**
+     * @brief Triggers a reconnect.
+     */
+    void reconnect();
 
     /**
      * @brief Restarts the connection.
@@ -323,6 +351,7 @@ private:
     std::condition_variable m_cv_manager{};
     ManagerAction::variant m_manager_action{};
     std::optional<bool> m_track_idling{};
+    std::optional<bool> m_queue_reconnect{};
     bool m_stop_manager_loop{ false };
 
     void reset_connection_state();
@@ -330,6 +359,7 @@ private:
     void internal_stop(
         std::unique_lock<std::mutex>& lock, bool terminate = false);
     void internal_stop_and_reset(std::unique_lock<std::mutex>& lock);
+    void internal_reconnect(std::unique_lock<std::mutex>& lock);
     void internal_restart(std::unique_lock<std::mutex>& lock);
 
     bool m_idle_waiting{ false };
@@ -339,6 +369,24 @@ private:
     inline void set_idle(bool state)
     {
         m_track_idling = state;
+        m_cv_manager.notify_one();
+    }
+
+    std::size_t m_reconnect_attempt{ 0 };
+    std::chrono::milliseconds m_reconnect_delay{ 0 };
+
+    std::chrono::milliseconds next_reconnect_delay();
+    void reset_reconnect_delay();
+
+    inline bool with_reconnect()
+    {
+        return m_options.websocket.reconnect_delay.has_value();
+    }
+
+    inline void queue_reconnect(bool state)
+    {
+        assert(with_reconnect());
+        m_queue_reconnect = state;
         m_cv_manager.notify_one();
     }
 

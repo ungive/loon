@@ -584,6 +584,9 @@ void ClientImpl::on_websocket_open()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     update_connected(true);
+    if (with_reconnect()) {
+        reset_reconnect_delay();
+    }
     m_was_explicitly_started = false;
 }
 
@@ -615,6 +618,11 @@ void ClientImpl::on_websocket_close()
     // i.e. when m_hello is/was set to a value.
     if (m_disconnect_callback) {
         m_disconnect_callback();
+    }
+    // Reconnect, if the client is still started.
+    if (m_started && with_reconnect()) {
+        assert(!m_was_explicitly_stopped);
+        queue_reconnect(true);
     }
 }
 
@@ -757,6 +765,11 @@ void ClientImpl::internal_stop(
     reset_connection_state();
     // Not idling anymore.
     set_idle(false);
+    // Not reconnecting anymore.
+    if (with_reconnect()) {
+        queue_reconnect(false);
+        reset_reconnect_delay();
+    }
     // Reset any manager state by removing pending actions.
     // We do not want to carry those into a fresh connection.
     m_manager_action = ManagerAction::Nothing{};
@@ -767,6 +780,20 @@ void ClientImpl::internal_stop_and_reset(std::unique_lock<std::mutex>& lock)
     internal_stop(lock);
     // Make sure the user can start the client again manually.
     m_started = false;
+}
+
+void ClientImpl::internal_reconnect(std::unique_lock<std::mutex>& lock)
+{
+#ifdef LOON_TEST
+    if (m_reconnect_callback) {
+        m_reconnect_callback();
+    }
+#endif
+    assert(m_started);
+    assert(!m_connected);
+    assert(!m_connecting);
+    assert(!m_idle_waiting);
+    internal_start();
 }
 
 void ClientImpl::internal_restart(std::unique_lock<std::mutex>& lock)
@@ -818,6 +845,50 @@ void loon::ClientImpl::fail()
     m_cv_manager.notify_one();
 }
 
+std::chrono::milliseconds ClientImpl::next_reconnect_delay()
+{
+    using namespace std::chrono_literals;
+
+    assert(m_reconnect_attempt >= 0);
+    assert(m_options.websocket.reconnect_delay.has_value());
+
+    m_reconnect_attempt += 1;
+
+    if (m_reconnect_attempt == 1) {
+        // Attempt to reconnect immediately first.
+        m_reconnect_delay = 0ms;
+#ifdef LOON_TEST
+        if (m_initial_reconnect_sleep_duration.has_value()) {
+            m_reconnect_delay = *m_initial_reconnect_sleep_duration;
+        }
+#endif
+        return m_reconnect_delay;
+    }
+    if (m_reconnect_attempt == 2) {
+        m_reconnect_delay =
+            m_options.websocket.reconnect_delay.value_or(1000ms);
+    }
+    if (m_reconnect_attempt > 2 &&
+        m_options.websocket.max_reconnect_delay.has_value()) {
+        // Exponentially increase reconnect delay.
+        auto next = std::min(m_options.websocket.max_reconnect_delay.value(),
+            2 * m_reconnect_delay);
+        // In case of an overflow with the above multiplication,
+        // note that reconnect_delay is set if max_reconnect_delay is set:
+        next = std::max(m_options.websocket.reconnect_delay.value(), next);
+        m_reconnect_delay = next;
+    }
+
+    assert(m_reconnect_delay >= std::chrono::milliseconds::zero());
+    return m_reconnect_delay;
+}
+
+void ClientImpl::reset_reconnect_delay()
+{
+    m_reconnect_attempt = 0;
+    m_reconnect_delay = 0ms;
+}
+
 void ClientImpl::manager_loop()
 {
     using Action = ManagerAction;
@@ -825,12 +896,18 @@ void ClientImpl::manager_loop()
 
     std::unique_lock<std::mutex> lock(m_mutex);
     auto idle_time_point = steady_clock::time_point::max();
+    auto reconnect_time_point = steady_clock::time_point::max();
     while (true) {
-        m_cv_manager.wait_until(lock, idle_time_point, [&] {
-            return m_stop_manager_loop || m_track_idling.has_value() ||
-                m_idle_waiting && steady_clock::now() >= idle_time_point ||
-                !std::holds_alternative<Action::Nothing>(m_manager_action);
-        });
+        m_cv_manager.wait_until(
+            lock, std::min(idle_time_point, reconnect_time_point), [&] {
+                return m_stop_manager_loop || m_track_idling.has_value() ||
+                    m_idle_waiting && steady_clock::now() >= idle_time_point ||
+                    !std::holds_alternative<Action::Nothing>(
+                        m_manager_action) ||
+                    m_queue_reconnect ||
+                    m_reconnect_attempt > 0 &&
+                    steady_clock::now() >= reconnect_time_point;
+            });
         if (m_stop_manager_loop) {
             return;
         }
@@ -869,14 +946,40 @@ void ClientImpl::manager_loop()
             m_idle_waiting = false;
             continue;
         }
-        if (auto* restart = std::get_if<Action::Restart>(&m_manager_action)) {
+        if (std::holds_alternative<Action::Restart>(m_manager_action)) {
             internal_restart(lock);
-        } else if (auto* fail = std::get_if<Action::Fail>(&m_manager_action)) {
+            m_manager_action = Action::Nothing{};
+            continue;
+        } else if (std::holds_alternative<Action::Fail>(m_manager_action)) {
             internal_stop_and_reset(lock);
             if (m_failed_callback) {
                 m_failed_callback();
             }
+            m_manager_action = Action::Nothing{};
+            continue;
+        } else {
+            assert(std::holds_alternative<Action::Nothing>(m_manager_action));
         }
-        m_manager_action = Action::Nothing{};
+        // Check for reconnects after idling, restarts and failures. We
+        // shouldn't be idling at this point, since the connection should be
+        // closed. And restarts and failures take precedence.
+        if (m_queue_reconnect.has_value()) {
+            assert(!m_idle_waiting);
+            bool do_queue = m_queue_reconnect.value();
+            m_queue_reconnect = std::nullopt;
+            reconnect_time_point = steady_clock::time_point::max();
+            if (do_queue) {
+                auto duration = next_reconnect_delay();
+                reconnect_time_point = steady_clock::now() + duration;
+                assert(m_reconnect_attempt > 0);
+            }
+            continue;
+        }
+        if (m_reconnect_attempt > 0 &&
+            steady_clock::now() >= reconnect_time_point) {
+            internal_reconnect(lock);
+            reconnect_time_point = steady_clock::time_point::max();
+            continue;
+        }
     }
 }

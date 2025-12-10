@@ -718,7 +718,7 @@ TEST(Client, CanBeConstructedWithMoveConstructor)
     EXPECT_NO_THROW(EXPECT_FALSE(client3.wait_until_ready()));
 }
 
-TEST(Client, DisconnectsAfterDoubleThePingIntervalOnDroppedConnection)
+TEST(Client, DisconnectsAfterDoubleThePingIntervalWhenNoPongIsReceived)
 {
     loon::ClientOptions options{};
     auto ping_interval = 250ms;
@@ -727,12 +727,13 @@ TEST(Client, DisconnectsAfterDoubleThePingIntervalOnDroppedConnection)
     auto client = create_client(options, false);
     client->start_and_wait_until_connected();
     EXPECT_TRUE(client->connected());
+    // No pong can ever be received when all packets are being dropped.
     drop_server_packets(true);
     std::this_thread::sleep_for(expected_ping_timeout + 50ms);
     EXPECT_FALSE(client->connected());
 }
 
-TEST(Client, StopsIdlingAfterDisconnectOnDroppedConnection)
+TEST(Client, StopsIdlingAfterUnexpectedDisconnectWithoutAutomaticReconnects)
 {
     loon::ClientOptions options{};
     auto ping_interval = 250ms;
@@ -750,27 +751,320 @@ TEST(Client, StopsIdlingAfterDisconnectOnDroppedConnection)
     std::this_thread::sleep_for(expected_idle_timeout - expected_ping_timeout);
 }
 
-// TEST(Client, AutomaticallyRestartsAfterPingTimeout)
-// {
-//     loon::ClientOptions options{};
-//     options.websocket.ping_interval = 1s;
-//     auto client = create_client(options);
-//     auto content = example_content();
-//     auto handle = client->register_content(content.source, content.info);
-//     // ExpectCalled callback;
-//     // handle->on_unregistered(callback.get());
-//     // client->unregister_content(handle);
-//     std::this_thread::sleep_for(100s);
-// }
+TEST(Client, AutomaticallyReconnectsAfterUnexpectedDisconnect)
+{
+    loon::ClientOptions options{};
+    auto ping_interval = 250ms;
+    auto expected_ping_timeout = 2 * ping_interval;
+    auto reconnect_delay = 250ms;
+    options.websocket.ping_interval = ping_interval;
+    options.websocket.reconnect_delay = reconnect_delay;
+    auto client = create_client(options, false);
+    // Delay the initial reconnect attempt so that we have time to check that
+    // the client really disconnected.
+    client->initial_reconnect_sleep(reconnect_delay);
+    client->start_and_wait_until_connected();
+    EXPECT_TRUE(client->connected());
+    drop_server_packets(true);
+    std::this_thread::sleep_for(expected_ping_timeout + 50ms);
+    EXPECT_FALSE(client->connected());
+    std::this_thread::sleep_for(reconnect_delay / 2);
+    drop_server_packets(false);
+    EXPECT_FALSE(client->connected());
+    EXPECT_TRUE(client->started()); // The client should still be started.
+    std::this_thread::sleep_for(reconnect_delay);
+    EXPECT_TRUE(client->connected());
+}
 
-// TODO TEST Check that the client doesn't idle anymore when it disconnects
-// from and then reconnects to the server internally. It shouldn't
-// idle-disconnect shortly after reconnecting. I think it does at the moment.
+TEST(Client, AttemptsToReconnectImmediatelyAfterUnexpectedDisconnect)
+{
+    loon::ClientOptions options{};
+    auto ping_interval = 250ms;
+    auto expected_ping_timeout = 2 * ping_interval;
+    auto reconnect_delay = 250ms;
+    options.websocket.ping_interval = ping_interval;
+    // The delay doesn't matter for the initial reconnect attempt.
+    options.websocket.reconnect_delay = 1s;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    EXPECT_TRUE(client->connected());
+    drop_server_packets(true);
+    // Ensure that packets are not dropped before attempting to reconnect.
+    client->before_reconnect_callback([] {
+        drop_server_packets(false);
+    });
+    std::this_thread::sleep_for(expected_ping_timeout + 50ms);
+    // Still connected.
+    EXPECT_TRUE(client->connected());
+}
 
-// TODO TEST The client should not reconnect after being stopped explicitly
-// TODO TEST The client should not reconnect after being stopped due to idle
+TEST(Client, AttemptsToReconnectMultipleTimesWithExponentiallyIncreasingDelay)
+{
+    loon::ClientOptions options{};
+    auto connect_timeout = 100ms;
+    auto ping_interval = 250ms;
+    auto expected_ping_timeout = 2 * ping_interval;
+    auto reconnect_delay = 125ms;
+    auto max_reconnect_delay = 500ms;
+    options.websocket.connect_timeout = connect_timeout;
+    options.websocket.ping_interval = ping_interval;
+    options.websocket.reconnect_delay = reconnect_delay;
+    options.websocket.max_reconnect_delay = max_reconnect_delay;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    EXPECT_TRUE(client->connected());
+    auto root = std::chrono::milliseconds::zero();
+    std::vector<std::chrono::milliseconds> reconnect_time_points;
+    std::promise<void> promise;
+    client->before_reconnect_callback([&] {
+        reconnect_time_points.push_back(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()));
+        if (reconnect_time_points.size() == 1) {
+            root = reconnect_time_points.back();
+        }
+        if (reconnect_time_points.size() == 5) {
+            promise.set_value();
+        }
+    });
+    auto start = std::chrono::steady_clock::now();
+    drop_server_packets(true, true); // Drop packets for all future connections.
+    std::shared_ptr<void> scope_guard(nullptr, std::bind([] {
+        // Since we drop packets for all future connections, we have to manually
+        // disable it again, as it's not reset by the test server on the next
+        // established connection.
+        drop_server_packets(false);
+    }));
+    promise.get_future().wait();
+    client->stop();
+    EXPECT_EQ(5, reconnect_time_points.size());
+    auto delta = std::chrono::steady_clock::now() - start;
+    // 5 attempts (exponential delay)
+    std::vector<std::chrono::milliseconds> expected_reconnect_delays = {
+        0ms,
+        125ms,
+        250ms,
+        500ms,
+        500ms,
+    };
+    auto summed_expected_reconnect_delays = 0ms;
+    for (auto delay : expected_reconnect_delays) {
+        summed_expected_reconnect_delays += delay;
+    }
+    auto expected_duration =             //
+        ping_interval +                  // time until disconnect
+        summed_expected_reconnect_delays // individual reconnect delays
+        + 5 * connect_timeout;           // 1 connect timeout per attempt
+    EXPECT_GT(delta, expected_duration);
+    EXPECT_LT(delta, expected_duration + 250ms);
+    std::cerr << "Expected delta: "
+              << std::chrono::duration_cast<std::chrono::milliseconds>(
+                     expected_duration)
+                     .count()
+              << "ms\n";
+    std::cerr
+        << "Actual delta: "
+        << std::chrono::duration_cast<std::chrono::milliseconds>(delta).count()
+        << "ms\n";
+    std::cerr << "Reconnect time points:\n";
+    auto previous = std::chrono::milliseconds::zero();
+    auto summed_actual_reconnect_delays = 0ms;
+    assert(reconnect_time_points.size() == expected_reconnect_delays.size());
+    for (std::size_t i = 0; i < reconnect_time_points.size(); i++) {
+        auto time_point = reconnect_time_points[i];
+        auto value = time_point - root - connect_timeout * i;
+        auto effective_delay = value - previous;
+        previous = value;
 
-// TODO TEST The client should not idle stop after a disconnect
+        std::cerr << (i + 1) << ": Got " << effective_delay.count()
+                  << "ms, expected " << expected_reconnect_delays[i].count()
+                  << "ms\n";
+        EXPECT_GE(static_cast<long>(effective_delay.count()),
+            static_cast<long>((expected_reconnect_delays[i] - 5ms).count()));
+        EXPECT_LT(static_cast<long>(effective_delay.count()),
+            static_cast<long>((expected_reconnect_delays[i] + 5ms).count()));
+        summed_actual_reconnect_delays += effective_delay;
+    }
+    EXPECT_GE(static_cast<long>(summed_actual_reconnect_delays.count()),
+        static_cast<long>((summed_expected_reconnect_delays - 25ms).count()));
+    EXPECT_LE(static_cast<long>(summed_actual_reconnect_delays.count()),
+        static_cast<long>((summed_expected_reconnect_delays + 25ms).count()));
+}
+
+TEST(Client, StopsReconnectingWhenClientIsStoppedExplicitly)
+{
+    loon::ClientOptions options{};
+    auto ping_interval = 250ms;
+    auto expected_ping_timeout = 2 * ping_interval;
+    auto reconnect_delay = 1000ms;
+    options.websocket.ping_interval = ping_interval;
+    options.websocket.reconnect_delay = reconnect_delay;
+    auto client = create_client(options, false);
+    // Delay the initial reconnect attempt so that we can stop the client before
+    // the reconnect is performed and then check that it is cancelled.
+    client->initial_reconnect_sleep(reconnect_delay);
+    client->start_and_wait_until_connected();
+    EXPECT_TRUE(client->connected());
+    drop_server_packets(true);
+    std::this_thread::sleep_for(expected_ping_timeout + 50ms);
+    EXPECT_FALSE(client->connected());
+    std::this_thread::sleep_for(reconnect_delay / 2);
+    drop_server_packets(false);
+    EXPECT_FALSE(client->connected());
+    EXPECT_TRUE(client->started());
+
+    // The client should not be attempting to reconnect anymore, after being
+    // stopped. Wait for a sufficient amount of time.
+    client->stop();
+    std::this_thread::sleep_for(reconnect_delay / 2);
+    EXPECT_FALSE(client->started());
+    EXPECT_FALSE(client->connected());
+    std::this_thread::sleep_for(reconnect_delay / 2);
+    EXPECT_FALSE(client->connected());
+}
+
+TEST(Client, ReconnectDelayIsResetWhenClientReconnectsAgain)
+{
+    loon::ClientOptions options{};
+    auto connect_timeout = 100ms;
+    auto ping_interval = 250ms;
+    auto expected_ping_timeout = 2 * ping_interval;
+    auto reconnect_delay = 500ms;
+    auto max_reconnect_delay = 1000ms;
+    options.websocket.connect_timeout = connect_timeout;
+    options.websocket.ping_interval = ping_interval;
+    options.websocket.reconnect_delay = reconnect_delay;
+    options.websocket.max_reconnect_delay = max_reconnect_delay;
+    auto client = create_client(options, false);
+    client->initial_reconnect_sleep(reconnect_delay);
+    client->start_and_wait_until_connected();
+    EXPECT_TRUE(client->connected());
+    std::vector<std::chrono::milliseconds> reconnect_time_points;
+    std::promise<void> on_sufficient_reconnect_attempts;
+    std::promise<void> on_successful_reconnect;
+    std::promise<void> on_last_reconnect;
+    client->before_reconnect_callback([&] {
+        reconnect_time_points.push_back(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()));
+        if (reconnect_time_points.size() == 2) {
+            on_sufficient_reconnect_attempts.set_value();
+        }
+        if (reconnect_time_points.size() == 3) {
+            on_successful_reconnect.set_value();
+        }
+        if (reconnect_time_points.size() == 4) {
+            on_last_reconnect.set_value();
+        }
+    });
+    // Drop server packets for all future connections in this test.
+    drop_server_packets(true, true);
+    std::shared_ptr<void> scope_guard(nullptr, std::bind([] {
+        drop_server_packets(false);
+    }));
+
+    on_sufficient_reconnect_attempts.get_future().wait();
+    std::this_thread::sleep_for(10ms);
+    drop_server_packets(false);
+    EXPECT_FALSE(client->connected());
+
+    on_successful_reconnect.get_future().wait();
+    std::this_thread::sleep_for(10ms);
+    EXPECT_TRUE(client->connected());
+
+    // Drop server packets again and expect it to have been reset, by checking
+    // if the delay is significantly reduced.
+    drop_server_packets(true);
+    on_last_reconnect.get_future().wait();
+    EXPECT_EQ(4, reconnect_time_points.size());
+    auto before_delay =
+        reconnect_time_points[2] - reconnect_time_points[1] - connect_timeout;
+    auto after_delay = reconnect_time_points[3] - reconnect_time_points[2] -
+        expected_ping_timeout;
+    std::cerr << "Before delay: " << before_delay.count() << "ms\n";
+    std::cerr << "After delay: " << after_delay.count() << "ms\n";
+    EXPECT_LT(after_delay, before_delay - reconnect_delay / 2);
+
+    EXPECT_LT(static_cast<long>(before_delay.count()),
+        static_cast<long>((max_reconnect_delay + 5ms).count()));
+    EXPECT_GT(static_cast<long>(before_delay.count()),
+        static_cast<long>((max_reconnect_delay - 5ms).count()));
+    EXPECT_LT(static_cast<long>(after_delay.count()),
+        static_cast<long>((reconnect_delay + 5ms).count()));
+    EXPECT_GT(static_cast<long>(after_delay.count()),
+        static_cast<long>((reconnect_delay - 5ms).count()));
+}
+
+TEST(Client,
+    ReconnectDelayIsResetWhenClientIsStoppedAndStartedAgainWithoutConnecting)
+{
+    loon::ClientOptions options{};
+    auto connect_timeout = 100ms;
+    auto ping_interval = 250ms;
+    auto expected_ping_timeout = 2 * ping_interval;
+    auto reconnect_delay = 500ms;
+    auto max_reconnect_delay = 1000ms;
+    options.websocket.connect_timeout = connect_timeout;
+    options.websocket.ping_interval = ping_interval;
+    options.websocket.reconnect_delay = reconnect_delay;
+    options.websocket.max_reconnect_delay = max_reconnect_delay;
+    auto client = create_client(options, false);
+    client->initial_reconnect_sleep(reconnect_delay);
+    client->start_and_wait_until_connected();
+    EXPECT_TRUE(client->connected());
+    std::vector<std::chrono::milliseconds> reconnect_time_points;
+    std::promise<void> on_sufficient_reconnect_attempts;
+    std::promise<void> on_last_reconnect;
+    client->before_reconnect_callback([&] {
+        reconnect_time_points.push_back(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()));
+        if (reconnect_time_points.size() == 3) {
+            on_sufficient_reconnect_attempts.set_value();
+        }
+        if (reconnect_time_points.size() == 4) {
+            on_last_reconnect.set_value();
+        }
+    });
+    // Drop server packets for all future connections in this test.
+    drop_server_packets(true, true);
+    std::shared_ptr<void> scope_guard(nullptr, std::bind([] {
+        drop_server_packets(false);
+    }));
+
+    on_sufficient_reconnect_attempts.get_future().wait();
+    client->stop();
+    client->start();
+    std::this_thread::sleep_for(25ms);
+    EXPECT_FALSE(client->connected());
+
+    // Expect the delay to be reset when the client is stopped and started
+    // again, even when client is not connecting.
+    on_last_reconnect.get_future().wait();
+    EXPECT_EQ(4, reconnect_time_points.size());
+    auto before_delay =
+        reconnect_time_points[2] - reconnect_time_points[1] - connect_timeout;
+    auto after_delay =
+        reconnect_time_points[3] - reconnect_time_points[2] - connect_timeout;
+    std::cerr << "Before delay: " << before_delay.count() << "ms\n";
+    std::cerr << "After delay: " << after_delay.count() << "ms\n";
+    EXPECT_LT(after_delay, before_delay - reconnect_delay / 2);
+
+    EXPECT_LT(static_cast<long>(before_delay.count()),
+        static_cast<long>((max_reconnect_delay + 5ms).count()));
+    EXPECT_GT(static_cast<long>(before_delay.count()),
+        static_cast<long>((max_reconnect_delay - 5ms).count()));
+    EXPECT_LT(static_cast<long>(after_delay.count()),
+        static_cast<long>((reconnect_delay + 5ms).count()));
+    EXPECT_GT(static_cast<long>(after_delay.count()),
+        static_cast<long>((reconnect_delay - 5ms).count()));
+}
+
+// TODO TEST The client should not attempt to reconnect while it's idling, as
+// the connection is not needed for anything. Instead wait with reconnecting
+// until the client is not idling anymore.
 
 // TODO TEST Do not hold public Client mutex during send(), when responding
-// to a websocket message...
+// to a websocket message.
+
+// TODO TEST Does not reconnect when no reconnect delay is configured.
