@@ -1,9 +1,12 @@
 [submodule "clients/third_party/googletest"]
 	path = client/third_party/googletest
 	url = https://github.com/google/googletest.git
-	branch = v1.14.x
+	branch = v1.17.x
 [submodule "clients/third_party/libhv"]
 	path = client/third_party/libhv
 	url = https://github.com/ithewei/libhv.git
 	tag = v1.3.2
 	ignore = dirty
+[submodule "client/third_party/libdatachannel"]
+	path = client/third_party/libdatachannel
+	url = https://github.com/ungive/libdatachannel
