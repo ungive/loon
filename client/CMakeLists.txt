@@ -100,11 +100,13 @@ if(LOON_BUILD_TESTS)
     add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
     include(GoogleTest)
     enable_testing()
-    set(TEST_SOURCES test/main.cpp test/client_test.cpp)
+    set(TEST_SOURCES
+        test/main.cpp test/client_test.cpp
+        test/shared_reference_counter_test.cpp test/shared_client_test.cpp)
 
     add_executable(loon_test ${TEST_SOURCES})
     target_link_libraries(loon_test loon)
-    target_include_directories(loon_test PRIVATE ./include ./src)
+    target_include_directories(loon_test PRIVATE ./include ./src ./)
     target_include_directories(loon_test PRIVATE ${Protobuf_INCLUDE_DIRS})
     target_include_directories(loon_test PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_link_libraries(loon_test protobuf::libprotobuf)
