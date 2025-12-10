@@ -467,8 +467,8 @@ void ClientImpl::on_request(Request const& request)
         ClientMessage message;
         auto empty_response = message.mutable_empty_response();
         empty_response->set_request_id(request.id());
-        log(Debug) << "empty response" << var("rid", request.id())
-                   << var("path", request.path());
+        log(Info) << "empty response" << var("rid", request.id())
+                  << var("path", request.path());
         send(message);
         return;
     }
