@@ -6,6 +6,7 @@
 #include <future>
 #include <map>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <thread>
 #include <utility>
@@ -47,7 +48,8 @@ public:
 
     inline Hello wait_for_hello() { return ClientImpl::wait_for_hello(); }
 
-    inline void inject_hello_modifier(std::function<void(Hello&)> modifier)
+    inline void inject_hello_modifier(
+        std::function<void(std::optional<Hello>&)> modifier)
     {
         ClientImpl::inject_hello_modifier(modifier);
     }

@@ -354,9 +354,13 @@ void ClientImpl::on_hello(Hello const& hello)
     std::optional<Hello> hello_copy{ std::nullopt };
 
 #ifdef LOON_TEST
-    if (m_injected_hello_modifer) {
-        Hello modified = hello;
-        m_injected_hello_modifer(modified);
+    if (m_injected_hello_modifier) {
+        std::optional<Hello> modified = hello;
+        m_injected_hello_modifier(modified);
+        if (!modified.has_value()) {
+            log(Debug) << "hello message discarded by injected modifier";
+            return;
+        }
         hello_copy = std::move(modified);
     } else {
         hello_copy = hello;
@@ -594,6 +598,7 @@ void ClientImpl::on_websocket_close()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
     bool was_connected = m_connected;
+    bool had_hello = m_hello.has_value();
     bool was_idling = m_idle_waiting;
     update_connected(false);
     reset_connection_state();
@@ -614,14 +619,12 @@ void ClientImpl::on_websocket_close()
         m_was_explicitly_stopped = false;
         log(Info) << "client stopped";
     }
-    // FIXME: disconnect can be called before ready is called!
-    // e.g. when the server disconnects before it sent a hello
-    // disconnect should only be called when the connection was ready,
-    // i.e. when m_hello is/was set to a value.
-    if (was_connected && m_disconnect_callback) {
+    // Only call the disconnect callback, if the client was connected and the
+    // connection was ready, i.e. the Hello message was received.
+    if (m_disconnect_callback && was_connected && had_hello) {
         m_disconnect_callback();
     }
-    // Reconnect, if the client is still started, reconnect are configured and
+    // Reconnect, if the client is still started, reconnects are enabled and
     // the client was not idling. If the client was idling, then we can just
     // stay disconnected, as the connection is not needed for anything.
     if (m_started && with_reconnect() && !was_idling) {

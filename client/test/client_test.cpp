@@ -147,8 +147,8 @@ TEST(Client, FailsWhenMinCacheDurationIsSetAndServerDoesNotCacheResponses)
     ClientOptions options;
     options.min_cache_duration = std::chrono::seconds{ 10 };
     auto client = create_client(options, false);
-    client->inject_hello_modifier([](Hello& hello) {
-        hello.mutable_constraints()->set_cache_duration(0);
+    client->inject_hello_modifier([](std::optional<Hello>& hello) {
+        hello->mutable_constraints()->set_cache_duration(0);
     });
     ExpectCalled callback;
     std::mutex mutex;
@@ -212,14 +212,14 @@ TEST(Client, FailsWhenMinCacheDurationIsSetButResponseIsNotCached)
     ClientOptions options;
     options.min_cache_duration = std::chrono::seconds{ cache_duration / 2 };
     auto client = create_client(options, false);
-    client->inject_hello_modifier([](Hello& hello) {
-        if (hello.constraints().cache_duration() > 0) {
+    client->inject_hello_modifier([](std::optional<Hello>& hello) {
+        if (hello->constraints().cache_duration() > 0) {
             FAIL() << "the test server is expected to not cache responses";
         }
         // The real test server does not cache responses,
         // but for the sake of the test, we pretend it does.
         // This would resemble a server that claims to cache, but doesn't.
-        hello.mutable_constraints()->set_cache_duration(30);
+        hello->mutable_constraints()->set_cache_duration(30);
     });
     client->start_and_wait_until_connected();
     auto content = example_content(cache_duration);
@@ -438,8 +438,8 @@ TEST(Client, CanBeStartedAgainWhenStoppedByFailure)
     options.min_cache_duration = std::chrono::seconds{ 10 };
     options.websocket.connect_timeout = 500ms;
     auto client = create_client(options, false);
-    client->inject_hello_modifier([](Hello& hello) {
-        hello.mutable_constraints()->set_cache_duration(0);
+    client->inject_hello_modifier([](std::optional<Hello>& hello) {
+        hello->mutable_constraints()->set_cache_duration(0);
     });
     ExpectCalled callback;
     std::mutex mutex;
@@ -460,9 +460,9 @@ TEST(Client, CanBeStartedAgainWhenStoppedByFailure)
         ASSERT_TRUE(done);
     }
     EXPECT_THROW(client->wait_for_hello(), ClientNotStartedException);
-    client->inject_hello_modifier([](Hello& hello) {
+    client->inject_hello_modifier([](std::optional<Hello>& hello) {
         // Increase the cache duration, so it won't fail again.
-        hello.mutable_constraints()->set_cache_duration(30);
+        hello->mutable_constraints()->set_cache_duration(30);
     });
     client->on_failed([] {});
     // Wait for the client to be properly disconnected.
@@ -1199,6 +1199,37 @@ TEST(Client, DisconnectCallbackIsNotCalledWhenClientWasNeverConnected)
     std::this_thread::sleep_for(2 * connect_timeout);
     EXPECT_FALSE(client->connected());
     EXPECT_EQ(0, disconnect_callback_call_count.load());
+}
+
+TEST(Client,
+    DisconnectCallbackIsOnlyCalledAfterHelloWasReceivedAndReadyWasCalled)
+{
+    loon::ClientOptions options{};
+    auto ping_interval = 100ms;
+    auto expected_ping_timeout = 2 * ping_interval;
+    options.websocket.ping_interval = ping_interval;
+    auto client = create_client(options, false);
+    client->inject_hello_modifier([](std::optional<Hello>& hello) {
+        // Pretend the hello message was never sent.
+        hello = std::nullopt;
+    });
+    std::atomic<bool> on_ready_called;
+    std::atomic<bool> on_disconnect_called;
+    client->on_ready([&] {
+        on_ready_called.store(true);
+    });
+    client->on_disconnect([&] {
+        EXPECT_TRUE(on_ready_called.load());
+        on_disconnect_called.store(true);
+    });
+    client->start();
+    std::this_thread::sleep_for(50ms);
+    EXPECT_TRUE(client->connected());
+    drop_server_packets(true);
+    std::this_thread::sleep_for(expected_ping_timeout + 50ms);
+    EXPECT_FALSE(client->connected());
+    EXPECT_FALSE(on_ready_called.load());
+    EXPECT_FALSE(on_disconnect_called.load());
 }
 
 // TODO TEST Does not reconnect when no reconnect delay is configured.

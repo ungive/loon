@@ -162,14 +162,16 @@ protected:
      * @brief Injects a Hello message modifer into the server communication.
      *
      * After calling this method, when start() is called,
-     * the server's Hello message may be modified with the given function.
+     * the server's Hello message may be modified with the given function
+     * or dropped entirely by setting it to std::nullopt.
      *
      * @param hello A function that modifies the server's hello message.
      */
-    inline void inject_hello_modifier(std::function<void(Hello&)> modifier)
+    inline void inject_hello_modifier(
+        std::function<void(std::optional<Hello>&)> modifier)
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        m_injected_hello_modifer = modifier;
+        m_injected_hello_modifier = modifier;
     }
 
     /**
@@ -266,7 +268,7 @@ protected:
     }
 
 private:
-    std::function<void(Hello&)> m_injected_hello_modifer{};
+    std::function<void(std::optional<Hello>&)> m_injected_hello_modifier{};
     bool m_inject_send_error{ false };
     std::chrono::milliseconds m_send_sleep_duration{
         std::chrono::milliseconds::zero()

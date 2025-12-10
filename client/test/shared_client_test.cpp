@@ -614,8 +614,8 @@ TEST(SharedClient, OnFailedIsCalledWhenWrappedClientFails)
     ClientOptions options;
     options.min_cache_duration = std::chrono::seconds{ 10 };
     auto client = create_client(options, false);
-    client->inject_hello_modifier([](Hello& hello) {
-        hello.mutable_constraints()->set_cache_duration(0);
+    client->inject_hello_modifier([](std::optional<Hello>& hello) {
+        hello->mutable_constraints()->set_cache_duration(0);
     });
     auto s1 = std::make_shared<SharedClient>(client);
     auto s2 = std::make_shared<SharedClient>(client);
