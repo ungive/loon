@@ -1232,4 +1232,45 @@ TEST(Client,
     EXPECT_FALSE(on_disconnect_called.load());
 }
 
+TEST(Client, IdlingWhileDisconnectedAndReconnectingCancelsReconnects)
+{
+    loon::ClientOptions options{};
+    auto connect_timeout = 100ms;
+    auto ping_interval = 100ms;
+    auto expected_ping_timeout = 2 * ping_interval;
+    auto reconnect_delay = 250ms;
+    auto idle_timeout = 500ms;
+    options.websocket.connect_timeout = connect_timeout;
+    options.websocket.ping_interval = ping_interval;
+    options.websocket.reconnect_delay = reconnect_delay;
+    options.disconnect_after_idle = idle_timeout;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+
+    // Ensure that content is registered, so that the client is not
+    // automatically idling from the get go.
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+
+    EXPECT_TRUE(client->connected());
+    std::atomic<std::size_t> reconnect_attempts{ 0 };
+    std::promise<void> reconnect_called;
+    client->before_reconnect_callback([&] {
+        reconnect_attempts.fetch_add(1);
+        reconnect_called.set_value();
+    });
+    drop_server_packets(true);
+
+    reconnect_called.get_future().wait();
+
+    EXPECT_EQ(1, reconnect_attempts.load());
+    std::this_thread::sleep_for(25ms);
+    client->idle();
+    EXPECT_TRUE(client->idling());
+    std::this_thread::sleep_for(4 * reconnect_delay);
+    EXPECT_FALSE(client->connected());
+    // The client shouldn't continue to reconnect on idle.
+    EXPECT_EQ(1, reconnect_attempts.load());
+}
+
 // TODO TEST Does not reconnect when no reconnect delay is configured.
