@@ -3,6 +3,7 @@
 #include <cassert>
 #include <chrono>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <thread>
 #include <variant>
@@ -583,6 +584,7 @@ void ClientImpl::on_websocket_close()
     const std::lock_guard<std::mutex> lock(m_mutex);
     update_connected(false);
     reset_connection_state();
+    bool was_idling = m_idle_waiting;
     set_idle(false);
     if (m_was_explicitly_started) {
         m_was_explicitly_started = false;
@@ -607,8 +609,10 @@ void ClientImpl::on_websocket_close()
     if (m_disconnect_callback) {
         m_disconnect_callback();
     }
-    // Reconnect, if the client is still started.
-    if (m_started && with_reconnect()) {
+    // Reconnect, if the client is still started, reconnect are configured and
+    // the client was not idling. If the client was idling, then we can just
+    // stay disconnected, as the connection is not needed for anything.
+    if (m_started && with_reconnect() && !was_idling) {
         assert(!m_was_explicitly_stopped);
         queue_reconnect(true);
     }

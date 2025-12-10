@@ -1074,9 +1074,40 @@ TEST(Client, StopBlocksUntilAllRegisteredContentIsUnregistered)
     EXPECT_TRUE(is_unregistered.load());
 }
 
-// TODO TEST The client should not attempt to reconnect while it's idling, as
-// the connection is not needed for anything. Instead wait with reconnecting
-// until the client is not idling anymore.
+TEST(Client, DoesNotAttemptToReconnectDuringIdling)
+{
+    // The client should not attempt to reconnect while it's idling, as the
+    // connection is not needed for anything and an early disconnect is ok.
+
+    loon::ClientOptions options{};
+    auto connect_timeout = 100ms;
+    auto ping_interval = 100ms;
+    auto expected_ping_timeout = 2 * ping_interval;
+    auto reconnect_delay = 250ms;
+    auto idle_timeout = 500ms;
+    options.websocket.connect_timeout = connect_timeout;
+    options.websocket.ping_interval = ping_interval;
+    options.websocket.reconnect_delay = reconnect_delay;
+    options.disconnect_after_idle = idle_timeout;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    EXPECT_TRUE(client->connected());
+    std::atomic<bool> attempted_to_reconnect{ false };
+    client->before_reconnect_callback([&] {
+        attempted_to_reconnect.store(true);
+    });
+    client->idle();
+    EXPECT_TRUE(client->idling());
+    drop_server_packets(true);
+    std::this_thread::sleep_for(expected_ping_timeout + 50ms);
+    assert(expected_ping_timeout < idle_timeout / 2);
+    EXPECT_FALSE(client->connected());
+    std::this_thread::sleep_for(idle_timeout - expected_ping_timeout);
+    EXPECT_FALSE(client->connected());
+    EXPECT_FALSE(attempted_to_reconnect.load());
+    std::this_thread::sleep_for(250ms);
+    EXPECT_FALSE(client->connected());
+}
 
 // TODO TEST Do not hold public Client mutex during send(), when responding
 // to a websocket message.
