@@ -732,6 +732,24 @@ TEST(Client, DisconnectsAfterDoubleThePingIntervalOnDroppedConnection)
     EXPECT_FALSE(client->connected());
 }
 
+TEST(Client, StopsIdlingAfterDisconnectOnDroppedConnection)
+{
+    loon::ClientOptions options{};
+    auto ping_interval = 250ms;
+    auto expected_ping_timeout = 2 * ping_interval;
+    auto expected_idle_timeout = 3 * ping_interval;
+    options.websocket.ping_interval = ping_interval;
+    options.disconnect_after_idle = expected_idle_timeout;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    EXPECT_TRUE(client->idling());
+    drop_server_packets(true);
+    std::this_thread::sleep_for(expected_ping_timeout + 50ms);
+    EXPECT_FALSE(client->idling());
+    // The client should not log that it disconnects after idle.
+    std::this_thread::sleep_for(expected_idle_timeout - expected_ping_timeout);
+}
+
 // TEST(Client, AutomaticallyRestartsAfterPingTimeout)
 // {
 //     loon::ClientOptions options{};
