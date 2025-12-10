@@ -36,8 +36,6 @@ public:
 
     void stop() override;
 
-    void terminate() override;
-
     inline bool started() override
     {
         const std::lock_guard<std::mutex> lock(m_mutex);
@@ -356,8 +354,7 @@ private:
 
     void reset_connection_state();
     void internal_start();
-    void internal_stop(
-        std::unique_lock<std::mutex>& lock, bool terminate = false);
+    void internal_stop(std::unique_lock<std::mutex>& lock);
     void internal_stop_and_reset(std::unique_lock<std::mutex>& lock);
     void internal_reconnect(std::unique_lock<std::mutex>& lock);
     void internal_restart(std::unique_lock<std::mutex>& lock);

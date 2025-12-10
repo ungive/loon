@@ -657,7 +657,7 @@ TEST(Client, StoppingTheClientMustNotWaitForCallbacks)
         std::find(flags.begin(), flags.end(), FLAG_AFTER_CALL) != flags.end());
 }
 
-TEST(Client, TerminatingTheClientWaitsForCallbacks)
+TEST(Client, StoppingTheClientWaitsForCallbacks)
 {
     using namespace std::chrono_literals;
     auto client = create_client();
@@ -674,7 +674,7 @@ TEST(Client, TerminatingTheClientWaitsForCallbacks)
         flags.push_back(FLAG_CALLBACK);
         cv.notify_one();
     });
-    client->terminate();
+    client->stop();
     flags.push_back(FLAG_AFTER_CALL);
     {
         std::unique_lock lock(mutex);
@@ -690,12 +690,12 @@ TEST(Client, TerminatingTheClientWaitsForCallbacks)
     EXPECT_EQ(FLAG_AFTER_CALL, flags[1]);
 }
 
-TEST(Client, StartCanBeCalledAgainAfterTerminate)
+TEST(Client, StartCanBeCalledAgainAfterStop)
 {
     auto client = create_client();
     auto content = example_content();
     auto h1 = client->register_content(content.source, content.info);
-    client->terminate();
+    client->stop();
     EXPECT_NO_THROW(client->start());
     EXPECT_NO_THROW(client->wait_until_ready());
     EXPECT_TRUE(client->started());
@@ -1058,6 +1058,20 @@ TEST(Client,
         static_cast<long>((reconnect_delay + 5ms).count()));
     EXPECT_GT(static_cast<long>(after_delay.count()),
         static_cast<long>((reconnect_delay - 5ms).count()));
+}
+
+TEST(Client, StopBlocksUntilAllRegisteredContentIsUnregistered)
+{
+    auto client = create_client();
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    std::atomic<bool> is_unregistered{ false };
+    handle->on_unregistered([&] {
+        std::this_thread::sleep_for(25ms);
+        is_unregistered.store(true);
+    });
+    client->stop();
+    EXPECT_TRUE(is_unregistered.load());
 }
 
 // TODO TEST The client should not attempt to reconnect while it's idling, as

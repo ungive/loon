@@ -355,8 +355,6 @@ public:
         return m_client->stop();
     }
 
-    inline void terminate() override { return m_client->terminate(); }
-
     inline bool started() override
     {
         m_n_started++;

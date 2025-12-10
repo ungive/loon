@@ -114,7 +114,7 @@ ClientImpl::~ClientImpl()
     // Terminate the client and block until it is stopped
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        internal_stop(lock, true); // terminate
+        internal_stop(lock);
     }
     // Stop the manager loop thread
     {
@@ -147,18 +147,6 @@ void ClientImpl::stop()
     m_was_explicitly_stopped = true;
     m_started = false;
     internal_stop(lock);
-}
-
-void ClientImpl::terminate()
-{
-    {
-        std::unique_lock<std::mutex> lock(m_mutex);
-        if (m_started) {
-            m_started = false;
-            internal_stop(lock, true); // terminate
-            return;
-        }
-    }
 }
 
 std::string ClientImpl::make_url(std::string const& path)
@@ -743,8 +731,7 @@ void ClientImpl::reset_connection_state()
     m_no_content_request_history.clear();
 }
 
-void ClientImpl::internal_stop(
-    std::unique_lock<std::mutex>& lock, bool terminate)
+void ClientImpl::internal_stop(std::unique_lock<std::mutex>& lock)
 {
     // Note: the order of the following operations is critical.
     {
@@ -754,11 +741,7 @@ void ClientImpl::internal_stop(
         // It is safe to read m_conn without holding the lock
         // because m_conn is never changed after object construction.
         lock.unlock();
-        if (terminate) {
-            m_conn->terminate();
-        } else {
-            m_conn->stop();
-        }
+        m_conn->stop();
         lock.lock();
     }
     // Unregister all content and stop all request handlers.

@@ -7,14 +7,6 @@ TEST(SharedClient, ConstructorThrowsWithSharedClientAsArgument)
     EXPECT_ANY_THROW(SharedClient(std::dynamic_pointer_cast<IClient>(s)));
 }
 
-TEST(SharedClient, CallingTerminateIsNotPossible)
-{
-    auto client = create_client(false);
-    auto s = std::make_shared<SharedClient>(client);
-    auto is = std::dynamic_pointer_cast<ISharedClient>(s);
-    EXPECT_DEATH(is->terminate(), "");
-}
-
 TEST(SharedClient, StartedNotDelegatedWhenNotStarted)
 {
     auto client = create_client(false);

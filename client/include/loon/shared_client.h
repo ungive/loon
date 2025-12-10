@@ -51,20 +51,6 @@ public:
      * @returns The path prefix for registered content.
      */
     virtual std::string const& path_prefix() const = 0;
-
-    /**
-     * @brief Shared clients cannot be terminated.
-     *
-     * Triggers an assertion error when called, does nothing otherwise.
-     */
-    inline void terminate() override
-    {
-        assert(false && "terminate cannot be called on a shared client");
-        // Call stop as a reasonable fallback, since the user would at least
-        // expect the client to stop its operations in some way.
-        // This is better than doing nothing at all.
-        stop();
-    }
 };
 
 class SharedClient : public ISharedClient
