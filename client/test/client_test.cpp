@@ -828,7 +828,7 @@ TEST(Client, AttemptsToReconnectMultipleTimesWithExponentiallyIncreasingDelay)
         }
     });
     auto start = std::chrono::steady_clock::now();
-    drop_server_packets(true, true); // Drop packets for all future connections.
+    drop_server_packets(All); // Drop packets for all future connections.
     std::shared_ptr<void> scope_guard(nullptr, std::bind([] {
         // Since we drop packets for all future connections, we have to manually
         // disable it again, as it's not reset by the test server on the next
@@ -958,7 +958,7 @@ TEST(Client, ReconnectDelayIsResetWhenClientReconnectsAgain)
         }
     });
     // Drop server packets for all future connections in this test.
-    drop_server_packets(true, true);
+    drop_server_packets(All);
     std::shared_ptr<void> scope_guard(nullptr, std::bind([] {
         drop_server_packets(false);
     }));
@@ -1027,7 +1027,7 @@ TEST(Client,
         }
     });
     // Drop server packets for all future connections in this test.
-    drop_server_packets(true, true);
+    drop_server_packets(All);
     std::shared_ptr<void> scope_guard(nullptr, std::bind([] {
         drop_server_packets(false);
     }));

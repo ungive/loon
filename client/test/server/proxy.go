@@ -35,12 +35,14 @@ import (
 )
 
 const (
-	WsScheme   = "ws"
-	WssScheme  = "wss"
-	BufSize    = 1024 * 32
-	DropNone   = 0
-	DropActive = 1
-	DropAll    = 2
+	WsScheme            = "ws"
+	WssScheme           = "wss"
+	BufSize             = 1024 * 32
+	DropNone      int32 = 0
+	DropActive    int32 = 1
+	DropActiveIn  int32 = 2
+	DropActiveOut int32 = 3
+	DropAll       int32 = 4
 )
 
 var (
@@ -117,6 +119,13 @@ func (w *dropWriter) Write(p []byte) (int, error) {
 		return len(p), nil
 	}
 	return w.conn.Write(p)
+}
+
+func If[T any](condition bool, trueVal, falseVal T) T {
+	if condition {
+		return trueVal
+	}
+	return falseVal
 }
 
 type Options func(wp *WebsocketProxy)
@@ -206,20 +215,21 @@ func (wp *WebsocketProxy) Proxy(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 	errChan := make(chan error, 2)
-	copyConn := func(a, b net.Conn) {
+	copyConn := func(a, b net.Conn, in bool) {
 		buf := ByteSliceGet(BufSize)
 		defer ByteSlicePut(buf)
-		reader := &dropReader{conn: b, drop: func() bool {
-			return wp.drop.Load() != DropNone
-		}}
-		writer := &dropWriter{conn: a, drop: func() bool {
-			return wp.drop.Load() != DropNone
-		}}
+		dropPredicate := func() bool {
+			drop := wp.drop.Load()
+			return drop == DropAll || drop == DropActive ||
+				drop == If(in, DropActiveIn, DropActiveOut)
+		}
+		reader := &dropReader{conn: b, drop: dropPredicate}
+		writer := &dropWriter{conn: a, drop: dropPredicate}
 		_, err := io.CopyBuffer(writer, reader, buf)
 		errChan <- err
 	}
-	go copyConn(conn, remoteConn) // response
-	go copyConn(remoteConn, conn) // request
+	go copyConn(conn, remoteConn, true)  // response
+	go copyConn(remoteConn, conn, false) // request
 	err = <-errChan
 	if err != nil {
 		log.Println(err)
@@ -228,6 +238,10 @@ func (wp *WebsocketProxy) Proxy(writer http.ResponseWriter, request *http.Reques
 
 func (wp *WebsocketProxy) Drop(state int32) {
 	wp.drop.Store(state)
+}
+
+func (wp *WebsocketProxy) CloseRemotes() {
+
 }
 
 func SetTLSConfig(tlsc *tls.Config) Options {

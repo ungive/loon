@@ -48,16 +48,28 @@ func main() {
 		log.Fatalf("%v", err)
 	}
 	http.HandleFunc("/proxy/ws", wp.Proxy)
-	http.HandleFunc("/proxy/drop/all", func(writer http.ResponseWriter, request *http.Request) {
+	http.HandleFunc("/proxy/drop_all", func(writer http.ResponseWriter, request *http.Request) {
 		wp.Drop(DropAll)
 		writer.WriteHeader(http.StatusOK)
 	})
-	http.HandleFunc("/proxy/drop/active", func(writer http.ResponseWriter, request *http.Request) {
+	http.HandleFunc("/proxy/drop_active", func(writer http.ResponseWriter, request *http.Request) {
 		wp.Drop(DropActive)
 		writer.WriteHeader(http.StatusOK)
 	})
-	http.HandleFunc("/proxy/drop/none", func(writer http.ResponseWriter, request *http.Request) {
+	http.HandleFunc("/proxy/drop_active_in", func(writer http.ResponseWriter, request *http.Request) {
+		wp.Drop(DropActiveIn)
+		writer.WriteHeader(http.StatusOK)
+	})
+	http.HandleFunc("/proxy/drop_active_out", func(writer http.ResponseWriter, request *http.Request) {
+		wp.Drop(DropActiveOut)
+		writer.WriteHeader(http.StatusOK)
+	})
+	http.HandleFunc("/proxy/drop_none", func(writer http.ResponseWriter, request *http.Request) {
 		wp.Drop(DropNone)
+		writer.WriteHeader(http.StatusOK)
+	})
+	http.HandleFunc("/proxy/close_remotes", func(writer http.ResponseWriter, request *http.Request) {
+		wp.CloseRemotes()
 		writer.WriteHeader(http.StatusOK)
 	})
 	http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", ProxyPort), nil)

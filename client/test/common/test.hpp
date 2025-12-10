@@ -24,9 +24,13 @@ using namespace std::chrono_literals;
 
 #define TEST_SERVER_HOST "127.0.0.1:8072"
 #define TEST_SERVER_WS "ws://" TEST_SERVER_HOST "/proxy/ws"
-#define TEST_SERVER_DROP_ALL "http://" TEST_SERVER_HOST "/proxy/drop/all"
-#define TEST_SERVER_DROP_ACTIVE "http://" TEST_SERVER_HOST "/proxy/drop/active"
-#define TEST_SERVER_DROP_NONE "http://" TEST_SERVER_HOST "/proxy/drop/none"
+#define TEST_SERVER_DROP_ALL "http://" TEST_SERVER_HOST "/proxy/drop_all"
+#define TEST_SERVER_DROP_ACTIVE "http://" TEST_SERVER_HOST "/proxy/drop_active"
+#define TEST_SERVER_DROP_ACTIVE_IN \
+    "http://" TEST_SERVER_HOST "/proxy/drop_active_in"
+#define TEST_SERVER_DROP_ACTIVE_OUT \
+    "http://" TEST_SERVER_HOST "/proxy/drop_active_out"
+#define TEST_SERVER_DROP_NONE "http://" TEST_SERVER_HOST "/proxy/drop_none"
 #define TEST_AUTH std::nullopt
 
 class TestClient : public loon::ClientImpl
@@ -453,20 +457,47 @@ private:
     size_t m_n_wait_until_ready_timeout{ 0 };
 };
 
+enum DropPackets
+{
+    None,
+    Active,
+    ActiveIn,
+    ActiveOut,
+    All
+};
+
 // Turns dropping of websocket server packets on/off. Packets are dropped until
 // the next websocket/client connection is established.
-inline void drop_server_packets(bool state, bool all = false)
+inline void drop_server_packets(DropPackets choice)
 {
-    assert(state || !all);
     std::optional<CurlResponse> response;
-    if (state) {
-        if (all) {
-            response = http_get(TEST_SERVER_DROP_ALL);
-        } else {
-            response = http_get(TEST_SERVER_DROP_ACTIVE);
-        }
-    } else {
+    switch (choice) {
+    case None:
         response = http_get(TEST_SERVER_DROP_NONE);
+        break;
+    case Active:
+        response = http_get(TEST_SERVER_DROP_ACTIVE);
+        break;
+    case ActiveIn:
+        response = http_get(TEST_SERVER_DROP_ACTIVE_IN);
+        break;
+    case ActiveOut:
+        response = http_get(TEST_SERVER_DROP_ACTIVE_OUT);
+        break;
+    case All:
+        response = http_get(TEST_SERVER_DROP_ALL);
+        break;
+    default:
+        throw std::invalid_argument("Unrecognized packets choice");
     }
     EXPECT_EQ(200, response->status);
+}
+
+inline void drop_server_packets(bool state)
+{
+    if (state) {
+        drop_server_packets(Active);
+    } else {
+        drop_server_packets(None);
+    }
 }
