@@ -767,6 +767,9 @@ void ClientImpl::internal_stop_and_reset(std::unique_lock<std::mutex>& lock)
 
 void ClientImpl::internal_reconnect(std::unique_lock<std::mutex>& lock)
 {
+    log(Info) << "reconnecting" << var("attempt", m_reconnect_attempt)
+              << var("delay", m_reconnect_delay)
+              << var("conn_timeout", m_options.websocket.connect_timeout);
 #ifdef LOON_TEST
     if (m_reconnect_callback) {
         m_reconnect_callback();

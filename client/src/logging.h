@@ -73,6 +73,14 @@ public:
         return *this;
     }
 
+    template <typename K, typename R, typename P>
+    LogBuffer& operator<<(
+        std::pair<K, std::chrono::duration<R, P>&> const& pair)
+    {
+        *this << std::make_pair(pair.first, pair.second.count());
+        return *this;
+    }
+
     template <typename K, typename V>
     LogBuffer& operator<<(std::pair<K, const std::optional<V>&> const& pair)
     {
