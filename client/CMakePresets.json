@@ -5,11 +5,9 @@
             "name": "base",
             "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
-                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
-                "LOON_WEBSOCKET_BACKEND": "QT"
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}"
             },
-            "environment": {
-            },
+            "environment": {},
             "hidden": true
         },
         {
@@ -28,8 +26,7 @@
         },
         {
             "name": "windows-base",
-            "cacheVariables": {
-            },
+            "cacheVariables": {},
             "inherits": [
                 "base"
             ],
@@ -42,8 +39,7 @@
         },
         {
             "name": "mac-base",
-            "cacheVariables": {
-            },
+            "cacheVariables": {},
             "inherits": [
                 "base"
             ],

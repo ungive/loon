@@ -383,7 +383,7 @@ struct WebsocketOptions
      *
      * If this value is set, ca_certificate_path must be empty.
      */
-    std::optional<std::vector<uint8_t>> ca_certificate{};
+    std::optional<std::string> ca_certificate{};
 
     /**
      * @brief The time after which a connection attempt times out.

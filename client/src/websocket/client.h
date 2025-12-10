@@ -3,10 +3,10 @@
 #include <atomic>
 #include <chrono>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <string>
 
-#include "logging.h"
 #include "loon/client.h"
 
 // TODO proper version string
@@ -14,13 +14,20 @@
 
 namespace loon::websocket
 {
+
+constexpr loon::LogLevel default_log_level = LogLevel::Error;
+
+void log_level(LogLevel level);
+void log_handler(log_handler_t handler);
+log_handler_t log_handler();
+
 extern std::chrono::milliseconds default_connect_timeout;
 extern std::chrono::milliseconds default_ping_interval;
 
 class IClient
 {
 public:
-    virtual ~IClient(){};
+    virtual ~IClient() = default;
 
     /**
      * @brief The websocket server address the client connects to.
@@ -106,15 +113,6 @@ public:
      * it can safely be locked from any of the event handlers.
      */
     virtual void stop() = 0;
-
-    /**
-     * @brief Terminates the websocket client and aborts any pending operations.
-     *
-     * This method blocks until the connection has been closed and all
-     * background threads have been terminated. This method may leave the client
-     * in an incomplete or unusable state and should not be used anymore.
-     */
-    virtual void terminate() = 0;
 };
 
 class Client : public IClient
@@ -158,8 +156,6 @@ public:
 
     inline void stop() override { return m_impl->stop(); }
 
-    inline void terminate() override { return m_impl->terminate(); }
-
 private:
     std::unique_ptr<IClient> m_impl;
 };
@@ -188,12 +184,9 @@ public:
 
     void stop() override;
 
-    void terminate() override;
-
 protected:
     virtual void internal_start() = 0;
     virtual void internal_stop() = 0;
-    virtual void internal_terminate() = 0;
 
     /**
      * @brief Call this method when the websocket connection is opened.
@@ -202,7 +195,18 @@ protected:
     {
         m_connected.store(true);
         if (m_open_callback) {
-            m_open_callback();
+            try {
+                m_open_callback();
+            }
+            catch (std::exception const& e) {
+                log_handler()(LogLevel::Error,
+                    std::string("uncaught exception in on_websocket_open: ") +
+                        e.what());
+            }
+            catch (...) {
+                log_handler()(LogLevel::Error,
+                    std::string("uncaught exception in on_websocket_open"));
+            }
         }
     }
 
@@ -213,7 +217,18 @@ protected:
     {
         m_connected.store(false);
         if (m_close_callback) {
-            m_close_callback();
+            try {
+                m_close_callback();
+            }
+            catch (std::exception const& e) {
+                log_handler()(LogLevel::Error,
+                    std::string("uncaught exception in on_websocket_close: ") +
+                        e.what());
+            }
+            catch (...) {
+                log_handler()(LogLevel::Error,
+                    std::string("uncaught exception in on_websocket_close"));
+            }
         }
     }
 
@@ -223,7 +238,19 @@ protected:
     inline void on_websocket_message(std::string const& message)
     {
         if (m_message_callback) {
-            m_message_callback(message);
+            try {
+                m_message_callback(message);
+            }
+            catch (std::exception const& e) {
+                log_handler()(LogLevel::Error,
+                    std::string(
+                        "uncaught exception in on_websocket_message: ") +
+                        e.what());
+            }
+            catch (...) {
+                log_handler()(LogLevel::Error,
+                    std::string("uncaught exception in on_websocket_message"));
+            }
         }
     }
 
@@ -259,10 +286,5 @@ private:
     std::function<void()> m_close_callback{};
     std::function<void(std::string const& message)> m_message_callback{};
 };
-
-constexpr loon::LogLevel default_log_level = LogLevel::Error;
-
-void log_level(LogLevel level);
-void log_handler(log_handler_t handler);
 
 } // namespace loon::websocket

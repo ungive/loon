@@ -14,6 +14,9 @@ class Loon(ConanFile):
     requires = (
         "openssl/[~3.5]",  # LTS version until Apr 2030
         "protobuf/3.21.12",
+        # Using libdatachannel as a git submodule until the following PR is merged:
+        # https://github.com/paullouisageneau/libdatachannel/pull/1488
+        # "libdatachannel/0.23.2",
     )
 
     test_requires = "libcurl/[~8]"

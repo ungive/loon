@@ -1,12 +1,15 @@
 #include "client.h"
 
 #include <cassert>
+#include <chrono>
 #include <memory>
 #include <sstream>
 #include <thread>
+#include <variant>
 
 #include <google/protobuf/text_format.h>
 
+#include "base64.hpp"
 #include "logging.h"
 #include "loon/client.h"
 #include "util.h"
@@ -108,7 +111,7 @@ ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
 
 ClientImpl::~ClientImpl()
 {
-    // Stop the client
+    // Terminate the client and block until it is stopped
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         internal_stop(lock, true); // terminate
@@ -165,7 +168,7 @@ std::string ClientImpl::make_url(std::string const& path)
     std::ostringstream oss;
     oss << m_hello->client_id() << "/" << path;
     auto mac = util::hmac_sha256(oss.str(), m_hello->connection_secret());
-    auto mac_encoded = util::base64_raw_url_encode(mac);
+    auto mac_encoded = base64::encode_url_unpadded(mac);
     oss.str("");
     oss.clear();
     oss << m_hello->base_url() << "/" << m_hello->client_id() << "/"

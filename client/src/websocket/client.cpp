@@ -75,9 +75,3 @@ void BaseClient::stop()
     }
     internal_stop();
 }
-
-void BaseClient::terminate()
-{
-    // Always call terminate, without any checks.
-    internal_terminate();
-}

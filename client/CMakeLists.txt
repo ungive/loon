@@ -5,54 +5,35 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 
 option(LOON_BUILD_EXAMPLES "Build loon examples" ON)
 option(LOON_BUILD_TESTS "Build loon tests" ON)
-set(LOON_WEBSOCKET_BACKEND "LIBHV" CACHE STRING "Websocket backend")
-set_property(CACHE LOON_WEBSOCKET_BACKEND PROPERTY STRINGS "LIBHV" "QT")
 
-set(LIB_SOURCES src/client.cpp src/shared_client.cpp src/request_handler.cpp
-                src/util.cpp src/logging.cpp src/websocket/client.cpp)
-if(LOON_WEBSOCKET_BACKEND STREQUAL "LIBHV")
-    message("Using libhv as websocket backend")
-    list(APPEND LIB_SOURCES src/websocket/backend_libhv.cpp)
-    set(USE_LIBHV true)
-elseif(LOON_WEBSOCKET_BACKEND STREQUAL "QT")
-    message("Using QT as websocket backend")
-    set(CMAKE_AUTOMOC ON)
-    list(APPEND LIB_SOURCES src/websocket/backend_qt.cpp)
-    list(APPEND LIB_SOURCES src/websocket/backend_qt.h)
-    set(USE_QT true)
-else()
-    message(FATAL_ERROR "Wrong value of the option 'LOON_WEBSOCKET_BACKEND'")
-endif()
+set(SOURCES
+    src/client.cpp
+    src/shared_client.cpp
+    src/request_handler.cpp
+    src/util.cpp
+    src/base64.cpp
+    src/logging.cpp
+    src/websocket/client.cpp
+    src/websocket/backend_libdatachannel.cpp)
 
-add_library(loon STATIC ${LIB_SOURCES})
+add_library(loon STATIC ${SOURCES})
 add_library(loon::loon ALIAS loon)
 target_compile_definitions(loon PRIVATE NOMINMAX)
 target_include_directories(loon PUBLIC ./include)
 target_include_directories(loon PRIVATE ./src)
 
-# openssl
+# OpenSSL
 find_package(OpenSSL REQUIRED)
 target_link_libraries(loon OpenSSL::SSL OpenSSL::Crypto)
 
-# libhv
-if(DEFINED USE_LIBHV)
-    include(FetchContent)
-    set(WITH_OPENSSL ON CACHE INTERNAL "use openssl")
-    FetchContent_Declare(libhv SOURCE_DIR
-                               ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libhv)
-    FetchContent_MakeAvailable(libhv)
-    target_link_libraries(loon hv_static)
-    target_compile_definitions(loon PRIVATE USE_LIBHV)
-endif()
+# libdatachannel
+add_subdirectory(third_party/libdatachannel EXCLUDE_FROM_ALL)
+target_link_libraries(loon LibDataChannel::LibDataChannel)
+target_compile_definitions(loon PRIVATE USE_LIBDATACHANNEL)
+# TODO Use conan once this PR is merged:
+# https://github.com/paullouisageneau/libdatachannel/pull/1488
 
-# qt websockets
-if(DEFINED USE_QT)
-    find_package(Qt6 REQUIRED COMPONENTS Core Network WebSockets)
-    target_link_libraries(loon Qt6::Core Qt6::Network Qt6::WebSockets)
-    target_compile_definitions(loon PRIVATE USE_QT)
-endif()
-
-# protobuf + protocol buffers
+# Protobuf
 set(Protobuf_USE_STATIC_LIBS ON CACHE BOOL "Override option" FORCE)
 find_package(Protobuf CONFIG REQUIRED)
 target_include_directories(loon PRIVATE ${Protobuf_INCLUDE_DIRS}
@@ -119,33 +100,6 @@ if(LOON_BUILD_TESTS)
     set_property(TARGET loon_test PROPERTY CXX_STANDARD 17)
     set_property(TARGET loon_test PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
     target_compile_definitions(loon_test PRIVATE LOON_TEST)
-
-    # Required because QWebSockets needs a QApplication instance.
-    if(DEFINED USE_QT)
-        find_package(Qt6 REQUIRED COMPONENTS Core Network WebSockets)
-        target_link_libraries(loon_test Qt6::Core Qt6::Network Qt6::WebSockets)
-        target_compile_definitions(loon_test PRIVATE USE_QT)
-
-        if(WIN32)
-            add_custom_command(
-                TARGET loon_test
-                POST_BUILD
-                COMMAND
-                    ${CMAKE_COMMAND} -E copy_if_different
-                    $<TARGET_RUNTIME_DLLS:loon_test>
-                    $<TARGET_FILE_DIR:loon_test>
-                COMMAND_EXPAND_LISTS)
-            include(windeployqt)
-            windeployqt(loon_test)
-            add_custom_command(
-                TARGET loon_test
-                POST_BUILD
-                COMMAND
-                    ${CMAKE_COMMAND} -E copy_directory_if_different
-                    ${CMAKE_CURRENT_BINARY_DIR}/windeployqt/
-                    $<TARGET_FILE_DIR:loon_test>)
-        endif()
-    endif()
 
     if(WIN32)
         add_custom_command(
