@@ -758,7 +758,7 @@ TEST(Client, AutomaticallyReconnectsAfterUnexpectedDisconnect)
     auto expected_ping_timeout = 2 * ping_interval;
     auto reconnect_delay = 250ms;
     options.websocket.ping_interval = ping_interval;
-    options.websocket.reconnect_delay = reconnect_delay;
+    options.reconnect_delay = reconnect_delay;
     auto client = create_client(options, false);
     // Delay the initial reconnect attempt so that we have time to check that
     // the client really disconnected.
@@ -784,7 +784,7 @@ TEST(Client, AttemptsToReconnectImmediatelyAfterUnexpectedDisconnect)
     auto reconnect_delay = 250ms;
     options.websocket.ping_interval = ping_interval;
     // The delay doesn't matter for the initial reconnect attempt.
-    options.websocket.reconnect_delay = 1s;
+    options.reconnect_delay = 1s;
     auto client = create_client(options, false);
     client->start_and_wait_until_connected();
     EXPECT_TRUE(client->connected());
@@ -808,8 +808,8 @@ TEST(Client, AttemptsToReconnectMultipleTimesWithExponentiallyIncreasingDelay)
     auto max_reconnect_delay = 500ms;
     options.websocket.connect_timeout = connect_timeout;
     options.websocket.ping_interval = ping_interval;
-    options.websocket.reconnect_delay = reconnect_delay;
-    options.websocket.max_reconnect_delay = max_reconnect_delay;
+    options.reconnect_delay = reconnect_delay;
+    options.max_reconnect_delay = max_reconnect_delay;
     auto client = create_client(options, false);
     client->start_and_wait_until_connected();
     EXPECT_TRUE(client->connected());
@@ -898,7 +898,7 @@ TEST(Client, StopsReconnectingWhenClientIsStoppedExplicitly)
     auto expected_ping_timeout = 2 * ping_interval;
     auto reconnect_delay = 1000ms;
     options.websocket.ping_interval = ping_interval;
-    options.websocket.reconnect_delay = reconnect_delay;
+    options.reconnect_delay = reconnect_delay;
     auto client = create_client(options, false);
     // Delay the initial reconnect attempt so that we can stop the client before
     // the reconnect is performed and then check that it is cancelled.
@@ -933,8 +933,8 @@ TEST(Client, ReconnectDelayIsResetWhenClientReconnectsAgain)
     auto max_reconnect_delay = 1000ms;
     options.websocket.connect_timeout = connect_timeout;
     options.websocket.ping_interval = ping_interval;
-    options.websocket.reconnect_delay = reconnect_delay;
-    options.websocket.max_reconnect_delay = max_reconnect_delay;
+    options.reconnect_delay = reconnect_delay;
+    options.max_reconnect_delay = max_reconnect_delay;
     auto client = create_client(options, false);
     client->initial_reconnect_sleep(reconnect_delay);
     client->start_and_wait_until_connected();
@@ -1006,8 +1006,8 @@ TEST(Client,
     auto max_reconnect_delay = 1000ms;
     options.websocket.connect_timeout = connect_timeout;
     options.websocket.ping_interval = ping_interval;
-    options.websocket.reconnect_delay = reconnect_delay;
-    options.websocket.max_reconnect_delay = max_reconnect_delay;
+    options.reconnect_delay = reconnect_delay;
+    options.max_reconnect_delay = max_reconnect_delay;
     auto client = create_client(options, false);
     client->initial_reconnect_sleep(reconnect_delay);
     client->start_and_wait_until_connected();
@@ -1087,7 +1087,7 @@ TEST(Client, DoesNotAttemptToReconnectDuringIdling)
     auto idle_timeout = 500ms;
     options.websocket.connect_timeout = connect_timeout;
     options.websocket.ping_interval = ping_interval;
-    options.websocket.reconnect_delay = reconnect_delay;
+    options.reconnect_delay = reconnect_delay;
     options.disconnect_after_idle = idle_timeout;
     auto client = create_client(options, false);
     client->start_and_wait_until_connected();
@@ -1151,7 +1151,7 @@ TEST(Client, DisconnectCallbackIsOnlyCalledOnceAfterDisconnect)
     auto reconnect_delay = 250ms;
     options.websocket.connect_timeout = connect_timeout;
     options.websocket.ping_interval = ping_interval;
-    options.websocket.reconnect_delay = reconnect_delay;
+    options.reconnect_delay = reconnect_delay;
     auto client = create_client(options, false);
     std::atomic<std::size_t> disconnect_callback_call_count{ 0 };
     client->on_disconnect([&] {
@@ -1189,7 +1189,7 @@ TEST(Client, DisconnectCallbackIsNotCalledWhenClientWasNeverConnected)
     auto reconnect_delay = 250ms;
     options.websocket.connect_timeout = connect_timeout;
     options.websocket.ping_interval = ping_interval;
-    options.websocket.reconnect_delay = reconnect_delay;
+    options.reconnect_delay = reconnect_delay;
     auto client = create_client(options, false);
     std::atomic<std::size_t> disconnect_callback_call_count{ 0 };
     client->on_disconnect([&] {
@@ -1242,7 +1242,7 @@ TEST(Client, IdlingWhileDisconnectedAndReconnectingCancelsReconnects)
     auto idle_timeout = 500ms;
     options.websocket.connect_timeout = connect_timeout;
     options.websocket.ping_interval = ping_interval;
-    options.websocket.reconnect_delay = reconnect_delay;
+    options.reconnect_delay = reconnect_delay;
     options.disconnect_after_idle = idle_timeout;
     auto client = create_client(options, false);
     client->start_and_wait_until_connected();

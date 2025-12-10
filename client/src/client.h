@@ -390,7 +390,7 @@ private:
 
     inline bool with_reconnect()
     {
-        return m_options.websocket.reconnect_delay.has_value();
+        return m_options.reconnect_delay.has_value();
     }
 
     inline void queue_reconnect(bool state)

@@ -391,27 +391,6 @@ struct WebsocketOptions
      * If not set, a sane default value is used.
      */
     std::optional<std::chrono::milliseconds> ping_interval{};
-
-    /**
-     * @brief The delay between reconnects.
-     *
-     * If not set, the client will not attempt to reconnect after a close.
-     * Otherwise reconnect attempts are made in the given interval.
-     */
-    std::optional<std::chrono::milliseconds> reconnect_delay{};
-
-    /**
-     * @brief The maximum delay between reconnects.
-     *
-     * If set, the reconnect delay will be continuously increased
-     * (exactly how is left to the implementation)
-     * until the maximum reconnect delay.
-     * If not set, the reconnect delay remains constant.
-     *
-     * reconnect_delay must be set. The value of max_reconnect_delay
-     * must be greater than reconnect_delay.
-     */
-    std::optional<std::chrono::milliseconds> max_reconnect_delay{};
 };
 
 /**
@@ -504,6 +483,26 @@ struct ClientOptions
      * @see IClient::idle()
      */
     bool automatic_idling{ true };
+
+    /**
+     * @brief The delay between reconnects.
+     *
+     * If not set, the client will not attempt to reconnect after a close.
+     * Otherwise reconnect attempts are made in the given interval.
+     */
+    std::optional<std::chrono::milliseconds> reconnect_delay{};
+
+    /**
+     * @brief The maximum delay between reconnects.
+     *
+     * If set, the reconnect delay is increased exponentially
+     * until the maximum reconnect delay.
+     * If not set, the reconnect delay remains constant.
+     *
+     * reconnect_delay must be set. The value of max_reconnect_delay
+     * must be greater than reconnect_delay.
+     */
+    std::optional<std::chrono::milliseconds> max_reconnect_delay{};
 
     // TODO: not yet implemented
     /**

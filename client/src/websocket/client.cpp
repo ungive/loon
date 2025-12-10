@@ -6,17 +6,6 @@ BaseClient::BaseClient(
     std::string const& address, WebsocketOptions const& options)
     : m_address{ address }, m_options{ options }
 {
-    if (options.max_reconnect_delay.has_value() &&
-        !options.reconnect_delay.has_value()) {
-        throw std::runtime_error(
-            "reconnect_delay is required, if max_reconnect_delay is set");
-    }
-    if (options.max_reconnect_delay.has_value() &&
-        options.reconnect_delay.value() >=
-            options.max_reconnect_delay.value()) {
-        throw std::runtime_error("the max_reconnect_delay must be greater "
-                                 "than the reconnect_delay");
-    }
     if (options.ca_certificate.has_value() &&
         options.ca_certificate_path.has_value()) {
         throw std::runtime_error(

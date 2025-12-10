@@ -78,21 +78,20 @@ ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
             std::chrono::milliseconds::zero()) {
         throw std::runtime_error("the ping interval must be greater than zero");
     }
-    if (options.websocket.reconnect_delay.has_value() &&
-        options.websocket.reconnect_delay.value() <=
-            std::chrono::milliseconds::zero()) {
+    if (options.reconnect_delay.has_value() &&
+        options.reconnect_delay.value() <= std::chrono::milliseconds::zero()) {
         throw std::runtime_error(
             "the reconnect delay must be greater than zero");
     }
-    if (options.websocket.max_reconnect_delay.has_value() &&
-        !options.websocket.reconnect_delay.has_value()) {
+    if (options.max_reconnect_delay.has_value() &&
+        !options.reconnect_delay.has_value()) {
         throw std::runtime_error("the maximum reconnect delay may only be set"
                                  "when a reconnect delay is set");
     }
-    if (options.websocket.max_reconnect_delay.has_value() &&
-        options.websocket.reconnect_delay.has_value() &&
-        options.websocket.max_reconnect_delay.value() <=
-            options.websocket.reconnect_delay.value()) {
+    if (options.max_reconnect_delay.has_value() &&
+        options.reconnect_delay.has_value() &&
+        options.max_reconnect_delay.value() <=
+            options.reconnect_delay.value()) {
         throw std::runtime_error("the maximum reconnect delay must be greater "
                                  "than the reconnect delay");
     }
@@ -605,15 +604,14 @@ void ClientImpl::on_websocket_close()
     set_idle(false);
     if (m_was_explicitly_started) {
         m_was_explicitly_started = false;
-        auto retrying = m_options.websocket.reconnect_delay.has_value();
+        auto retrying = m_options.reconnect_delay.has_value();
         log(Error) << (retrying ? "initial connection attempt failed"
                                 : "connection failed")
                    << var("retrying", retrying)
                    << var("address", m_conn->address())
                    << var("conn_timeout", m_options.websocket.connect_timeout)
-                   << var("reconn_delay", m_options.websocket.reconnect_delay)
-                   << var("max_reconn_delay",
-                          m_options.websocket.max_reconnect_delay);
+                   << var("reconn_delay", m_options.reconnect_delay)
+                   << var("max_reconn_delay", m_options.max_reconnect_delay);
     }
     if (m_was_explicitly_stopped) {
         m_was_explicitly_stopped = false;
@@ -861,7 +859,7 @@ std::chrono::milliseconds ClientImpl::next_reconnect_delay()
     using namespace std::chrono_literals;
 
     assert(m_reconnect_attempt >= 0);
-    assert(m_options.websocket.reconnect_delay.has_value());
+    assert(m_options.reconnect_delay.has_value());
 
     m_reconnect_attempt += 1;
 
@@ -876,17 +874,15 @@ std::chrono::milliseconds ClientImpl::next_reconnect_delay()
         return m_reconnect_delay;
     }
     if (m_reconnect_attempt == 2) {
-        m_reconnect_delay =
-            m_options.websocket.reconnect_delay.value_or(1000ms);
+        m_reconnect_delay = m_options.reconnect_delay.value_or(1000ms);
     }
-    if (m_reconnect_attempt > 2 &&
-        m_options.websocket.max_reconnect_delay.has_value()) {
+    if (m_reconnect_attempt > 2 && m_options.max_reconnect_delay.has_value()) {
         // Exponentially increase reconnect delay.
-        auto next = std::min(m_options.websocket.max_reconnect_delay.value(),
-            2 * m_reconnect_delay);
+        auto next = std::min(
+            m_options.max_reconnect_delay.value(), 2 * m_reconnect_delay);
         // In case of an overflow with the above multiplication,
         // note that reconnect_delay is set if max_reconnect_delay is set:
-        next = std::max(m_options.websocket.reconnect_delay.value(), next);
+        next = std::max(m_options.reconnect_delay.value(), next);
         m_reconnect_delay = next;
     }
 
