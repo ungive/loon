@@ -1143,4 +1143,62 @@ TEST(Client, StartDoesNotBlockWhenSendForEmptyResponseBlocks)
     background.join();
 }
 
+TEST(Client, DisconnectCallbackIsOnlyCalledOnceAfterDisconnect)
+{
+    loon::ClientOptions options{};
+    auto connect_timeout = 100ms;
+    auto ping_interval = 125ms;
+    auto reconnect_delay = 250ms;
+    options.websocket.connect_timeout = connect_timeout;
+    options.websocket.ping_interval = ping_interval;
+    options.websocket.reconnect_delay = reconnect_delay;
+    auto client = create_client(options, false);
+    std::atomic<std::size_t> disconnect_callback_call_count{ 0 };
+    client->on_disconnect([&] {
+        disconnect_callback_call_count.fetch_add(1);
+    });
+    client->start_and_wait_until_connected();
+    EXPECT_TRUE(client->connected());
+    std::atomic<std::size_t> reconnect_calls{ 0 };
+    std::promise<void> promise;
+    client->before_reconnect_callback([&] {
+        reconnect_calls.fetch_add(1);
+        if (reconnect_calls.load() >= 5) {
+            promise.set_value();
+        }
+    });
+    drop_server_packets(All);
+    std::shared_ptr<void> scope_guard(nullptr, std::bind([] {
+        drop_server_packets(false);
+    }));
+    promise.get_future().wait();
+    client->stop();
+    EXPECT_GT(reconnect_calls.load(), 1);
+    EXPECT_EQ(1, disconnect_callback_call_count.load());
+}
+
+TEST(Client, DisconnectCallbackIsNotCalledWhenClientWasNeverConnected)
+{
+    drop_server_packets(All);
+    std::shared_ptr<void> scope_guard(nullptr, std::bind([] {
+        drop_server_packets(false);
+    }));
+    loon::ClientOptions options{};
+    auto connect_timeout = 100ms;
+    auto ping_interval = 125ms;
+    auto reconnect_delay = 250ms;
+    options.websocket.connect_timeout = connect_timeout;
+    options.websocket.ping_interval = ping_interval;
+    options.websocket.reconnect_delay = reconnect_delay;
+    auto client = create_client(options, false);
+    std::atomic<std::size_t> disconnect_callback_call_count{ 0 };
+    client->on_disconnect([&] {
+        disconnect_callback_call_count.fetch_add(1);
+    });
+    client->start();
+    std::this_thread::sleep_for(2 * connect_timeout);
+    EXPECT_FALSE(client->connected());
+    EXPECT_EQ(0, disconnect_callback_call_count.load());
+}
+
 // TODO TEST Does not reconnect when no reconnect delay is configured.

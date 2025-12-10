@@ -593,9 +593,10 @@ void ClientImpl::on_websocket_open()
 void ClientImpl::on_websocket_close()
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
+    bool was_connected = m_connected;
+    bool was_idling = m_idle_waiting;
     update_connected(false);
     reset_connection_state();
-    bool was_idling = m_idle_waiting;
     set_idle(false);
     if (m_was_explicitly_started) {
         m_was_explicitly_started = false;
@@ -617,7 +618,7 @@ void ClientImpl::on_websocket_close()
     // e.g. when the server disconnects before it sent a hello
     // disconnect should only be called when the connection was ready,
     // i.e. when m_hello is/was set to a value.
-    if (m_disconnect_callback) {
+    if (was_connected && m_disconnect_callback) {
         m_disconnect_callback();
     }
     // Reconnect, if the client is still started, reconnect are configured and
