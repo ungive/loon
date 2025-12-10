@@ -1,6 +1,4 @@
-#include "test/common.hpp"
-
-using namespace testing;
+#include "common/test.hpp"
 
 TEST(SharedReferenceCounter, AnyMethodThrowsWithNullPointer)
 {

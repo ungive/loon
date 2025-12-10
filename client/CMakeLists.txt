@@ -101,7 +101,7 @@ if(LOON_BUILD_TESTS)
     include(GoogleTest)
     enable_testing()
     set(TEST_SOURCES
-        test/main.cpp test/client_test.cpp
+        test/common/main.cpp test/client_test.cpp
         test/shared_reference_counter_test.cpp test/shared_client_test.cpp)
 
     add_executable(loon_test ${TEST_SOURCES})

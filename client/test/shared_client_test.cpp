@@ -1,4 +1,4 @@
-#include "test/common.hpp"
+#include "common/test.hpp"
 
 TEST(SharedClient, ConstructorThrowsWithSharedClientAsArgument)
 {

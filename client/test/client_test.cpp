@@ -1,8 +1,4 @@
-#include "test/common.hpp"
-
-using namespace loon;
-using namespace testing;
-using namespace std::chrono_literals;
+#include "common/test.hpp"
 
 TEST(Client, ServerServesContentWhenRegisteredWithClient)
 {
