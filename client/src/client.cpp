@@ -159,8 +159,6 @@ void ClientImpl::terminate()
             return;
         }
     }
-    // Don't hold a lock while calling this method, since it blocks.
-    m_conn->terminate();
 }
 
 std::string ClientImpl::make_url(std::string const& path)
