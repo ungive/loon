@@ -185,6 +185,13 @@ protected:
         m_inject_send_error = trigger_error;
     }
 
+    inline void send_sleep(
+        std::chrono::milliseconds duration = std::chrono::milliseconds::zero())
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_send_sleep_duration = duration;
+    }
+
     /**
      * @brief How long to sleep inbetween chunks.
      *
@@ -261,6 +268,9 @@ protected:
 private:
     std::function<void(Hello&)> m_injected_hello_modifer{};
     bool m_inject_send_error{ false };
+    std::chrono::milliseconds m_send_sleep_duration{
+        std::chrono::milliseconds::zero()
+    };
     std::chrono::milliseconds m_chunk_sleep_duration{
         std::chrono::milliseconds::zero()
     };
@@ -313,10 +323,11 @@ private:
     void on_websocket_open();
     void on_websocket_close();
     void on_websocket_message(std::string const& message);
-    void handle_message(ServerMessage const& message);
+    void handle_message(
+        std::unique_lock<std::mutex>& lock, ServerMessage const& message);
     void response_sent(uint64_t request_id);
     void on_hello(Hello const& request);
-    void on_request(Request const& request);
+    void on_request(std::unique_lock<std::mutex>& lock, Request const& request);
     void on_success(Success const& success);
     void on_request_closed(RequestClosed const& request_closed);
     void on_close(Close const& close);

@@ -53,6 +53,12 @@ public:
         ClientImpl::inject_send_error(trigger_error);
     }
 
+    inline void send_sleep(
+        std::chrono::milliseconds duration = std::chrono::milliseconds::zero())
+    {
+        ClientImpl::send_sleep(duration);
+    }
+
     inline void incoming_sleep(
         std::chrono::milliseconds duration = std::chrono::milliseconds::zero())
     {

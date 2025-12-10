@@ -1109,7 +1109,38 @@ TEST(Client, DoesNotAttemptToReconnectDuringIdling)
     EXPECT_FALSE(client->connected());
 }
 
-// TODO TEST Do not hold public Client mutex during send(), when responding
-// to a websocket message.
+TEST(Client, StartDoesNotBlockWhenSendForEmptyResponseBlocks)
+{
+    // The start() method (or any other public method that locks the root mutex)
+    // should not block when send() on the websocket connection blocks for along
+    // time, when sending an empty response. This has been the case in the past.
+
+    loon::ClientOptions options{};
+    options.websocket.ping_interval = 1000ms;
+    auto client = create_client(options);
+    auto content = example_content();
+    auto handle = client->register_content(content.source, content.info);
+    client->unregister_content(handle);
+    std::this_thread::sleep_for(25ms);
+    // Cause the send() method to block, as if there were connectivity issues.
+    client->send_sleep(1s);
+    // This will trigger empty content, since generated URLs cannot be revoked.
+    std::promise<void> ready;
+    std::thread background([&] {
+        ready.set_value();
+        CurlOptions options{};
+        options.timeout = 1000ms;
+        EXPECT_ANY_THROW(http_get(handle->url(), options));
+    });
+    ready.get_future().wait();
+    std::this_thread::sleep_for(25ms);
+    auto start = std::chrono::steady_clock::now();
+    client->start();
+    auto delta = std::chrono::steady_clock::now() - start;
+    EXPECT_LT(
+        std::chrono::duration_cast<std::chrono::milliseconds>(delta).count(),
+        (50ms).count());
+    background.join();
+}
 
 // TODO TEST Does not reconnect when no reconnect delay is configured.

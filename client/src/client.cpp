@@ -430,9 +430,10 @@ bool ClientImpl::check_request_limit(decltype(m_content)::iterator it)
     return false;
 }
 
-void ClientImpl::on_request(Request const& request)
+void ClientImpl::on_request(
+    std::unique_lock<std::mutex>& lock, Request const& request)
 {
-    std::lock_guard<std::mutex> lock(m_request_mutex);
+    std::lock_guard<std::mutex> request_lock(m_request_mutex);
 
     if (m_requests.find(request.id()) != m_requests.end()) {
         log(Error) << "protocol: request id already in use"
@@ -456,6 +457,16 @@ void ClientImpl::on_request(Request const& request)
         empty_response->set_request_id(request.id());
         log(Info) << "empty response" << var("rid", request.id())
                   << var("path", request.path());
+        // Unlock the lock since send() can block for a long time. This only
+        // leaves the request and send mutex locked, which is desirable for
+        // sending responses for requests. The public methods of the client must
+        // stay responsive though. The lock does not need to be locked again, as
+        // we are returning after sending and this is the last operation in the
+        // chain. It is best to call send() here, on the websocket's thread,
+        // because the manager thread may not be locked for a possibly long
+        // time. Spawning a separate thread only for the purpose of sending
+        // empty responses is overkill.
+        lock.unlock();
         send(message);
         return;
     }
@@ -624,7 +635,7 @@ void ClientImpl::on_websocket_message(std::string const& message)
     std::this_thread::sleep_for(m_incoming_sleep_duration);
 #endif
 
-    const std::lock_guard<std::mutex> lock(m_mutex);
+    std::unique_lock<std::mutex> lock(m_mutex);
 
     ServerMessage server_message;
     if (!server_message.ParseFromString(message)) {
@@ -647,16 +658,17 @@ void ClientImpl::on_websocket_message(std::string const& message)
         break;
     }
 
-    handle_message(server_message);
+    handle_message(lock, server_message);
 }
 
-void ClientImpl::handle_message(ServerMessage const& message)
+void ClientImpl::handle_message(
+    std::unique_lock<std::mutex>& lock, ServerMessage const& message)
 {
     switch (message.data_case()) {
     case ServerMessage::kHello:
         return on_hello(message.hello());
     case ServerMessage::kRequest:
-        return on_request(message.request());
+        return on_request(lock, message.request());
     case ServerMessage::kSuccess:
         return on_success(message.success());
     case ServerMessage::kRequestClosed:
@@ -680,13 +692,16 @@ bool ClientImpl::send(ClientMessage const& message)
         restart();
         return false;
     }
-#ifdef LOON_TEST
     int64_t n = 0;
-    if (!m_inject_send_error) {
-        n = m_conn->send_binary(result.data(), result.size());
+#ifdef LOON_TEST
+    if (m_send_sleep_duration > std::chrono::milliseconds::zero()) {
+        std::this_thread::sleep_for(m_send_sleep_duration);
     }
-#else
-    int64_t n = m_conn->send_binary(result.data(), result.size());
+    if (!m_inject_send_error) {
+#endif
+        n = m_conn->send_binary(result.data(), result.size());
+#ifdef LOON_TEST
+    }
 #endif
     if (n <= 0) {
         log(Error) << "failed to send message" << var("retval", n);
