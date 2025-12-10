@@ -84,8 +84,8 @@ set_property(TARGET loon PROPERTY CXX_STANDARD 17)
 set_property(TARGET loon PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    # Compile test methods and functions with debug builds.
-    # That way they are not greyed out during development.
+    # Compile test methods and functions with debug builds. That way they are
+    # not greyed out during development.
     target_compile_definitions(loon PRIVATE LOON_TEST)
 endif()
 
@@ -94,8 +94,8 @@ if(LOON_BUILD_EXAMPLES)
 endif()
 
 if(LOON_BUILD_TESTS)
-    # For Windows:
-    # Prevent overriding the parent project's compiler/linker settings
+    # For Windows: Prevent overriding the parent project's compiler/linker
+    # settings
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
     include(GoogleTest)
@@ -156,7 +156,8 @@ if(LOON_BUILD_TESTS)
                 $<TARGET_RUNTIME_DLLS:loon_test> $<TARGET_FILE_DIR:loon_test>
             COMMAND_EXPAND_LISTS)
 
-        # Copy DLLs that aren't included with TARGET_RUNTIME_DLLS for some reason.
+        # Copy DLLs that aren't included with TARGET_RUNTIME_DLLS for some
+        # reason.
         set(MISSING_DLLS "")
         if(CMAKE_BUILD_TYPE STREQUAL "Debug")
             list(APPEND MISSING_DLLS zlibd1.dll)
