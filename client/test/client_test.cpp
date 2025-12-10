@@ -300,7 +300,7 @@ TEST(Client, ClientCreationThrowsExceptionWhenNoContentRequestLimitIsUnset)
     ClientOptions options;
     // Not setting no_content_request_limit to anything explicitly.
     // options.no_content_request_limit = std::nullopt;
-    EXPECT_THROW(TestClient(TEST_ADDRESS, options), std::exception);
+    EXPECT_THROW(TestClient(TEST_SERVER_WS, options), std::exception);
 }
 
 TEST(Client, CreationFailsWhenMaxUploadSpeedIsSet)
@@ -708,7 +708,7 @@ TEST(Client, CanBeConstructedWithMoveConstructor)
 {
     loon::ClientOptions options{};
     options.no_content_request_limit = std::make_pair(8, 1s);
-    loon::Client client1(TEST_ADDRESS, options);
+    loon::Client client1(TEST_SERVER_WS, options);
     client1.start();
     client1.wait_until_ready();
     loon::Client client2(std::move(client1));
@@ -716,6 +716,20 @@ TEST(Client, CanBeConstructedWithMoveConstructor)
     // Test the default move-assignment operator as well.
     loon::Client client3 = std::move(client2);
     EXPECT_NO_THROW(EXPECT_FALSE(client3.wait_until_ready()));
+}
+
+TEST(Client, DisconnectsAfterDoubleThePingIntervalOnDroppedConnection)
+{
+    loon::ClientOptions options{};
+    auto ping_interval = 250ms;
+    const auto expected_ping_timeout = 2 * ping_interval;
+    options.websocket.ping_interval = ping_interval;
+    auto client = create_client(options, false);
+    client->start_and_wait_until_connected();
+    EXPECT_TRUE(client->connected());
+    drop_server_packets(true);
+    std::this_thread::sleep_for(expected_ping_timeout + 50ms);
+    EXPECT_FALSE(client->connected());
 }
 
 // TEST(Client, AutomaticallyRestartsAfterPingTimeout)

@@ -21,7 +21,10 @@ using namespace loon;
 using namespace testing;
 using namespace std::chrono_literals;
 
-#define TEST_ADDRESS "ws://127.0.0.1:8071/ws"
+#define TEST_SERVER_HOST "127.0.0.1:8072"
+#define TEST_SERVER_WS "ws://" TEST_SERVER_HOST "/proxy/ws"
+#define TEST_SERVER_DROP_ON "http://" TEST_SERVER_HOST "/proxy/drop/on"
+#define TEST_SERVER_DROP_OFF "http://" TEST_SERVER_HOST "/proxy/drop/off"
 #define TEST_AUTH std::nullopt
 
 class TestClient : public loon::ClientImpl
@@ -98,7 +101,7 @@ static std::shared_ptr<TestClient> create_client(
     if (!options.websocket.ping_interval.has_value()) {
         options.websocket.ping_interval = 25ms;
     }
-    auto client = std::make_shared<TestClient>(TEST_ADDRESS, options);
+    auto client = std::make_shared<TestClient>(TEST_SERVER_WS, options);
     if (started) {
         client->start();
         client->wait_until_ready();
@@ -432,3 +435,16 @@ private:
     size_t m_n_wait_until_ready{ 0 };
     size_t m_n_wait_until_ready_timeout{ 0 };
 };
+
+// Turns dropping of websocket server packets on/off. Packets are dropped until
+// the next websocket/client connection is established.
+inline void drop_server_packets(bool state)
+{
+    std::optional<CurlResponse> response;
+    if (state) {
+        response = http_get(TEST_SERVER_DROP_ON);
+    } else {
+        response = http_get(TEST_SERVER_DROP_OFF);
+    }
+    EXPECT_EQ(200, response->status);
+}

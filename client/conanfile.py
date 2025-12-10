@@ -16,9 +16,7 @@ class Loon(ConanFile):
         "protobuf/3.21.12",
     )
 
-    test_requires = (
-        "libcurl/[~8]",
-    )
+    test_requires = "libcurl/[~8]"
 
     tool_requires = "cmake/3.31.6"
 
