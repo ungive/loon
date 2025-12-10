@@ -728,6 +728,7 @@ bool ClientImpl::update_connected(bool state)
 
 void ClientImpl::internal_start()
 {
+    assert(m_started);
     m_connecting = true;
     m_conn->start();
 }
@@ -756,7 +757,9 @@ void ClientImpl::reset_connection_state()
 
 void ClientImpl::internal_stop(std::unique_lock<std::mutex>& lock)
 {
-    // Note: the order of the following operations is critical.
+    // Note: the order of the following operations is critical. In addition to
+    // this, one responsibility of this method is to reset all state, such that
+    // the manager loop does not, under any circumstance, call internal_start().
     {
         // Unlock the lock while stopping the websocket connection,
         // since this might trigger a call to on_websocket_close(),
@@ -798,7 +801,6 @@ void ClientImpl::internal_reconnect(std::unique_lock<std::mutex>& lock)
         m_reconnect_callback();
     }
 #endif
-    assert(m_started);
     assert(!m_connected);
     assert(!m_connecting);
     assert(!m_idle_waiting);
@@ -978,6 +980,7 @@ void ClientImpl::manager_loop()
             m_queue_reconnect = std::nullopt;
             reconnect_time_point = steady_clock::time_point::max();
             if (do_queue) {
+                assert(m_started);
                 auto duration = next_reconnect_delay();
                 reconnect_time_point = steady_clock::now() + duration;
                 assert(m_reconnect_attempt > 0);
