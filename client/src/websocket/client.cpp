@@ -62,7 +62,7 @@ void BaseClient::on_message(
 
 void BaseClient::start()
 {
-    if (m_active.exchange(true) && m_connected) {
+    if (m_active.exchange(true)) {
         return;
     }
     internal_start();
