@@ -3,12 +3,14 @@
 #include <cassert>
 #include <chrono>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <sstream>
 #include <thread>
 #include <variant>
 
 #include <google/protobuf/text_format.h>
+#include <rtc/global.hpp>
 
 #include "base64.hpp"
 #include "logging.hpp"
@@ -22,6 +24,36 @@ using namespace std::chrono_literals;
 #define log(level) \
     loon_log_macro(level, loon::log_level(), loon::log_message, logger_factory)
 
+static std::mutex g_rtc_init_mutex;
+static bool g_rtc_initialized = false;
+
+static void rtc_global_init()
+{
+    // Initialize the global WebSocket/RTC thread pool to the minimum amount of
+    // threads. At the time of writing this will be 2 or more threads:
+    // https://github.com/paullouisageneau/libdatachannel/blob/v0.23/src/impl/internals.hpp#L48
+
+    // TODO I don't really want to expose a global init method for loon, but it
+    // would be great if libdatachannel was able to dynamically add more threads
+    // to the thread pool during runtime, depending on how many concurrent
+    // websocket clients exist. A global rtc::EnsureThreadPoolSize(n) function
+    // that can be called at any time, even after the thread pool was created,
+    // would be useful in my eyes.
+
+    std::lock_guard lock(g_rtc_init_mutex);
+
+    if (g_rtc_initialized)
+        return;
+
+    g_rtc_initialized = true;
+
+    rtc::SetThreadPoolSize(1);
+    bool initialized = rtc::Preload();
+
+    // Make sure initialization wasn't performed a different way beforehand.
+    assert(initialized && "rtc already initialized");
+}
+
 Client::Client(std::string const& address, ClientOptions options)
     : m_impl{ std::make_unique<ClientImpl>(address, options) }
 {
@@ -32,6 +64,9 @@ loon::Client::Client(Client&& other) : m_impl{ std::move(other.m_impl) } {}
 ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
     : m_options{ std::move(options) }
 {
+    // Initialize libdatachannel before creating a websocket instance.
+    rtc_global_init();
+
     if (m_options.min_cache_duration.has_value() &&
         m_options.min_cache_duration.value() <=
             std::chrono::milliseconds::zero()) {
@@ -95,6 +130,8 @@ ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
         throw std::runtime_error("the maximum reconnect delay must be greater "
                                  "than the reconnect delay");
     }
+    // Websocket connection
+    m_conn = std::make_unique<websocket::Client>(address, m_options.websocket);
     // Event handlers
     m_conn->on_open(std::bind(&ClientImpl::on_websocket_open, this));
     m_conn->on_close(std::bind(&ClientImpl::on_websocket_close, this));
