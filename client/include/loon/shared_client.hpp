@@ -5,19 +5,11 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <type_traits>
 
 #include "loon/client.hpp"
 
 namespace loon
 {
-namespace internal
-{
-template <typename T>
-struct fail : std::false_type
-{
-};
-} // namespace internal
 
 /**
  * @brief A client that uses a shared connection by wrapping a real client.
@@ -152,14 +144,6 @@ public:
         return m_impl->register_content(source, info);
     }
 
-    template <typename T = bool>
-    inline void terminate()
-    {
-        // Ensure that this call does not compile.
-        static_assert(internal::fail<T>::value,
-            "terminate cannot be called on a shared client");
-    }
-
     // Client implementation methods
 
     inline void start() override { return m_impl->start(); }
@@ -210,4 +194,5 @@ public:
 private:
     std::unique_ptr<ISharedClient> m_impl;
 };
+
 } // namespace loon
