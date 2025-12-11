@@ -78,11 +78,9 @@ ClientImpl::~ClientImpl() { stop(); }
 std::unique_ptr<rtc::WebSocket> ClientImpl::create_conn()
 {
     rtc::WebSocket::Configuration configuration;
-
-    // FIXME What value was this with Qt? What's a good default value here?
-    // FIXME This should be configurable
+    // For now we stick with 1 max outstanding ping, since the documentation for
+    // "ping_interval" says "he ping interval is used as the pong timeout".
     configuration.maxOutstandingPings = 1;
-
     configuration.connectionTimeout =
         options().connect_timeout.value_or(default_connect_timeout);
     configuration.pingInterval =
