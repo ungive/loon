@@ -1,4 +1,5 @@
-#pragma once
+#ifndef UNGIVE_LOON_CLIENT_HPP
+#define UNGIVE_LOON_CLIENT_HPP
 
 #include <chrono>
 #include <functional>
@@ -13,6 +14,7 @@
 
 namespace loon
 {
+
 /**
  * @brief A handle for content registered with a Client.
  *
@@ -73,7 +75,7 @@ public:
 class IClient
 {
 public:
-    virtual ~IClient() {};
+    virtual ~IClient() = default;
 
     /**
      * @brief Connects to the server and maintains a connection.
@@ -717,4 +719,7 @@ class TimeoutException : public std::runtime_error
 public:
     using runtime_error::runtime_error;
 };
+
 } // namespace loon
+
+#endif // UNGIVE_LOON_CLIENT_HPP

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef UNGIVE_LOON_SHARED_CLIENT_HPP
+#define UNGIVE_LOON_SHARED_CLIENT_HPP
 
 #include <cassert>
 #include <chrono>
@@ -196,3 +197,5 @@ private:
 };
 
 } // namespace loon
+
+#endif // UNGIVE_LOON_SHARED_CLIENT_HPP

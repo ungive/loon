@@ -1,4 +1,5 @@
-#pragma once
+#ifndef UNGIVE_LOON_CONTENT_HPP
+#define UNGIVE_LOON_CONTENT_HPP
 
 #include <cstdint>
 #include <istream>
@@ -10,6 +11,7 @@
 
 namespace loon
 {
+
 /**
  * @brief Describes a source for loon content.
  *
@@ -169,4 +171,7 @@ struct ContentInfo
      */
     std::optional<std::string> attachment_filename{};
 };
+
 } // namespace loon
+
+#endif // UNGIVE_LOON_CONTENT_HPP
