@@ -27,11 +27,18 @@ find_package(OpenSSL REQUIRED)
 target_link_libraries(loon OpenSSL::SSL OpenSSL::Crypto)
 
 # libdatachannel
+block(SCOPE_FOR VARIABLES)
+set(NO_WEBRTC ON CACHE BOOL "Disable WebRTC support")
+set(NO_EXAMPLES ON CACHE BOOL "Disable examples")
+set(NO_TESTS ON CACHE BOOL "Disable tests build")
 add_subdirectory(third_party/libdatachannel EXCLUDE_FROM_ALL)
 target_link_libraries(loon LibDataChannel::LibDataChannel)
-target_compile_definitions(loon PRIVATE USE_LIBDATACHANNEL)
-# TODO Use conan once this PR is merged:
+# TODO Use conan once the following PRs are merged:
 # https://github.com/paullouisageneau/libdatachannel/pull/1488
+# https://github.com/paullouisageneau/libdatachannel/pull/1491
+# With conan "NO_WEBRTC" would have to be exposed as an option. One could most
+# likely also manually set it as a CMake configure option.
+endblock()
 
 # Protobuf
 set(Protobuf_USE_STATIC_LIBS ON CACHE BOOL "Override option" FORCE)
