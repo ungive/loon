@@ -9,3 +9,5 @@ format:
     command_case: "canonical"
     keyword_case: "upper"
     literal_comment_pattern: ".*"
+markup:
+    enable_markup: false
