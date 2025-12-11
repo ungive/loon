@@ -30,8 +30,7 @@ Client::Client(std::string const& address, ClientOptions options)
 loon::Client::Client(Client&& other) : m_impl{ std::move(other.m_impl) } {}
 
 ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
-    : m_conn{ std::make_unique<websocket::Client>(address, options.websocket) },
-      m_options{ options }
+    : m_options{ std::move(options) }
 {
     if (m_options.min_cache_duration.has_value() &&
         m_options.min_cache_duration.value() <=
@@ -67,31 +66,32 @@ ClientImpl::ClientImpl(std::string const& address, ClientOptions options)
     if (m_options.max_upload_speed.has_value()) {
         throw std::runtime_error("max_upload_speed is not yet implemented");
     }
-    if (options.websocket.connect_timeout.has_value() &&
-        options.websocket.connect_timeout.value() <=
+    if (m_options.websocket.connect_timeout.has_value() &&
+        m_options.websocket.connect_timeout.value() <=
             std::chrono::milliseconds::zero()) {
         throw std::runtime_error(
             "the connect timeout must be greater than zero");
     }
-    if (options.websocket.ping_interval.has_value() &&
-        options.websocket.ping_interval.value() <=
+    if (m_options.websocket.ping_interval.has_value() &&
+        m_options.websocket.ping_interval.value() <=
             std::chrono::milliseconds::zero()) {
         throw std::runtime_error("the ping interval must be greater than zero");
     }
-    if (options.reconnect_delay.has_value() &&
-        options.reconnect_delay.value() <= std::chrono::milliseconds::zero()) {
+    if (m_options.reconnect_delay.has_value() &&
+        m_options.reconnect_delay.value() <=
+            std::chrono::milliseconds::zero()) {
         throw std::runtime_error(
             "the reconnect delay must be greater than zero");
     }
-    if (options.max_reconnect_delay.has_value() &&
-        !options.reconnect_delay.has_value()) {
+    if (m_options.max_reconnect_delay.has_value() &&
+        !m_options.reconnect_delay.has_value()) {
         throw std::runtime_error("the maximum reconnect delay may only be set"
                                  "when a reconnect delay is set");
     }
-    if (options.max_reconnect_delay.has_value() &&
-        options.reconnect_delay.has_value() &&
-        options.max_reconnect_delay.value() <=
-            options.reconnect_delay.value()) {
+    if (m_options.max_reconnect_delay.has_value() &&
+        m_options.reconnect_delay.has_value() &&
+        m_options.max_reconnect_delay.value() <=
+            m_options.reconnect_delay.value()) {
         throw std::runtime_error("the maximum reconnect delay must be greater "
                                  "than the reconnect delay");
     }
