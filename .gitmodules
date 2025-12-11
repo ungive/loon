@@ -5,3 +5,4 @@
 [submodule "client/third_party/libdatachannel"]
 	path = client/third_party/libdatachannel
 	url = https://github.com/ungive/libdatachannel
+	branch = develop
