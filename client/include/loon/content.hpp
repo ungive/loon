@@ -32,6 +32,10 @@ public:
      * The underlying stream may therefore be reused or reset
      * and does not need to be thread-safe.
      *
+     * Requests are never served concurrently, as the server should cache
+     * responses and ideally only forward requests if any previous request has
+     * been fully served (and possibly cached).
+     *
      * The stream must supply at least as many bytes
      * as the size() method indicates
      * and at most that many bytes will be read from the stream.
