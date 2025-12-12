@@ -1,51 +1,139 @@
-> Note: The project is still a WIP,
-> a license and proper versioning will be added soon.
-
-# local files online &ndash; loon
-
 ![loon logo](./assets/loon-small.png)
 
-**<ins>loon</ins>** allows you to make
-a **<ins>lo</ins>cal** file
-accessible **<ins>on</ins>line**.
+> Note: The project is still a WIP.
+> A license, a stable API and proper versioning will be available soon.
 
-The loon client generates one URL per resource,
-which points to an HTTP server,
-which in turn forwards any request back to the loon client
-through a websocket connection.
-It acts like a **tunnel for HTTP traffic**,
-but with a very minimal and lightweight implementation behind it,
-ideal to keep your client small and lean.
+# loon &ndash; local files online
+
+**<ins>loon</ins>** allows you to make
+a **<ins>lo</ins>cal** resource
+accessible **<ins>on</ins>line**. Instantly.
+
+The loon client connects to the loon server over a persistent connection.
+When you register content with the client, no network roundtrip is made,
+a URL is generated locally and is immediately available for your use.
+
+When a request is made to the URL (via HTTP or HTTPS),
+the server forwards this request to your client
+and the client uploads the content to the server,
+which then forwards it to whomever made the initial request.
+The loon client and server effectively act like a **tunnel for HTTP traffic**,
+but with a very minimal footprint and several safety guarantees,
+to keep your client small and lean
+and remove the headaches of traditional tunnels.
 
 The Go server and C++ client implementation are battle-tested
 and actively used with [**Music Presence**](https://musicpresence.app),
 a desktop application to show what you are listening to
-in your Discord status!
+in your Discord status.
+Thanks to loon, Music Presence is the only application out there
+that reliably displays album cover images on the user's profile!
+
+## Features
+
+- Generate a URL for any local resource in under 1 millisecond
+- Efficiently recycle the server connection
+  with automatic idling and delayed disconnects
+- Client abstraction layer to use one underlying client connection
+  for use with multiple shared clients in different,
+  fully distinct application contexts
+- Automatic reconnecting to the server, in case the connection is lost
+- Support for client authentication via HTTP
+  and server verification with CA certificates
+- Lightweight, unit- and battle-tested client library written in C++
+  and server written in Go
+- Not just a side project.
+  The loon client runs on well over 10.000 devices daily.
+  See [here](https://musicpresence.app)
+- All the safety guarantees you'd expect
+  from software that tunnels traffic from the internet to your device
+
+## Safety guarantees
+
+- Your client never receives a request for a URL
+  for which it didn't register any content
+- Generated URLs are unique.
+  Knowing a URL, it is infeasible to craft other URLs and test if they work.
+  Each URL contains an HMAC that is computed from the URL path and an ephemeral,
+  securely generated secret,
+  which is only used for the lifetime of the connection and
+  is only known to the client and server
+- Generated URLs can't be easily guessed.
+  Each content URL contains a random client ID,
+  which is generated upon connecting to the server
+  and discarded upon disconnecting.
+  Together with the HMAC, the URL appears entirely random to external actors
+- Uploaded content is cached on the server for a configurable duration,
+  to not stress your bandwidth
+- The client aborts,
+  should the server not respect your client's minimum required cache duration
+- The client aborts,
+  when it receives too many requests in a configurable time frame
+- Your public IP is never exposed to third-parties that request your content
+
+## Limitations
+
+- Generated URLs can be rather long (~100 characters),
+  as the path contains the client ID, an HMAC and
+  a path component selected by the client
+- Registering different content over time, within the same connection
+  and under the same path is possible, but not recommended,
+  as the content will be accessible to someone
+  who has knowledge of the old URL
+- Anyone who knows the URL is able to access its contents
+  and the server can see what is transmitted
+
+Current limitations that might be remedied in the future:
+
+- There is currently no support for compression,
+  as the primary use case was to transmit images,
+  which are already compressed.
+  Support for compression is planned though:
+  [#23](https://github.com/ungive/loon/issues/23)
+- Content may be kept in the server's cache
+  longer than it is registered with the client,
+  depending on the maximum configured cache duration.
+  There is currently no way to purge the cache for unregistered content,
+  which may be undesirable for certain use cases.
+  Discussion: [#22](https://github.com/ungive/loon/issues/22)
+- Generated URLs can't be invalidated.
+  Once content is unregistered,
+  requests to the URL are still forwarded to the client
+  and responses are not cached by the server.
+  The client will disconnect from the server,
+  should it get too many requests to old URLs,
+  but this could be abused
+  to make the client reconnect to the server,
+  only with the knowledge of a URL that has no content anymore.
+  Discussion: [#21](https://github.com/ungive/loon/issues/21)
+- Only static paths without query parameters are supported.
+  Each URL that is forwarded to the client must have been generated explicitly.
+  Discussion: [#17](https://github.com/ungive/loon/issues/17)
 
 ## Architecture overview
 
 There are three main actors with loon:
 
-**Client** &ndash; The client library is used on the device
-that wishes to share a resource.
+**loon client** &nbsp;&bullet;&nbsp;
+The client library is used on the device that wishes to share a resource.
 It connects to the server via a websocket connection
 and remains connected for the duration it wants to share these resources.
 Sharing a resource is as simple as registering it with the client
-and generating a URL - this process is instant.
+and generating a URL &ndash; this process is instant.
 The URL can then be shared with a third party to access the resource.
 Uploading is done when the server receives a request at the generated URL,
 the request is forwarded to the client and then uploaded by the client
 through the websocket connection.
-The generated URL becomes invalid once the resource has been unregistered
-or the websocket connection has been closed.
 
-**Server** &ndash; The server accepts both client websocket connections
+**loon server** &nbsp;&bullet;&nbsp;
+The server accepts both client websocket connections
 and requests to URLs that were generated by these clients.
 Its sole purpose is to provide a mechanism for clients
 to generate URLs that are accessible from the internet
 and to forward requests and responses between clients and third parties.
 
-**Third party** &ndash; Any third party can make requests to generated URLs
+**Third party** &nbsp;&bullet;&nbsp;
+Any third party with knowledge of a generated URL can make a request to it
 to access the resource that has been registered by a client.
 
 ## Server limitations
@@ -56,45 +144,46 @@ The only caching mechanism that is provided by the implementation
 is control over the `max-age` value in a response's `Cache-Control` header,
 but the actual caching itself needs to be taken care of separately.
 
-The used cache and/or reverse proxy must guarantee the following
+The reverse proxy and cache must guarantee the following
 to prevent clients from being flooded with requests:
 
-- Concurrent requests **MUST** lead to a *single request* to the client,
+- Concurrent requests **MUST** lead to a single request to the client,
   whose response should then be cached and served.
+  Concurrent requests must not lead to multiple requests to the client
 - Any `Cache-Control` request header **MUST** be ignored,
   otherwise third parties can bypass the cache,
   e.g. by setting the `no-cache` directive.
   When using a reverse proxy, this header should be deleted from all requests.
   If not done properly, the cache is effectively rendered obsolete
-  from an attackers point of view.
+  from an attackers point of view
 - Query parameters are not forwarded to a connected client,
   so they **MUST** not be part of the cache key.
-  Setting a meaningless query parameter should not bypass the cache.
+  Setting a meaningless query parameter should not bypass the cache
+- The content **MUST** be committed to the cache once the upload finished
+  and stay cached for the desired cache duration.
+  This should go without saying, but it's worth mentioning anyway
 
-A deployment example can be found in [**deployments**](./deployments).
+A deployment example can be found in [**./deployments**](./deployments).
 
 ## What is in this repository?
 
-- System and protocol specification: **[api](./api)**
-- A well-tested server library written in Go: **[pkg/server](./pkg/server)**
-- A simple client library written in Go: **[pkg/client](./pkg/client)**
-- A CLI program to run the server and client: **[cmd/loon](./cmd/loon)**
-  - It makes use of the above server and client library
-- A feature-complete, reference client library written in C++:
-  **[client](./client)**
-  - Well-tested and has more features than the Go client library
-  - Dependencies: libhv or Qt for websocket communication + OpenSSL + Protobuf
-  - Compatible with C++17 or newer
-  - Uses the CMake build system
-  - Small footprint: 2.899 lines for commit `6d44d2`
-    (excluding websocket abstraction and tests)
-  - Documentation: *https://ungive.github.io/loon/client*
-- A ready to use server Docker image:
-  **[build/package/Dockerfile](./build/package/Dockerfile)**
+- System and protocol specification: **[./api](./api)**
+- A well-tested server library written in Go: **[./pkg/server](./pkg/server)**
+- A well-tested, feature-complete, reference client library written in C++:
+  **[./client](./client)**
+  - C++17-compatible
+  - Uses the CMake build-system
+  - Conan and git submodules for dependency-management
+  - Dependencies: OpenSSL, Protobuf, libdatachannel
 - A server deployment example with Docker Compose and Caddy:
-  **[deployments](./deployments)**  
+  **[./deployments](./deployments)**  
+- A CLI program to run the server and a simple client: **[./cmd/loon](./cmd/loon)**
+  - The Go client is very rudimentary
+    and is just meant for development and testing
+- A ready to use server Docker image:
+  **[./build/package/Dockerfile](./build/package/Dockerfile)**  
   For a more production-ready example have a look at
-  **[music-presence/client-proxy](https://github.com/music-presence/client-proxy)**
+  [github.com/music-presence/client-proxy](https://github.com/music-presence/client-proxy)
 - An example server configuration to quickly get started:
   **[examples/server/config.yaml](./examples/server/config.yaml)**
 
