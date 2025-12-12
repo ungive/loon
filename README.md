@@ -109,6 +109,12 @@ Current limitations that might be remedied in the future:
 - Only static paths without query parameters are supported.
   Each URL that is forwarded to the client must have been generated explicitly.
   Discussion: [#17](https://github.com/ungive/loon/issues/17)
+- Uploading of registered content only starts when a request comes in.
+  Content can't be uploaded in preparation of an incoming request yet.
+  Discussion: [#27](https://github.com/ungive/loon/issues/27)
+- The loon client currently uploads data as fast as it can,
+  there currently is no way to limit the upload speed.
+  Discussion: [#26](https://github.com/ungive/loon/issues/26)
 
 ## Architecture overview
 
@@ -185,7 +191,7 @@ A deployment example can be found in [**./deployments**](./deployments).
   For a more production-ready example have a look at
   [github.com/music-presence/client-proxy](https://github.com/music-presence/client-proxy)
 - An example server configuration to quickly get started:
-  **[examples/server/config.yaml](./examples/server/config.yaml)**
+  **[./examples/server/config.yaml](./examples/server/config.yaml)**
 
 > **Warning!**  
 > The public API of these libraries and programs
