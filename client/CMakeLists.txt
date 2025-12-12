@@ -18,13 +18,17 @@ set(SOURCES
 
 add_library(loon STATIC ${SOURCES})
 add_library(loon::loon ALIAS loon)
-target_compile_definitions(loon PRIVATE NOMINMAX)
 target_include_directories(loon PUBLIC ./include)
 target_include_directories(loon PRIVATE ./src)
+set_property(TARGET loon PROPERTY CXX_STANDARD 17)
+set_property(TARGET loon PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_library(loon_deps INTERFACE)
+target_compile_definitions(loon_deps INTERFACE NOMINMAX)
 
 # OpenSSL
 find_package(OpenSSL REQUIRED)
-target_link_libraries(loon OpenSSL::SSL OpenSSL::Crypto)
+target_link_libraries(loon_deps INTERFACE OpenSSL::SSL OpenSSL::Crypto)
 
 # libdatachannel
 block(SCOPE_FOR VARIABLES)
@@ -32,7 +36,7 @@ set(NO_WEBRTC ON CACHE BOOL "Disable WebRTC support")
 set(NO_EXAMPLES ON CACHE BOOL "Disable examples")
 set(NO_TESTS ON CACHE BOOL "Disable tests build")
 add_subdirectory(third_party/libdatachannel EXCLUDE_FROM_ALL)
-target_link_libraries(loon LibDataChannel::LibDataChannel)
+target_link_libraries(loon_deps INTERFACE LibDataChannel::LibDataChannel)
 # TODO Use conan once the following PRs are merged:
 # https://github.com/paullouisageneau/libdatachannel/pull/1488
 # https://github.com/paullouisageneau/libdatachannel/pull/1491
@@ -43,9 +47,9 @@ endblock()
 # Protobuf
 set(Protobuf_USE_STATIC_LIBS ON CACHE BOOL "Override option" FORCE)
 find_package(Protobuf CONFIG REQUIRED)
-target_include_directories(loon PRIVATE ${Protobuf_INCLUDE_DIRS}
-                                        ${protobuf_INCLUDE_DIRS})
-target_include_directories(loon PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(loon_deps INTERFACE ${Protobuf_INCLUDE_DIRS}
+                                               ${protobuf_INCLUDE_DIRS})
+target_include_directories(loon_deps INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
 configure_file(../api/messages.proto
                ${CMAKE_CURRENT_BINARY_DIR}/loon/messages.proto COPYONLY)
 add_library(loon_proto STATIC ${CMAKE_CURRENT_BINARY_DIR}/loon/messages.proto)
@@ -65,17 +69,10 @@ protobuf_generate(
     OUT_VAR
     PROTOLOON_SOURCES)
 set_property(SOURCE ${PROTOLOON_SOURCES} PROPERTY SKIP_AUTOGEN ON)
-target_link_libraries(loon protobuf::libprotobuf)
-target_link_libraries(loon loon_proto)
+target_link_libraries(loon_deps INTERFACE protobuf::libprotobuf)
+target_link_libraries(loon_deps INTERFACE loon_proto)
 
-set_property(TARGET loon PROPERTY CXX_STANDARD 17)
-set_property(TARGET loon PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
-
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    # Compile test methods and functions with debug builds. That way they are
-    # not greyed out during development.
-    target_compile_definitions(loon PRIVATE LOON_TEST)
-endif()
+target_link_libraries(loon PRIVATE loon_deps)
 
 if(LOON_BUILD_EXAMPLES)
     add_subdirectory(examples)
@@ -92,21 +89,28 @@ if(LOON_BUILD_TESTS)
         test/common/main.cpp test/client_test.cpp
         test/shared_reference_counter_test.cpp test/shared_client_test.cpp)
 
-    add_executable(loon_test ${TEST_SOURCES})
-    target_link_libraries(loon_test loon)
+    # Add the sources again, so that they are recompiled with the LOON_TEST
+    # flag. Setting the LOON_TEST flag for the loon library itself is not
+    # desirable, as that alters the exported library. The loon library sources
+    # have to be compiled with LOON_TEST defined though, otherwise there can be
+    # strange alignment problems, when there is a method definition or member
+    # declaration in the header, but not in the linked library!
+    add_executable(loon_test ${SOURCES} ${TEST_SOURCES})
+    target_link_libraries(loon_test PRIVATE loon_deps)
+    target_compile_definitions(loon_test PRIVATE LOON_TEST)
     target_include_directories(loon_test PRIVATE ./include ./src ./)
     target_include_directories(loon_test PRIVATE ${Protobuf_INCLUDE_DIRS})
     target_include_directories(loon_test PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-    target_link_libraries(loon_test protobuf::libprotobuf)
-    target_link_libraries(loon_test loon_proto)
-    target_link_libraries(loon_test GTest::gmock_main)
+    target_link_libraries(loon_test PRIVATE GTest::gmock_main)
     target_include_directories(loon_test PRIVATE ${gtest_SOURCE_DIR}/include
                                                  ${gtest_SOURCE_DIR})
     find_package(CURL CONFIG REQUIRED)
-    target_link_libraries(loon_test CURL::libcurl)
+    target_link_libraries(loon_test PRIVATE CURL::libcurl)
     set_property(TARGET loon_test PROPERTY CXX_STANDARD 17)
     set_property(TARGET loon_test PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
-    target_compile_definitions(loon_test PRIVATE LOON_TEST)
+
+    # Ensure deterministic behaviour in tests
+    target_compile_options(loon_test BEFORE PRIVATE -O0 -g)
 
     if(WIN32)
         add_custom_command(
