@@ -12,7 +12,7 @@ class Loon(ConanFile):
     generators = "CMakeDeps", "CMakeToolchain"
 
     requires = (
-        "openssl/[~3.5]",  # LTS version until Apr 2030
+        "openssl/[~3]",
         "protobuf/3.21.12",
         # Using libdatachannel as a git submodule until the following PR is merged:
         # https://github.com/paullouisageneau/libdatachannel/pull/1488
