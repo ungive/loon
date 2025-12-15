@@ -13,4 +13,5 @@ notes.txt
 /client/build
 /out
 /client/out
-vcpkg_installed
+
+__pycache__
