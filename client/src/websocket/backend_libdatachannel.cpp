@@ -212,14 +212,17 @@ void ClientImpl::on_disconnected()
     log(Info) << "disconnected";
 }
 
-inline void ClientImpl::on_text_message_received(rtc::string message)
+inline void ClientImpl::on_text_message_received(rtc::string text)
 {
-    on_websocket_message(message);
+    on_websocket_message(text);
 }
 
-inline void ClientImpl::on_binary_message_received(rtc::binary message)
+inline void ClientImpl::on_binary_message_received(rtc::binary bytes)
 {
-    on_websocket_message(std::string(message.begin(), message.end()));
+    // FIXME Don't call the same method for text and binary messages.
+
+    on_websocket_message(
+        std::string(reinterpret_cast<const char*>(bytes.data()), bytes.size()));
 }
 
 void loon::websocket::log_level(LogLevel level)
