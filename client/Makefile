@@ -1,5 +1,7 @@
 .PHONY: all docs
 
+-include .env
+
 all:
 
 docs:
@@ -9,8 +11,11 @@ run-test-server:
 	go run ./test/server
 
 define conan_install
+	echo "$(CONAN_BEFORE_PROFILE_ARGS)"
 	conan install . \
+		$(CONAN_BEFORE_PROFILE_ARGS) \
 		--profile:all="./conan/profiles/$(1)" \
+		$(CONAN_AFTER_PROFILE_ARGS) \
 		--settings:all="build_type=$(2)" \
 		--output-folder="./conan/out/$(1)" \
 		--build=missing

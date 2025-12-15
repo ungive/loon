@@ -3,3 +3,5 @@ out
 build
 install
 compile_commands.json
+*.env
+!.env.example
