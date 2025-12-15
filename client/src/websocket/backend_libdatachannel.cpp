@@ -3,6 +3,7 @@
 #include <functional>
 #include <optional>
 
+#include <rtc/global.hpp>
 #include <rtc/websocket.hpp>
 
 #include "base64.hpp"
@@ -16,12 +17,17 @@
 #define log(level) \
     loon_log_macro(level, g_log_level.load(), ::log_message, loon::Logger)
 
+static constexpr rtc::LogLevel loon_to_rtc_level(loon::LogLevel level);
+static constexpr loon::LogLevel rtc_to_loon_level(rtc::LogLevel level);
 static void log_message(loon::LogLevel level, std::string const& message);
+static void rtc_log_handler(rtc::LogLevel level, std::string message);
 
 using namespace loon::websocket;
 
 static std::mutex g_log_mutex{};
-static std::atomic<loon::LogLevel> g_log_level{ default_log_level };
+static std::atomic<loon::LogLevel> g_log_level{
+    loon::websocket::default_log_level
+};
 static loon::log_handler_t g_log_handler{ loon::default_log_handler };
 
 using WebsocketOptions = loon::WebsocketOptions;
@@ -218,8 +224,13 @@ inline void ClientImpl::on_binary_message_received(rtc::binary message)
 
 void loon::websocket::log_level(LogLevel level)
 {
-    const std::lock_guard<std::mutex> lock(g_log_mutex);
-    g_log_level.exchange(level);
+    auto converted_level = loon_to_rtc_level(level);
+    // FIXME Updating the log level does not appear to be thread-safe.
+    rtc::InitLogger(converted_level, rtc_log_handler);
+    {
+        const std::lock_guard<std::mutex> lock(g_log_mutex);
+        g_log_level.exchange(level);
+    }
 }
 
 void loon::websocket::log_handler(log_handler_t handler)
@@ -243,5 +254,73 @@ inline void log_message(loon::LogLevel level, std::string const& message)
     const std::lock_guard<std::mutex> lock(g_log_mutex);
     if (g_log_handler) {
         g_log_handler(level, LOG_PREFIX + message);
+    }
+}
+
+static void rtc_log_handler(rtc::LogLevel level, std::string message)
+{
+    // Read the current logger in a thread-safe manner.
+    decltype(g_log_handler) handler;
+    {
+        const std::lock_guard<std::mutex> lock(g_log_mutex);
+        if (!g_log_handler) {
+            return;
+        }
+        handler = g_log_handler;
+    }
+    std::ostringstream oss;
+    oss << LOG_PREFIX;
+    oss << message;
+    auto log_message = oss.str();
+    // Log
+    loon::LogLevel converted_level = rtc_to_loon_level(level);
+    handler(converted_level, log_message);
+}
+
+static constexpr rtc::LogLevel loon_to_rtc_level(loon::LogLevel level)
+{
+    switch (level) {
+    case loon::LogLevel::Verbose:
+        return rtc::LogLevel::Verbose;
+    case loon::LogLevel::Debug:
+        return rtc::LogLevel::Debug;
+    case loon::LogLevel::Info:
+        return rtc::LogLevel::Info;
+    case loon::LogLevel::Warning:
+        return rtc::LogLevel::Warning;
+    case loon::LogLevel::Error:
+        return rtc::LogLevel::Error;
+    case loon::LogLevel::Fatal:
+        return rtc::LogLevel::Fatal;
+    case loon::LogLevel::Silent:
+        return rtc::LogLevel::None;
+    default:
+        assert(false);
+        return rtc::LogLevel::Warning;
+    }
+}
+
+static constexpr loon::LogLevel rtc_to_loon_level(rtc::LogLevel level)
+{
+    switch (level) {
+    case rtc::LogLevel::Verbose:
+        return loon::LogLevel::Verbose;
+    case rtc::LogLevel::Debug:
+        return loon::LogLevel::Debug;
+    case rtc::LogLevel::Info:
+        return loon::LogLevel::Info;
+    case rtc::LogLevel::Warning:
+        return loon::LogLevel::Warning;
+    case rtc::LogLevel::Error:
+        return loon::LogLevel::Error;
+    case rtc::LogLevel::Fatal:
+        // If there is a fatal websocket error, it's also a fatal loon error,
+        // since the client cannot possibly be connected to the server.
+        return loon::LogLevel::Fatal;
+    case rtc::LogLevel::None:
+        return loon::LogLevel::Silent;
+    default:
+        assert(false);
+        return loon::LogLevel::Warning;
     }
 }

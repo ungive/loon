@@ -614,6 +614,7 @@ private:
  */
 enum class LogLevel
 {
+    Verbose, /// All log messages.
     Debug,   /// Messages to aid with debugging.
     Info,    /// Informational messages, like served requests.
     Warning, /// Events and errors that can be handled gracefully.

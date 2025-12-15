@@ -62,6 +62,8 @@ static void protobuf_log_handler(google::protobuf::LogLevel level,
 static const char* level_str(LogLevel level)
 {
     switch (level) {
+    case LogLevel::Verbose:
+        return "VERBOSE";
     case LogLevel::Debug:
         return "DEBUG";
     case LogLevel::Info:
