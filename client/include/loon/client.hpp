@@ -357,6 +357,11 @@ struct WebsocketOptions
     std::optional<std::string> basic_authorization{};
 
     /**
+     * @brief Whether to disable TLS certificate verification.
+     */
+    bool disable_tls_verification{ false };
+
+    /**
      * @brief A path to a CA certificate to authenticate the server.
      *
      * In case the QT backend is used for websocket connections,

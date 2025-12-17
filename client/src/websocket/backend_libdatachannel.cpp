@@ -84,8 +84,9 @@ ClientImpl::~ClientImpl() { stop(); }
 std::unique_ptr<rtc::WebSocket> ClientImpl::create_conn()
 {
     rtc::WebSocket::Configuration configuration;
+    configuration.disableTlsVerification = options().disable_tls_verification;
     // For now we stick with 1 max outstanding ping, since the documentation for
-    // "ping_interval" says "he ping interval is used as the pong timeout".
+    // "ping_interval" says "the ping interval is used as the pong timeout".
     configuration.maxOutstandingPings = 1;
     configuration.connectionTimeout =
         options().connect_timeout.value_or(default_connect_timeout);
@@ -116,16 +117,6 @@ void ClientImpl::internal_start()
     if (m_conn == nullptr) {
         m_conn = create_conn();
     }
-
-    // FIXME Remove. Moved to loon client implementation
-
-    // // Reconnect
-    // if (options().reconnect_delay.has_value()) {
-    //     // FIXME
-    //     // assert(false && "reconnects not yet implemented");
-    //     log(Warning) << "Reconnects are not yet implemented";
-    // }
-
     rtc::WebSocket::Headers headers;
     headers["User-Agent"] = LOON_USER_AGENT;
     for (auto const& [key, value] : options().headers) {
@@ -135,7 +126,6 @@ void ClientImpl::internal_start()
         auto credentials = options().basic_authorization.value();
         headers["Authorization"] = "Basic " + base64::encode(credentials);
     }
-
     try {
         m_conn->open(address(), headers);
     }
