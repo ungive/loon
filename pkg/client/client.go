@@ -250,7 +250,7 @@ func NewClient(address string, httpBasicAuth *string) (Client, error) {
 			return nil
 		},
 	}
-	log.Println(websocket.DefaultDialer.TLSClientConfig)
+	// log.Println(websocket.DefaultDialer.TLSClientConfig)
 
 	conn, _, err := websocket.DefaultDialer.Dial(address, headers)
 	if err != nil {
