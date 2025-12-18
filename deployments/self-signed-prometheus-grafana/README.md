@@ -1,4 +1,11 @@
-# Deployments
+# self-signed-prometheus-grafana
+
+> [!NOTE]
+> This example may be incomplete or slightly outdated.
+> For a more recent and minimally working example check the deployment files in
+> the [deployments/minimal-https-example](../minimal-https-example) directory.
+
+---
 
 ## Docker Compose
 
