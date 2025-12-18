@@ -1,6 +1,13 @@
-# Minimal HTTPS example
+# Basic deployment of a loon server
 
 This deployment example can be run both on a server and on your local computer.
+
+## Goal
+
+The goal of this example is to give you a fully functional loon server
+with an encrypted and authenticated endpoint for loon clients
+and a basic HTTP endpoint for generated URLs
+that you can optionally put behind your own HTTPS reverse proxy, if you so wish.
 
 ## Requirements
 
@@ -50,10 +57,10 @@ To deploy a loon server, the following steps need to be performed:
 git clone https://github.com/ungive/loon
 ```
 
-For this example, change into the `deployments/minimal-https-example` directory:
+For this example, change into the `deployments/basic-deployment` directory:
 
 ```
-cd loon/deployments/minimal-https-example
+cd loon/deployments/basic-deployment
 ```
 
 ### Setting environment variables
@@ -210,10 +217,10 @@ The default of 30 seconds should be sufficient in most cases.
 
 Now that you have configured everything, let's get the server up and running!
 
-Make sure you have changed into the `deployments/minimal-https-example` directory:
+Make sure you have changed into the `deployments/basic-deployment` directory:
 
 ```
-cd deployments/minimal-https-example
+cd deployments/basic-deployment
 ```
 
 Now start the server:
@@ -238,7 +245,7 @@ Make sure to keep an eye on the logs and wait until that process is finished.
 This may take a few minutes.
 
 If you need to check the logs while the server is running in "detached" mode,
-you can run this command inside the `minimal-https-example` directory:
+you can run this command inside the `basic-deployment` directory:
 
 ```
 docker compose logs --follow
@@ -249,7 +256,7 @@ docker compose logs --follow
 Time to test that everything's working!
 
 For this it's best to change to the root of the cloned loon repository.
-If you're still in the `minimal-https-example` directory,
+If you're still in the `basic-deployment` directory,
 enter this command to change to the repository root:
 
 ```
@@ -274,8 +281,9 @@ If you did, you need to add it back or use a different file to test with.
 If your server is running on your local machine (not on a remote server),
 then you didn't need to configure your server's domain.
 The hostname to use for HTTPS is `localhost`.
+For HTTP you can also use `127.0.0.1`.
 
-You can connect via HTTPS like so:
+You can connect via HTTPS (self-signed certificate) like so:
 
 ```
 go run ./cmd/loon client -server https://localhost -auth "loon:hiccup" assets/loon-small.png
@@ -291,56 +299,65 @@ assets/loon-small.png: https://localhost/epBdKCrppewh_mIIASC40g/R0sO-ICZ_8R9sfj9
 
 Open the URL in a browser and the image should appear!
 
-You can also connect to the server via HTTP:
+You can also connect to the server via HTTP,
+but make sure to update the `base_url` in `config.yml`
+to `http://localhost` first. Then run this command:
 
 ```
-go run ./cmd/loon client -server http://127.0.0.1:80 -auth "loon:hiccup" assets/loon-small.png
+go run ./cmd/loon client -server http://localhost -auth "loon:hiccup" assets/loon-small.png
 ```
-
-Note the use of `127.0.0.1`. You shouldn't use `localhost` here,
-as that will lead to an HTTPS redirect.
-You can change this behaviour in the `Caddyfile`, if needed.
 
 #### Running on your local machine + Tunneling software
 
 Don't have a remote server,
 but you want to make your files internet accessible anyway?
-
-You can use tunneling software like `bore`: https://github.com/ekzhang/bore
+You can use tunneling software like `bore`: https://github.com/ekzhang/bore.
+Keep in mind that this is only for testing.
 
 Please note the following when using tunneling software:
 - You need to update `base_url` in `config.yml`
   to the base URL of the public tunnel endpoint
   and then restart the server
-- For this to work you need to run the tunneling client first, then the server
+- For this to work you need to run the tunneling client first,
+  then the loon server in this deployment example
 
-Example with `bore`:
+Example with `bore` via HTTPS (self-signed certificate):
 
 ```
-brew install bore-cli
-bore local 80 --to bore.pub
+$ brew install bore-cli
+$ bore local 443 --to bore.pub
+... connected to server remote_port=61510
+... listening at bore.pub:61510
 ```
 
-Then configure the `base_url` in `config.yml`
-(make sure the port is correct!):
+Then configure the `base_url` in `config.yml` and
+make sure the port is correct:
 
 ```
 protocol:
-  base_url: http://bore.pub:61510
+  base_url: https://bore.pub:61510
 ```
 
-Then you can connect to it:
+And also configure your server's domain to `bore.pub` in `caddy.env`:
 
 ```
-go run ./cmd/loon client -server http://bore.pub:61510 -auth "loon:hiccup" assets/loon-small.png
+SERVER_DOMAIN=bore.pub
+```
+
+Now start the server again and then you can connect to it:
+
+```
+go run ./cmd/loon client -server https://bore.pub:61510 -auth "loon:hiccup" assets/loon-small.png
 ```
 
 Only use this for testing do not send large amounts of data through `bore`,
 to not stress their public instance.
-HTTPS is not supported with the public instance, only HTTP can be used.
 
-Do not use HTTP authentication credentials here
-that you intend to use for HTTPS!
+You can use HTTP instead of HTTPS by starting bore
+with `bore local 80 --to bore.pub`.
+If you do, do not use HTTP authentication credentials here
+that you intend to use for HTTPS,
+as these will be sent unencrypted over the internet!
 
 #### Running on a remote server
 

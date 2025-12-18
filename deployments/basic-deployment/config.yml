@@ -1,5 +1,5 @@
 protocol:
-  base_url: http://bore.pub:61510
+  base_url: https://localhost
   chunk_buffer_size: 8
   constraints:
     chunk_size: 65536 # 64 KiB

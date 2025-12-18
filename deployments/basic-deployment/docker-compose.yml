@@ -1,4 +1,4 @@
-name: loon-minimal-https-example
+name: loon-basic-deployment
 
 services:
   loon:
@@ -24,8 +24,6 @@ services:
       - caddy_data:/data
       - caddy_config:/config
 
-# These volumes are essential so that HTTPS certifications are not provisioned
-# every time the Caddy service is shut down and started again.
 volumes:
   caddy_data:
   caddy_config:
