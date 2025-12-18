@@ -33,9 +33,9 @@ the [Music Presence](https://github.com/ungive/discord-music-presence) app.
     - [HTTP write timeout](#http-write-timeout)
 - [Starting the server](#starting-the-server)
 - [Testing the server](#testing-the-server)
-    - [Running on your local machine](#running-on-your-local-machine)
-    - [Running on your local machine + Tunneling software](#running-on-your-local-machine--tunneling-software)
-    - [Running on a remote server](#running-on-a-remote-server)
+    - [Server is running on your local machine](#server-is-running-on-your-local-machine)
+    - [Tunneling the server on your local machine](#tunneling-the-server-on-your-local-machine)
+    - [Server is running on a remote server](#server-is-running-on-a-remote-server)
     - [Test with the Music Presence app](#test-with-the-music-presence-app)
 - [Going further](#going-further)
 
@@ -255,28 +255,15 @@ docker compose logs --follow
 
 Time to test that everything's working!
 
-For this it's best to change to the root of the cloned loon repository.
-If you're still in the `basic-deployment` directory,
-enter this command to change to the repository root:
-
-```
-cd ../..
-```
-
-You should now be inside the `loon` directory, e.g. `/home/me/git/loon`,
-if you keep all your cloned repositories in `~/git`.
-You can check with the `pwd` command:
-
-```
-$ pwd
-/home/me/git/loon
-```
+For this it's best to open a new terminal in the root of the cloned repository.
+That way you can keep changing the server configuration and restart it
+while testing the server with a client.
 
 These tests assume that you didn't remove `image/png`
 from the allowed content types.
 If you did, you need to add it back or use a different file to test with.
 
-#### Running on your local machine
+#### Server is running on your local machine
 
 If your server is running on your local machine (not on a remote server),
 then you didn't need to configure your server's domain.
@@ -307,7 +294,7 @@ to `http://localhost` first. Then run this command:
 go run ./cmd/loon client -server http://localhost -auth "loon:hiccup" assets/loon-small.png
 ```
 
-#### Running on your local machine + Tunneling software
+#### Tunneling the server on your local machine
 
 Don't have a remote server,
 but you want to make your files internet accessible anyway?
@@ -359,9 +346,66 @@ If you do, do not use HTTP authentication credentials here
 that you intend to use for HTTPS,
 as these will be sent unencrypted over the internet!
 
-#### Running on a remote server
+#### Server is running on a remote server
 
-TODO
+The following allows you to connect to the server with a loon client over HTTPS.
+It uses a self-signed certificate,
+but that is entirely sufficient for the loon client.
+It ensures that your HTTP credentials are encrypted
+and nobody else can use your server without authorization.
+
+By default port 80 and 443 are used on your host.
+You can change this by editing `docker-compose.yml`
+and changing the first number listed on each line under `ports`.
+You can e.g. change 80 to 8080 and 443 to 8081,
+in case your server's port 80 and 443 are already in use:
+
+```
+ports:
+  - 8080:80
+  - 8081:443
+  - 8081:443/udp
+```
+
+Make sure to open up the ports in your firewall, e.g. with `ufw`:
+```
+ufw allow 8080
+ufw allow 8081
+```
+
+Then make sure to update the `base_url` in `config.yml`:
+
+```
+protocol:
+  base_url: http://example.com:8080
+```
+
+Note that the public URL here uses HTTP, not HTTPS,
+since browsers will show a warning for self-signed certificates
+and many services might not accept HTTPS URLs that use a self-signed certificate
+(e.g. Discord).
+In a later section we talk about
+automatically provisioning an HTTPS certificate from a trusted CA with Caddy.
+
+Lastly update the domain of your server in `caddy.env`:
+
+```
+SERVER_DOMAIN=example.com
+```
+
+
+
+Now you should be able to connect to your server:
+
+```
+go run ./cmd/loon client -server https://example.com:8081 -auth "loon:hiccup" assets/loon-small.png
+```
+
+Make sure to pass the username and password you configured.
+
+You don't want to connect to `http://example.com:8080`,
+as this will make your username and password readable to external actors,
+since it's sent unencrypted.
 
 #### Test with the Music Presence app
 
