@@ -1,0 +1,24 @@
+protocol:
+  base_url: http://bore.pub:61510
+  chunk_buffer_size: 8
+  constraints:
+    chunk_size: 65536 # 64 KiB
+    max_content_size: 16777216 # 16 MiB
+    accepted_content_types:
+      - image/png
+      - image/jpeg
+      - text/plain
+      - text/html
+    cache_duration: 30s
+  intervals:
+    write_wait: 10s
+    pong_wait: 60s
+    ping_interval: 48s
+    timeout_duration: 30s
+    timeout_interval: 8s
+http:
+  write_timeout: 4s
+  read_timeout: 10s
+  idle_timeout: 30s
+log:
+  level: INFO

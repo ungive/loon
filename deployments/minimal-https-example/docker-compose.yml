@@ -1,0 +1,31 @@
+name: loon-minimal-https-example
+
+services:
+  loon:
+    build:
+      context: ../..
+      dockerfile: build/package/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./config.yml:/app/config.yaml:ro
+  caddy:
+    build:
+      context: .
+      dockerfile: caddy.dockerfile
+    restart: unless-stopped
+    env_file:
+      - caddy.env
+    ports:
+      - 80:80
+      - 443:443
+      - 443:443/udp
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+
+# These volumes are essential so that HTTPS certifications are not provisioned
+# every time the Caddy service is shut down and started again.
+volumes:
+  caddy_data:
+  caddy_config:
