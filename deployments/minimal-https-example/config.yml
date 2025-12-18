@@ -17,7 +17,7 @@ protocol:
     timeout_duration: 30s
     timeout_interval: 8s
 http:
-  write_timeout: 4s
+  write_timeout: 30s
   read_timeout: 10s
   idle_timeout: 30s
 log:

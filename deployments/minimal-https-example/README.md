@@ -23,6 +23,7 @@ the [Music Presence](https://github.com/ungive/discord-music-presence) app.
     - [Maximum content size](#maximum-content-size)
     - [Allowed content types](#allowed-content-types)
     - [Cache duration](#cache-duration)
+    - [HTTP write timeout](#http-write-timeout)
 - [Starting the server](#starting-the-server)
 - [Testing the server](#testing-the-server)
     - [Running on your local machine](#running-on-your-local-machine)
@@ -190,6 +191,21 @@ protocol:
     cache_duration: 30s
 ```
 
+#### HTTP write timeout
+
+The `write_timeout` under `http` should be set to a large enough value,
+so that clients have enough time to upload content.
+Since uploading is restrict to the client's upload bandwidth,
+which is usually rather slower with home internet,
+the HTTP write time will almost always be bottlenecked by it.
+
+```
+http:
+  write_timeout: 30s
+```
+
+The default of 30 seconds should be sufficient in most cases.
+
 ### Starting the server
 
 Now that you have configured everything, let's get the server up and running!
@@ -288,7 +304,7 @@ You can change this behaviour in the `Caddyfile`, if needed.
 #### Running on your local machine + Tunneling software
 
 Don't have a remote server,
-but you want to make your files internet accesible anyway?
+but you want to make your files internet accessible anyway?
 
 You can use tunneling software like `bore`: https://github.com/ekzhang/bore
 
