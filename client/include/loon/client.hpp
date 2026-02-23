@@ -398,6 +398,13 @@ struct WebsocketOptions
      * If not set, a sane default value is used.
      */
     std::optional<std::chrono::milliseconds> ping_interval{};
+
+    /**
+     * @brief The size of the internal send buffer.
+     *
+     * If not set, no messages are buffered and sending might block frequently.
+     */
+    std::optional<std::size_t> buffer_size{};
 };
 
 /**

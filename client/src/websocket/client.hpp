@@ -22,6 +22,7 @@ log_handler_t log_handler();
 
 extern std::chrono::milliseconds default_connect_timeout;
 extern std::chrono::milliseconds default_ping_interval;
+extern std::size_t default_buffer_size;
 
 class IClient
 {

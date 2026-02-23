@@ -1,6 +1,8 @@
 #include <cassert>
 #include <chrono>
+#include <condition_variable>
 #include <functional>
+#include <mutex>
 #include <optional>
 
 #include <rtc/global.hpp>
@@ -38,6 +40,8 @@ std::chrono::milliseconds loon::websocket::default_connect_timeout =
 std::chrono::milliseconds loon::websocket::default_ping_interval =
     std::chrono::milliseconds{ 20000 };
 
+std::size_t loon::websocket::default_buffer_size = 0;
+
 // TODO Consider reducing the libdatachannel thread pool size? how large is it?
 // https://github.com/paullouisageneau/libdatachannel/pull/1486
 
@@ -51,19 +55,27 @@ public:
     int64_t send_text(const char* data, size_t length) override;
 
 protected:
+    void buffered_send(const char* data, size_t length, bool text = false);
+
     void on_connected();
     void on_disconnected();
     void on_binary_message_received(rtc::binary message);
     void on_text_message_received(rtc::string message);
+    void on_buffered_amount_low();
 
     void internal_start() override;
     void internal_stop() override;
 
 private:
+    std::size_t buffer_size() const;
     std::unique_ptr<rtc::WebSocket> create_conn();
 
     // FIXME There's a lot of levels of indirection here. Use optional?
     std::unique_ptr<rtc::WebSocket> m_conn{};
+
+    std::mutex m_buffer_mutex;
+    std::condition_variable m_buffer_cv;
+    bool m_buffer_ready{ true };
 };
 
 Client::Client(std::string const& address, WebsocketOptions const& options)
@@ -75,11 +87,18 @@ Client::~Client() {}
 
 ClientImpl::ClientImpl(
     std::string const& address, WebsocketOptions const& options)
-    : BaseClient(address, options), m_conn{ create_conn() }
+    : BaseClient(address, options)
 {
+    // Create the connection here to ensure all members are initialized.
+    m_conn = create_conn();
 }
 
 ClientImpl::~ClientImpl() { stop(); }
+
+inline std::size_t ClientImpl::buffer_size() const
+{
+    return options().buffer_size.value_or(default_buffer_size);
+}
 
 std::unique_ptr<rtc::WebSocket> ClientImpl::create_conn()
 {
@@ -109,6 +128,9 @@ std::unique_ptr<rtc::WebSocket> ClientImpl::create_conn()
     conn->onError([](rtc::string message) {
         log(Error) << message;
     });
+    conn->setBufferedAmountLowThreshold(buffer_size());
+    conn->onBufferedAmountLow(
+        std::bind(&ClientImpl::on_buffered_amount_low, this));
     return conn;
 }
 
@@ -142,6 +164,8 @@ void ClientImpl::internal_stop()
         assert(false);
         return;
     }
+    // Ensure that no thread is waiting for the buffer to be ready.
+    on_buffered_amount_low();
     try {
         m_conn->close();
     }
@@ -159,11 +183,8 @@ int64_t ClientImpl::send_binary(const char* data, size_t length)
         return 0;
     }
     try {
-        auto result =
-            m_conn->send(reinterpret_cast<const rtc::byte*>(data), length);
-        if (result) {
-            return length;
-        }
+        buffered_send(data, length);
+        return length;
     }
     catch (std::exception const& e) {
         log(Error) << "exception during websocket send: " << e.what();
@@ -179,15 +200,30 @@ int64_t ClientImpl::send_text(const char* data, size_t length)
         return 0;
     }
     try {
-        bool result = m_conn->send(rtc::string(data, length));
-        if (result) {
-            return length;
-        }
+        buffered_send(data, length, true);
+        return length;
     }
     catch (std::exception const& e) {
         log(Error) << "exception during websocket send: " << e.what();
     }
     return 0;
+}
+
+void ClientImpl::buffered_send(const char* data, size_t length, bool text)
+{
+    std::unique_lock lock(m_buffer_mutex);
+
+    if (m_conn->bufferedAmount() > buffer_size()) {
+        m_buffer_ready = false;
+        m_buffer_cv.wait(lock, [this] {
+            return m_buffer_ready;
+        });
+    }
+    if (text) {
+        m_conn->send(rtc::string(data, length));
+    } else {
+        m_conn->send(reinterpret_cast<const rtc::byte*>(data), length);
+    }
 }
 
 void ClientImpl::on_connected()
@@ -213,6 +249,17 @@ inline void ClientImpl::on_binary_message_received(rtc::binary bytes)
 
     on_websocket_message(
         std::string(reinterpret_cast<const char*>(bytes.data()), bytes.size()));
+}
+
+void ClientImpl::on_buffered_amount_low()
+{
+    assert(m_conn->bufferedAmount() <= buffer_size());
+    {
+        std::lock_guard lock(m_buffer_mutex);
+        m_buffer_ready = true;
+    }
+    // Only notify one, as the next sender might fill up the buffer again.
+    m_buffer_cv.notify_one();
 }
 
 void loon::websocket::log_level(LogLevel level)
