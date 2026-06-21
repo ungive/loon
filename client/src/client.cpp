@@ -331,7 +331,7 @@ void ClientImpl::unregister_content(std::shared_ptr<ContentHandle> handle)
             "the content handle has the wrong type");
     }
 
-    std::unique_lock<std::mutex> lock(m_mutex);
+    const std::lock_guard<std::mutex> lock(m_mutex);
 
     // Idling if no content is registered when execution ends.
     std::shared_ptr<void> scope_guard(nullptr, std::bind([this] {
