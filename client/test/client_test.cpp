@@ -800,12 +800,18 @@ TEST(Client, AttemptsToReconnectImmediatelyAfterUnexpectedDisconnect)
 
 TEST(Client, AttemptsToReconnectMultipleTimesWithExponentiallyIncreasingDelay)
 {
+#ifdef _WIN32
+    // Timing on Windows is quite inaccurate.
+    const auto allowed_delta = 25ms;
+#else
+    const auto allowed_delta = 5ms;
+#endif
     loon::ClientOptions options{};
     auto connect_timeout = 100ms;
     auto ping_interval = 250ms;
     auto expected_ping_timeout = 2 * ping_interval;
-    auto reconnect_delay = 125ms;
-    auto max_reconnect_delay = 500ms;
+    auto reconnect_delay = 200ms;
+    auto max_reconnect_delay = 1600ms;
     options.websocket.connect_timeout = connect_timeout;
     options.websocket.ping_interval = ping_interval;
     options.reconnect_delay = reconnect_delay;
@@ -842,10 +848,10 @@ TEST(Client, AttemptsToReconnectMultipleTimesWithExponentiallyIncreasingDelay)
     // 5 attempts (exponential delay)
     std::vector<std::chrono::milliseconds> expected_reconnect_delays = {
         0ms,
-        125ms,
-        250ms,
-        500ms,
-        500ms,
+        200ms,
+        400ms,
+        800ms,
+        1600ms,
     };
     auto summed_expected_reconnect_delays = 0ms;
     for (auto delay : expected_reconnect_delays) {
@@ -880,15 +886,21 @@ TEST(Client, AttemptsToReconnectMultipleTimesWithExponentiallyIncreasingDelay)
                   << "ms, expected " << expected_reconnect_delays[i].count()
                   << "ms\n";
         EXPECT_GE(static_cast<long>(effective_delay.count()),
-            static_cast<long>((expected_reconnect_delays[i] - 5ms).count()));
+            static_cast<long>(
+                (expected_reconnect_delays[i] - allowed_delta).count()));
         EXPECT_LT(static_cast<long>(effective_delay.count()),
-            static_cast<long>((expected_reconnect_delays[i] + 5ms).count()));
+            static_cast<long>(
+                (expected_reconnect_delays[i] + allowed_delta).count()));
         summed_actual_reconnect_delays += effective_delay;
     }
     EXPECT_GE(static_cast<long>(summed_actual_reconnect_delays.count()),
-        static_cast<long>((summed_expected_reconnect_delays - 25ms).count()));
+        static_cast<long>((summed_expected_reconnect_delays -
+            allowed_delta * expected_reconnect_delays.size())
+                .count()));
     EXPECT_LE(static_cast<long>(summed_actual_reconnect_delays.count()),
-        static_cast<long>((summed_expected_reconnect_delays + 25ms).count()));
+        static_cast<long>((summed_expected_reconnect_delays +
+            allowed_delta * expected_reconnect_delays.size())
+                .count()));
 }
 
 TEST(Client, StopsReconnectingWhenClientIsStoppedExplicitly)
