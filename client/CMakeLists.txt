@@ -114,7 +114,11 @@ if(LOON_BUILD_TESTS)
     set_property(TARGET loon_test PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 
     # Ensure deterministic behaviour in tests
-    target_compile_options(loon_test BEFORE PRIVATE -O0 -g)
+    if(MSVC)
+        target_compile_options(loon_test PRIVATE /Od /Zi)
+    else()
+        target_compile_options(loon_test PRIVATE -O0 -g)
+    endif()
 
     if(WIN32 AND DEFINED CONAN_RUNTIME_LIB_DIRS)
         foreach(CONAN_RUNTIME_LIB_DIR ${CONAN_RUNTIME_LIB_DIRS})
