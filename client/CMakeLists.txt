@@ -122,10 +122,10 @@ if(LOON_BUILD_TESTS)
 
     if(WIN32 AND DEFINED CONAN_RUNTIME_LIB_DIRS)
         foreach(CONAN_RUNTIME_LIB_DIR ${CONAN_RUNTIME_LIB_DIRS})
-        add_custom_command(
-            TARGET loon_test
-            POST_BUILD
-            COMMAND
+            add_custom_command(
+                TARGET loon_test
+                POST_BUILD
+                COMMAND
                     ${CMAKE_COMMAND} -DSRC_DIR=${CONAN_RUNTIME_LIB_DIR}
                     -DDEST_DIR=$<TARGET_FILE_DIR:loon_test> -DQUIET=1 -P
                     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/copy_dlls.cmake"
