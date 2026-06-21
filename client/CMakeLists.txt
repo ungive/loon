@@ -6,6 +6,10 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 option(LOON_BUILD_EXAMPLES "Build loon examples" ON)
 option(LOON_BUILD_TESTS "Build loon tests" ON)
 
+if(WIN32 AND MSVC)
+    add_compile_options(/Zc:__cplusplus /EHsc)
+endif()
+
 set(SOURCES
     src/client.cpp
     src/shared_client.cpp
