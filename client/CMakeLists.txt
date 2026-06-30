@@ -36,7 +36,9 @@ target_link_libraries(loon_deps INTERFACE OpenSSL::SSL OpenSSL::Crypto)
 
 # libdatachannel
 block(SCOPE_FOR VARIABLES)
-set(NO_WEBRTC ON CACHE BOOL "Disable WebRTC support")
+set(NO_MEDIA ON CACHE BOOL "Disable media transport support")
+# Not supported yet
+# set(NO_WEBRTC ON CACHE BOOL "Disable WebRTC support")
 set(NO_EXAMPLES ON CACHE BOOL "Disable examples")
 set(NO_TESTS ON CACHE BOOL "Disable tests build")
 add_subdirectory(third_party/libdatachannel EXCLUDE_FROM_ALL)
