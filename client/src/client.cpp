@@ -931,6 +931,8 @@ void ClientImpl::reset_reconnect_delay()
 {
     m_reconnect_attempt = 0;
     m_reconnect_delay = 0ms;
+    // Let the manager reset the reconnect time point.
+    m_cv_manager.notify_one();
 }
 
 void ClientImpl::manager_loop()
@@ -942,16 +944,42 @@ void ClientImpl::manager_loop()
     auto idle_time_point = steady_clock::time_point::max();
     auto reconnect_time_point = steady_clock::time_point::max();
     while (true) {
-        m_cv_manager.wait_until(
+        // Always reset the reconnect time point before waiting, as the code
+        // after the wait call can unlock the mutex, which can allow other
+        // threads to modify m_reconnect_attempt.
+        if (m_reconnect_attempt == 0) {
+            reconnect_time_point = steady_clock::time_point::max();
+        }
+        assert(m_idle_waiting ||
+            idle_time_point == steady_clock::time_point::max());
+        assert(m_reconnect_attempt > 0 ||
+            reconnect_time_point == steady_clock::time_point::max());
+        bool result = m_cv_manager.wait_until(
             lock, std::min(idle_time_point, reconnect_time_point), [&] {
                 return m_stop_manager_loop || m_track_idling.has_value() ||
                     m_idle_waiting && steady_clock::now() >= idle_time_point ||
                     !std::holds_alternative<Action::Nothing>(
                         m_manager_action) ||
-                    m_queue_reconnect ||
+                    m_queue_reconnect.has_value() ||
                     m_reconnect_attempt > 0 &&
-                    steady_clock::now() >= reconnect_time_point;
+                    steady_clock::now() >= reconnect_time_point ||
+                    m_reconnect_attempt == 0 &&
+                    reconnect_time_point != steady_clock::time_point::max();
             });
+        // The wait condition must always return true, otherwise the idle or
+        // reconnect time point is not reset properly, which leads to contention
+        // and possibly starvation of other threads.
+        if (!result) {
+            log(Warning) << "manager: the loop's wait condition returned false"
+                         << var("now", steady_clock::now().time_since_epoch())
+                         << var("idle_time_point",
+                                idle_time_point.time_since_epoch())
+                         << var("reconnect_time_point",
+                                reconnect_time_point.time_since_epoch());
+            assert(false);
+            // Attempt to prevent starvation of other threads.
+            std::this_thread::sleep_for(10ms);
+        }
         if (m_stop_manager_loop) {
             return;
         }
