@@ -937,6 +937,7 @@ TEST(Client, StopsReconnectingWhenClientIsStoppedExplicitly)
 
 TEST(Client, ReconnectDelayIsResetWhenClientReconnectsAgain)
 {
+    drop_server_packets(false);
     loon::ClientOptions options{};
     auto connect_timeout = 100ms;
     auto ping_interval = 250ms;
