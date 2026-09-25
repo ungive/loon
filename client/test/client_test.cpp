@@ -978,11 +978,13 @@ TEST(Client, ReconnectDelayIsResetWhenClientReconnectsAgain)
 
     on_sufficient_reconnect_attempts.get_future().wait();
     std::this_thread::sleep_for(10ms);
-    drop_server_packets(false);
     EXPECT_FALSE(client->connected());
 
-    on_successful_reconnect.get_future().wait();
     std::this_thread::sleep_for(10ms);
+    drop_server_packets(false);
+
+    on_successful_reconnect.get_future().wait();
+    std::this_thread::sleep_for(connect_timeout);
     EXPECT_TRUE(client->connected());
 
     // Drop server packets again and expect it to have been reset, by checking
