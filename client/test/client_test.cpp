@@ -937,6 +937,12 @@ TEST(Client, StopsReconnectingWhenClientIsStoppedExplicitly)
 
 TEST(Client, ReconnectDelayIsResetWhenClientReconnectsAgain)
 {
+#ifdef _WIN32
+    // Timing on Windows is quite inaccurate.
+    const auto allowed_delta = 25ms;
+#else
+    const auto allowed_delta = 5ms;
+#endif
     drop_server_packets(false);
     loon::ClientOptions options{};
     auto connect_timeout = 100ms;
@@ -1001,18 +1007,24 @@ TEST(Client, ReconnectDelayIsResetWhenClientReconnectsAgain)
     EXPECT_LT(after_delay, before_delay - reconnect_delay / 2);
 
     EXPECT_LT(static_cast<long>(before_delay.count()),
-        static_cast<long>((max_reconnect_delay + 5ms).count()));
+        static_cast<long>((max_reconnect_delay + allowed_delta).count()));
     EXPECT_GT(static_cast<long>(before_delay.count()),
-        static_cast<long>((max_reconnect_delay - 5ms).count()));
+        static_cast<long>((max_reconnect_delay - allowed_delta).count()));
     EXPECT_LT(static_cast<long>(after_delay.count()),
-        static_cast<long>((reconnect_delay + 5ms).count()));
+        static_cast<long>((reconnect_delay + allowed_delta).count()));
     EXPECT_GT(static_cast<long>(after_delay.count()),
-        static_cast<long>((reconnect_delay - 5ms).count()));
+        static_cast<long>((reconnect_delay - allowed_delta).count()));
 }
 
 TEST(Client,
     ReconnectDelayIsResetWhenClientIsStoppedAndStartedAgainWithoutConnecting)
 {
+#ifdef _WIN32
+    // Timing on Windows is quite inaccurate.
+    const auto allowed_delta = 50ms;
+#else
+    const auto allowed_delta = 5ms;
+#endif
     loon::ClientOptions options{};
     auto connect_timeout = 100ms;
     auto ping_interval = 250ms;
@@ -1066,13 +1078,13 @@ TEST(Client,
     EXPECT_LT(after_delay, before_delay - reconnect_delay / 2);
 
     EXPECT_LT(static_cast<long>(before_delay.count()),
-        static_cast<long>((max_reconnect_delay + 5ms).count()));
+        static_cast<long>((max_reconnect_delay + allowed_delta).count()));
     EXPECT_GT(static_cast<long>(before_delay.count()),
-        static_cast<long>((max_reconnect_delay - 5ms).count()));
+        static_cast<long>((max_reconnect_delay - allowed_delta).count()));
     EXPECT_LT(static_cast<long>(after_delay.count()),
-        static_cast<long>((reconnect_delay + 5ms).count()));
+        static_cast<long>((reconnect_delay + allowed_delta).count()));
     EXPECT_GT(static_cast<long>(after_delay.count()),
-        static_cast<long>((reconnect_delay - 5ms).count()));
+        static_cast<long>((reconnect_delay - allowed_delta).count()));
 }
 
 TEST(Client, StopBlocksUntilAllRegisteredContentIsUnregistered)
